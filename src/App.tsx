@@ -200,6 +200,15 @@ function splitPhraseWords(phrase: string): string[] {
     .filter((w) => w.length > 0)
 }
 
+/** 번역 API(MyMemory 등)가 넣는 정렬용 마크업(<g id="n">…</g>) 및 기타 태그 제거 */
+function sanitizeTranslationApiText(text: string): string {
+  return text
+    .replace(/<[^>]+>/g, '')
+    .replace(/[ \t\f\v]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [items, setItems] = useState<StudyItem[]>(() => loadItems())
@@ -671,9 +680,9 @@ function App() {
           responseData?: { translatedText?: string }
           matches?: Array<{ translation?: string }>
         }
-        koMeaning = transData.responseData?.translatedText?.trim() || ''
+        koMeaning = sanitizeTranslationApiText(transData.responseData?.translatedText?.trim() || '')
         altMeanings = (transData.matches ?? [])
-          .map((m) => m.translation?.trim() || '')
+          .map((m) => sanitizeTranslationApiText(m.translation?.trim() || ''))
           .filter((line) => line && line !== koMeaning)
           .slice(0, 2)
       }
@@ -724,7 +733,7 @@ function App() {
         const exData = (await exRes.json()) as {
           responseData?: { translatedText?: string }
         }
-        koExample = exData.responseData?.translatedText?.trim() || ''
+        koExample = sanitizeTranslationApiText(exData.responseData?.translatedText?.trim() || '')
       }
     } catch {
       // Ignore example translation failure; keep English example.
