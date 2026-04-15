@@ -142,6 +142,17 @@ function cyclicIndex(index: number, total: number): number {
   return ((index % total) + total) % total
 }
 
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function weekRangeTitle(weekStart: Date): string {
+  const end = addDays(weekStart, 6)
+  return `${weekStart.getMonth() + 1}/${weekStart.getDate()} - ${end.getMonth() + 1}/${end.getDate()}`
+}
+
 function toFormState(item: StudyItem): FormState {
   return {
     phrase: item.phrase,
@@ -173,6 +184,12 @@ function App() {
   const [activeDeck, setActiveDeck] = useState<string>('all')
   const [cardFlipped, setCardFlipped] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(() => new Date())
+  const [weekStart, setWeekStart] = useState(() => {
+    const today = new Date()
+    const day = today.getDay()
+    const diff = day === 0 ? -6 : 1 - day
+    return addDays(today, diff)
+  })
 
   const persist = (next: StudyItem[]) => {
     setItems(next)
@@ -226,6 +243,15 @@ function App() {
     )
   }, [items])
 
+  const deckCountMap = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const item of items) {
+      const key = item.deck || '기본 덱'
+      map[key] = (map[key] ?? 0) + 1
+    }
+    return map
+  }, [items])
+
   const cardItems = useMemo(() => {
     return items.filter((item) => {
       const passDeck = activeDeck === 'all' ? true : item.deck === activeDeck
@@ -263,6 +289,21 @@ function App() {
     () => items.filter((item) => !item.scheduledDate),
     [items],
   )
+
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  }, [weekStart])
+
+  const weekItemsByDate = useMemo(() => {
+    const map: Record<string, StudyItem[]> = {}
+    for (const day of weekDays) map[toDateKey(day)] = []
+    for (const item of items) {
+      if (!item.scheduledDate) continue
+      if (!map[item.scheduledDate]) continue
+      map[item.scheduledDate].push(item)
+    }
+    return map
+  }, [items, weekDays])
 
   useEffect(() => {
     if (activeDeck === 'all') return
@@ -518,6 +559,59 @@ function App() {
               </section>
             )}
 
+            <section className="week-board">
+              <div className="week-board-header">
+                <div className="dash-title">🗓 주간 캘린더</div>
+                <div className="week-nav">
+                  <button className="secondary" onClick={() => setWeekStart((prev) => addDays(prev, -7))}>
+                    ←
+                  </button>
+                  <strong>{weekRangeTitle(weekStart)}</strong>
+                  <button className="secondary" onClick={() => setWeekStart((prev) => addDays(prev, 7))}>
+                    →
+                  </button>
+                </div>
+              </div>
+              <div className="week-grid">
+                {weekDays.map((day) => {
+                  const key = toDateKey(day)
+                  const dayItems = weekItemsByDate[key] ?? []
+                  return (
+                    <div
+                      key={key}
+                      className="week-cell"
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault()
+                        const itemId = event.dataTransfer.getData('text/plain')
+                        if (itemId) scheduleItem(itemId, key)
+                      }}
+                    >
+                      <div className="week-cell-head">
+                        <span>{['월', '화', '수', '목', '금', '토', '일'][((day.getDay() + 6) % 7)]}</span>
+                        <small>{day.getMonth() + 1}/{day.getDate()}</small>
+                      </div>
+                      <div className="week-cards">
+                        {dayItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className="week-card"
+                            draggable
+                            onDragStart={(event) => event.dataTransfer.setData('text/plain', item.id)}
+                            onClick={() => openDetailModal(item.id)}
+                          >
+                            <strong>{item.phrase}</strong>
+                            <small>{item.deck}</small>
+                          </div>
+                        ))}
+                        {dayItems.length === 0 && <div className="week-empty">비어 있음</div>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+
             <section className="dash-columns">
               <div>
                 <div className="dash-title">🕐 최근 추가</div>
@@ -620,31 +714,11 @@ function App() {
 
         {page === 'cards' && (
           <section className="cards-page">
-            <div className="deck-toolbar">
-              <label>
-                덱
-                <select
-                  value={activeDeck}
-                  onChange={(event) => {
-                    setActiveDeck(event.target.value)
-                    setCardIndex(0)
-                    setCardFlipped(false)
-                  }}
-                >
-                  <option value="all">전체 덱</option>
-                  {deckNames.map((deck) => (
-                    <option key={deck} value={deck}>
-                      {deck}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className="card-counter">
-                {cardItems.length === 0
-                  ? '카드 없음'
-                  : `${cardIndex + 1} / ${cardItems.length} 카드 · ${currentCard?.deck ?? ''}`}
-              </p>
-            </div>
+            <p className="card-counter">
+              {cardItems.length === 0
+                ? '카드 없음'
+                : `${cardIndex + 1} / ${cardItems.length} 카드 · ${currentCard?.deck ?? ''}`}
+            </p>
             {currentCard ? (
               <>
                 <div className="carousel-wrap">
@@ -704,9 +778,76 @@ function App() {
                     건너뛰기
                   </button>
                 </div>
+
+                <section className="deck-grid-wrap">
+                  <div className="deck-grid-title">덱 폴더</div>
+                  <div className="deck-grid">
+                    <button
+                      className={`deck-folder ${activeDeck === 'all' ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveDeck('all')
+                        setCardIndex(0)
+                        setCardFlipped(false)
+                      }}
+                    >
+                      <div className="folder-icon">📁</div>
+                      <strong>전체 덱</strong>
+                      <small>{items.length} cards</small>
+                    </button>
+                    {deckNames.map((deck) => (
+                      <button
+                        key={deck}
+                        className={`deck-folder ${activeDeck === deck ? 'active' : ''}`}
+                        onClick={() => {
+                          setActiveDeck(deck)
+                          setCardIndex(0)
+                          setCardFlipped(false)
+                        }}
+                      >
+                        <div className="folder-icon">📁</div>
+                        <strong>{deck}</strong>
+                        <small>{deckCountMap[deck] ?? 0} cards</small>
+                      </button>
+                    ))}
+                  </div>
+                </section>
               </>
             ) : (
-              <div className="empty">복습할 카드가 없습니다.</div>
+              <>
+                <div className="empty">복습할 카드가 없습니다.</div>
+                <section className="deck-grid-wrap">
+                  <div className="deck-grid-title">덱 폴더</div>
+                  <div className="deck-grid">
+                    <button
+                      className={`deck-folder ${activeDeck === 'all' ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveDeck('all')
+                        setCardIndex(0)
+                        setCardFlipped(false)
+                      }}
+                    >
+                      <div className="folder-icon">📁</div>
+                      <strong>전체 덱</strong>
+                      <small>{items.length} cards</small>
+                    </button>
+                    {deckNames.map((deck) => (
+                      <button
+                        key={deck}
+                        className={`deck-folder ${activeDeck === deck ? 'active' : ''}`}
+                        onClick={() => {
+                          setActiveDeck(deck)
+                          setCardIndex(0)
+                          setCardFlipped(false)
+                        }}
+                      >
+                        <div className="folder-icon">📁</div>
+                        <strong>{deck}</strong>
+                        <small>{deckCountMap[deck] ?? 0} cards</small>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </>
             )}
           </section>
         )}

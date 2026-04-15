@@ -175,6 +175,95 @@ button.danger {
   gap: 12px;
 }
 
+.week-board {
+  border: 1px solid #32324d;
+  border-radius: 12px;
+  background: #171727;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+.week-board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.week-nav strong {
+  font-size: 13px;
+  color: #b8bbd5;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.week-cell {
+  border: 1px solid #353552;
+  border-radius: 10px;
+  background: #1e1e33;
+  min-height: 130px;
+  padding: 7px;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.week-cell-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.week-cell-head span {
+  font-size: 12px;
+  color: #e4e5f3;
+}
+
+.week-cell-head small {
+  font-size: 11px;
+  color: #989dbc;
+}
+
+.week-cards {
+  display: grid;
+  gap: 6px;
+}
+
+.week-card {
+  border: 1px solid #505277;
+  border-radius: 8px;
+  background: #292b45;
+  padding: 5px 6px;
+  cursor: grab;
+}
+
+.week-card strong {
+  display: block;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.week-card small {
+  color: #b6bad4;
+  font-size: 10px;
+}
+
+.week-empty {
+  color: #7f86a8;
+  font-size: 11px;
+}
+
 .dash-title {
   margin-bottom: 8px;
   font-size: 15px;
@@ -310,33 +399,57 @@ button.danger {
   gap: 14px;
 }
 
-.deck-toolbar {
-  width: min(860px, 100%);
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 10px;
-}
-
-.deck-toolbar label {
-  display: grid;
-  gap: 4px;
-  color: #b8bbd5;
-  font-size: 12px;
-}
-
-.deck-toolbar select {
-  min-width: 180px;
-  background: #212136;
-  border: 1px solid #373752;
-  color: #e8e8f2;
-  border-radius: 9px;
-  padding: 8px 10px;
-}
-
 .card-counter {
   margin: 0;
   color: #b9bcd7;
+}
+
+.deck-grid-wrap {
+  width: min(940px, 100%);
+  margin-top: 4px;
+}
+
+.deck-grid-title {
+  font-size: 13px;
+  color: #aeb2cf;
+  margin-bottom: 8px;
+}
+
+.deck-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.deck-folder {
+  border: 1px solid #46496d;
+  background: #20233a;
+  border-radius: 10px;
+  padding: 10px;
+  text-align: left;
+  cursor: pointer;
+  color: #e9eaf7;
+}
+
+.deck-folder.active {
+  border-color: #7b5dff;
+  background: #2c2760;
+}
+
+.folder-icon {
+  font-size: 18px;
+  margin-bottom: 5px;
+}
+
+.deck-folder strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.deck-folder small {
+  color: #adb2cf;
+  font-size: 11px;
 }
 
 .carousel-wrap {
@@ -792,12 +905,20 @@ button.danger {
     grid-template-columns: 1fr;
   }
 
+  .week-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .flashcard h3 {
     font-size: 32px;
   }
 
   .carousel-wrap {
     grid-template-columns: 34px 1fr 34px;
+  }
+
+  .deck-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .card-stack {
