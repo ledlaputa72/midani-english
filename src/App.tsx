@@ -40,6 +40,9 @@ type FormState = {
 
 const STORAGE_KEY = 'midani.study.items.v2'
 
+/** 플래시카드 자동 넘김 간격 (롤링 배너, ms) */
+const CARD_AUTO_ADVANCE_MS = 8000
+
 const STATUS_LABEL: Record<Status, string> = {
   new: '새 단어',
   learning: '학습 중',
@@ -303,6 +306,8 @@ function App() {
   }
 
   const [cardIndex, setCardIndex] = useState(0)
+  const [cardSlideTick, setCardSlideTick] = useState(0)
+  const [cardTimerProgress, setCardTimerProgress] = useState(1)
   const [activeDeck, setActiveDeck] = useState<string>('all')
   const [openedDeck, setOpenedDeck] = useState<string | null>(null)
   const [cardFlipped, setCardFlipped] = useState(false)
@@ -743,17 +748,40 @@ function App() {
     setIsAutoFilling(false)
   }
 
-  const nextCard = () => {
+  const nextCard = useCallback(() => {
     if (cardItems.length === 0) return
     setCardIndex((prev) => (prev + 1 >= cardItems.length ? 0 : prev + 1))
     setCardFlipped(false)
-  }
+    setCardSlideTick((t) => t + 1)
+  }, [cardItems.length])
 
-  const prevCard = () => {
+  const prevCard = useCallback(() => {
     if (cardItems.length === 0) return
     setCardIndex((prev) => (prev - 1 < 0 ? cardItems.length - 1 : prev - 1))
     setCardFlipped(false)
-  }
+    setCardSlideTick((t) => t + 1)
+  }, [cardItems.length])
+
+  useEffect(() => {
+    if (page !== 'cards' || cardItems.length === 0 || isAddOpen || isDetailOpen) {
+      setCardTimerProgress(1)
+      return
+    }
+    setCardTimerProgress(1)
+    const start = Date.now()
+    const intervalId = window.setInterval(() => {
+      const elapsed = Date.now() - start
+      setCardTimerProgress(Math.max(0, 1 - elapsed / CARD_AUTO_ADVANCE_MS))
+    }, 32)
+    const timeoutId = window.setTimeout(() => {
+      clearInterval(intervalId)
+      nextCard()
+    }, CARD_AUTO_ADVANCE_MS)
+    return () => {
+      clearInterval(intervalId)
+      clearTimeout(timeoutId)
+    }
+  }, [page, cardIndex, cardSlideTick, cardItems.length, isAddOpen, isDetailOpen, nextCard])
 
   const rateCard = (rating: CardRating) => {
     if (!currentCard) return
@@ -1168,6 +1196,7 @@ function App() {
                             } else {
                               setCardIndex(idx)
                               setCardFlipped(false)
+                              setCardSlideTick((t) => t + 1)
                             }
                           }}
                         >
@@ -1190,6 +1219,17 @@ function App() {
                   <button className="carousel-nav right" onClick={nextCard}>
                     ▶
                   </button>
+                </div>
+                <div className="card-timer-wrap">
+                  <div className="card-timer-label">다음 카드까지</div>
+                  <div className="card-timer-track" aria-hidden>
+                    <div
+                      className="card-timer-fill"
+                      style={{
+                        transform: `scaleX(${cardTimerProgress})`,
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="rate-buttons">
                   <button className="again" onClick={() => rateCard('again')}>
@@ -1215,6 +1255,7 @@ function App() {
                         setActiveDeck('all')
                         setCardIndex(0)
                         setCardFlipped(false)
+                        setCardSlideTick((t) => t + 1)
                       }}
                       onDoubleClick={() => setOpenedDeck(null)}
                     >
@@ -1230,12 +1271,14 @@ function App() {
                           setActiveDeck(deck)
                           setCardIndex(0)
                           setCardFlipped(false)
+                          setCardSlideTick((t) => t + 1)
                         }}
                         onDoubleClick={() => {
                           setOpenedDeck(deck)
                           setActiveDeck(deck)
                           setCardIndex(0)
                           setCardFlipped(false)
+                          setCardSlideTick((t) => t + 1)
                         }}
                       >
                         <div className="folder-icon">📁</div>
@@ -1298,6 +1341,7 @@ function App() {
                         setActiveDeck('all')
                         setCardIndex(0)
                         setCardFlipped(false)
+                        setCardSlideTick((t) => t + 1)
                       }}
                       onDoubleClick={() => setOpenedDeck(null)}
                     >
@@ -1313,12 +1357,14 @@ function App() {
                           setActiveDeck(deck)
                           setCardIndex(0)
                           setCardFlipped(false)
+                          setCardSlideTick((t) => t + 1)
                         }}
                         onDoubleClick={() => {
                           setOpenedDeck(deck)
                           setActiveDeck(deck)
                           setCardIndex(0)
                           setCardFlipped(false)
+                          setCardSlideTick((t) => t + 1)
                         }}
                       >
                         <div className="folder-icon">📁</div>

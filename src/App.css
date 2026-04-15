@@ -908,6 +908,34 @@ button.danger {
   transform: translateX(calc(-50% + 420px)) scale(0.72);
 }
 
+.card-timer-wrap {
+  width: min(620px, calc(100% - 100px));
+  margin: 14px auto 4px;
+}
+
+.card-timer-label {
+  font-size: 11px;
+  color: #8b90b0;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.card-timer-track {
+  height: 5px;
+  border-radius: 999px;
+  background: #2a2a42;
+  overflow: hidden;
+}
+
+.card-timer-fill {
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  background: linear-gradient(90deg, #7458ec, #a78bfa);
+  border-radius: 999px;
+  will-change: transform;
+}
+
 .rate-buttons {
   display: flex;
   gap: 9px;
