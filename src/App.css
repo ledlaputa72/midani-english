@@ -452,6 +452,77 @@ button.danger {
   font-size: 11px;
 }
 
+.deck-explorer {
+  width: min(940px, 100%);
+  border: 1px solid #404364;
+  border-radius: 12px;
+  background: #181b31;
+  padding: 10px;
+}
+
+.deck-explorer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.deck-explorer-head strong {
+  display: block;
+}
+
+.deck-explorer-head small {
+  color: #adb2cf;
+  font-size: 12px;
+}
+
+.deck-explorer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.deck-file-list {
+  display: grid;
+  gap: 7px;
+}
+
+.deck-file-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #3d4060;
+  border-radius: 10px;
+  background: #21243b;
+  padding: 6px;
+}
+
+.deck-file-main {
+  border: none;
+  background: transparent;
+  color: #ececf8;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+}
+
+.deck-file-main small {
+  color: #b9bdd8;
+}
+
+.deck-file-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.deck-file-empty {
+  color: #9aa0c3;
+  font-size: 12px;
+  padding: 8px 6px;
+}
+
 .carousel-wrap {
   width: min(940px, 100%);
   display: grid;

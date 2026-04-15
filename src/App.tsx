@@ -182,6 +182,7 @@ function App() {
 
   const [cardIndex, setCardIndex] = useState(0)
   const [activeDeck, setActiveDeck] = useState<string>('all')
+  const [openedDeck, setOpenedDeck] = useState<string | null>(null)
   const [cardFlipped, setCardFlipped] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(() => new Date())
   const [weekStart, setWeekStart] = useState(() => {
@@ -315,6 +316,13 @@ function App() {
   }, [activeDeck, deckNames])
 
   useEffect(() => {
+    if (!openedDeck) return
+    if (!deckNames.includes(openedDeck)) {
+      setOpenedDeck(null)
+    }
+  }, [openedDeck, deckNames])
+
+  useEffect(() => {
     if (cardItems.length === 0) {
       setCardIndex(0)
       return
@@ -346,9 +354,9 @@ function App() {
     return () => window.removeEventListener('keydown', onKeydown)
   }, [page, isAddOpen, isDetailOpen, currentCard])
 
-  const openCreateModal = () => {
+  const openCreateModal = (deckPreset?: string) => {
     setEditingId(null)
-    setForm(EMPTY_FORM)
+    setForm({ ...EMPTY_FORM, deck: deckPreset || EMPTY_FORM.deck })
     setInputTab('text')
     setIsAddOpen(true)
   }
@@ -382,6 +390,11 @@ function App() {
     setIsDetailOpen(false)
   }
 
+  const removeItemFromDeck = (id: string) => {
+    const next = items.filter((item) => item.id !== id)
+    persist(next)
+  }
+
   const moveMonth = (delta: number) => {
     setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1))
   }
@@ -399,6 +412,11 @@ function App() {
     )
     persist(next)
   }
+
+  const openedDeckItems = useMemo(() => {
+    if (!openedDeck) return []
+    return items.filter((item) => item.deck === openedDeck)
+  }, [items, openedDeck])
 
   const onSubmitAdd = (event: FormEvent) => {
     event.preventDefault()
@@ -510,7 +528,7 @@ function App() {
             <h2>학습 노트</h2>
             <p>프로토타입 기반 모달 + 카드 학습 흐름</p>
           </div>
-          <button className="primary" onClick={openCreateModal}>
+          <button className="primary" onClick={() => openCreateModal()}>
             단어 / 구문 추가
           </button>
         </header>
@@ -789,6 +807,7 @@ function App() {
                         setCardIndex(0)
                         setCardFlipped(false)
                       }}
+                      onDoubleClick={() => setOpenedDeck(null)}
                     >
                       <div className="folder-icon">📁</div>
                       <strong>전체 덱</strong>
@@ -803,6 +822,12 @@ function App() {
                           setCardIndex(0)
                           setCardFlipped(false)
                         }}
+                        onDoubleClick={() => {
+                          setOpenedDeck(deck)
+                          setActiveDeck(deck)
+                          setCardIndex(0)
+                          setCardFlipped(false)
+                        }}
                       >
                         <div className="folder-icon">📁</div>
                         <strong>{deck}</strong>
@@ -811,6 +836,46 @@ function App() {
                     ))}
                   </div>
                 </section>
+
+                {openedDeck && (
+                  <section className="deck-explorer">
+                    <header className="deck-explorer-head">
+                      <div>
+                        <strong>📁 {openedDeck}</strong>
+                        <small>{openedDeckItems.length} cards</small>
+                      </div>
+                      <div className="deck-explorer-actions">
+                        <button className="secondary" onClick={() => openCreateModal(openedDeck)}>
+                          + 카드 추가
+                        </button>
+                        <button className="secondary" onClick={() => setOpenedDeck(null)}>
+                          폴더 닫기
+                        </button>
+                      </div>
+                    </header>
+                    <div className="deck-file-list">
+                      {openedDeckItems.map((item) => (
+                        <div key={item.id} className="deck-file-row">
+                          <button className="deck-file-main" onClick={() => openDetailModal(item.id)}>
+                            <strong>{item.phrase}</strong>
+                            <small>{item.translation}</small>
+                          </button>
+                          <div className="deck-file-actions">
+                            <button className="secondary" onClick={() => openEditModal(item)}>
+                              수정
+                            </button>
+                            <button className="danger" onClick={() => removeItemFromDeck(item.id)}>
+                              삭제
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {openedDeckItems.length === 0 && (
+                        <div className="deck-file-empty">폴더 안 카드가 없습니다. + 카드 추가를 눌러주세요.</div>
+                      )}
+                    </div>
+                  </section>
+                )}
               </>
             ) : (
               <>
@@ -825,6 +890,7 @@ function App() {
                         setCardIndex(0)
                         setCardFlipped(false)
                       }}
+                      onDoubleClick={() => setOpenedDeck(null)}
                     >
                       <div className="folder-icon">📁</div>
                       <strong>전체 덱</strong>
@@ -839,6 +905,12 @@ function App() {
                           setCardIndex(0)
                           setCardFlipped(false)
                         }}
+                        onDoubleClick={() => {
+                          setOpenedDeck(deck)
+                          setActiveDeck(deck)
+                          setCardIndex(0)
+                          setCardFlipped(false)
+                        }}
                       >
                         <div className="folder-icon">📁</div>
                         <strong>{deck}</strong>
@@ -847,6 +919,46 @@ function App() {
                     ))}
                   </div>
                 </section>
+
+                {openedDeck && (
+                  <section className="deck-explorer">
+                    <header className="deck-explorer-head">
+                      <div>
+                        <strong>📁 {openedDeck}</strong>
+                        <small>{openedDeckItems.length} cards</small>
+                      </div>
+                      <div className="deck-explorer-actions">
+                        <button className="secondary" onClick={() => openCreateModal(openedDeck)}>
+                          + 카드 추가
+                        </button>
+                        <button className="secondary" onClick={() => setOpenedDeck(null)}>
+                          폴더 닫기
+                        </button>
+                      </div>
+                    </header>
+                    <div className="deck-file-list">
+                      {openedDeckItems.map((item) => (
+                        <div key={item.id} className="deck-file-row">
+                          <button className="deck-file-main" onClick={() => openDetailModal(item.id)}>
+                            <strong>{item.phrase}</strong>
+                            <small>{item.translation}</small>
+                          </button>
+                          <div className="deck-file-actions">
+                            <button className="secondary" onClick={() => openEditModal(item)}>
+                              수정
+                            </button>
+                            <button className="danger" onClick={() => removeItemFromDeck(item.id)}>
+                              삭제
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {openedDeckItems.length === 0 && (
+                        <div className="deck-file-empty">폴더 안 카드가 없습니다. + 카드 추가를 눌러주세요.</div>
+                      )}
+                    </div>
+                  </section>
+                )}
               </>
             )}
           </section>
