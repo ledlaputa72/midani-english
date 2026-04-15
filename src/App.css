@@ -901,8 +901,22 @@ button.danger {
   gap: 8px;
 }
 
+.af-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .af-btn {
   padding: 5px 10px;
+  font-size: 12px;
+}
+
+.af-btn-inline {
+  height: 40px;
+  padding: 0 12px;
+  white-space: nowrap;
   font-size: 12px;
 }
 

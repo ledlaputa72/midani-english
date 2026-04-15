@@ -1160,16 +1160,16 @@ function App() {
             <form onSubmit={onSubmitAdd} className="modal-form">
               <label>
                 영어 단어 / 구문 *
-                <div className="af-row">
-                  <button type="button" className="secondary af-btn" onClick={autoFillFromEnglish} disabled={isAutoFilling}>
-                    {isAutoFilling ? '생성 중...' : '자동 채우기'}
+                <div className="af-input-row">
+                  <input
+                    value={form.phrase}
+                    onChange={(event) => setForm((prev) => ({ ...prev, phrase: event.target.value }))}
+                  />
+                  <button type="button" className="secondary af-btn-inline" onClick={autoFillFromEnglish} disabled={isAutoFilling}>
+                    {isAutoFilling ? '생성 중...' : '자동 생성'}
                   </button>
-                  {autoFillMsg && <small className="af-msg">{autoFillMsg}</small>}
                 </div>
-                <input
-                  value={form.phrase}
-                  onChange={(event) => setForm((prev) => ({ ...prev, phrase: event.target.value }))}
-                />
+                {autoFillMsg && <small className="af-msg">{autoFillMsg}</small>}
               </label>
               <label>
                 한국어 뜻 *
