@@ -185,6 +185,17 @@ function splitTranslationParts(text: string): { primary: string; secondary: stri
   return { primary, secondary }
 }
 
+/** Split display phrase into tokens (whitespace; strip edge punctuation). */
+function splitPhraseWords(phrase: string): string[] {
+  return phrase
+    .trim()
+    .split(/\s+/)
+    .map((part) =>
+      part.replace(/^[\s"'“”‘’.,!?;:()[\]{}—–-]+|["'“”‘’.,!?;:()[\]{}—–-]+$/g, ''),
+    )
+    .filter((w) => w.length > 0)
+}
+
 function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [items, setItems] = useState<StudyItem[]>(() => loadItems())
@@ -372,6 +383,10 @@ function App() {
   const currentCard = cardItems[cardIndex] ?? null
   const detailItem = detailId ? items.find((item) => item.id === detailId) ?? null : null
   const detailTranslation = splitTranslationParts(detailItem?.translation ?? '')
+  const detailPhraseWords = useMemo(
+    () => splitPhraseWords(detailItem?.phrase ?? ''),
+    [detailItem?.phrase],
+  )
 
   const calendarDays = useMemo(() => {
     const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1)
@@ -486,6 +501,16 @@ function App() {
     setEditingId(null)
     setForm({ ...EMPTY_FORM, deck: deckPreset || EMPTY_FORM.deck })
     setInputTab('text')
+    setIsAddOpen(true)
+  }
+
+  const openCreateModalWithPhrase = (phrase: string, deckPreset?: string) => {
+    const deck = (deckPreset ?? EMPTY_FORM.deck).trim() || EMPTY_FORM.deck
+    resetOcrState()
+    setEditingId(null)
+    setForm({ ...EMPTY_FORM, phrase: phrase.trim(), deck })
+    setInputTab('text')
+    setIsDetailOpen(false)
     setIsAddOpen(true)
   }
 
@@ -1561,6 +1586,23 @@ function App() {
               <button onClick={() => updateStatus(detailItem.id, 'learning')}>→ 학습 중</button>
               <button onClick={() => updateStatus(detailItem.id, 'mastered')}>→ 완료</button>
             </div>
+            {detailPhraseWords.length >= 2 && (
+              <div className="det-phrase-words">
+                <p className="det-phrase-words-label">포함된 단어 — 클릭하면 새 카드로 추가합니다</p>
+                <div className="det-phrase-words-btns">
+                  {detailPhraseWords.map((word, index) => (
+                    <button
+                      key={`${index}-${word}`}
+                      type="button"
+                      className="det-phrase-word-btn"
+                      onClick={() => openCreateModalWithPhrase(word, detailItem.deck)}
+                    >
+                      {word}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <footer>
               <button className="secondary" onClick={() => openEditModal(detailItem)}>
                 수정
