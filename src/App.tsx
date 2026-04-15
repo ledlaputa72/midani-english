@@ -5,6 +5,7 @@ import './App.css'
 type Status = 'new' | 'learning' | 'mastered'
 type Page = 'dashboard' | 'list' | 'board' | 'cards' | 'calendar'
 type InputTab = 'text' | 'ocr'
+type ListSort = 'latest' | 'oldest' | 'phrase'
 type CardRating = 'again' | 'good' | 'easy' | 'skip'
 
 type StudyItem = {
@@ -201,6 +202,8 @@ function App() {
   const [items, setItems] = useState<StudyItem[]>(() => loadItems())
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | Status>('all')
+  const [listShowFilter, setListShowFilter] = useState<string>('all')
+  const [listSort, setListSort] = useState<ListSort>('latest')
 
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -316,19 +319,42 @@ function App() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
   }
 
+  const listShowOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const item of items) {
+      const show = item.show?.trim()
+      if (show) set.add(show)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [items])
+
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return items.filter((item) => {
+    const rows = items.filter((item) => {
       if (statusFilter !== 'all' && item.status !== statusFilter) return false
+      if (listShowFilter !== 'all') {
+        if (listShowFilter === '__none__') {
+          if (item.show?.trim()) return false
+        } else if ((item.show ?? '').trim() !== listShowFilter) {
+          return false
+        }
+      }
       if (!q) return true
       return (
         item.phrase.toLowerCase().includes(q) ||
         item.translation.toLowerCase().includes(q) ||
+        item.example.toLowerCase().includes(q) ||
         item.show.toLowerCase().includes(q) ||
         item.tags.some((tag) => tag.toLowerCase().includes(q))
       )
     })
-  }, [items, query, statusFilter])
+    const sorted = [...rows].sort((a, b) => {
+      if (listSort === 'latest') return b.createdAt.localeCompare(a.createdAt)
+      if (listSort === 'oldest') return a.createdAt.localeCompare(b.createdAt)
+      return a.phrase.localeCompare(b.phrase, 'en', { sensitivity: 'base' })
+    })
+    return sorted
+  }, [items, query, statusFilter, listShowFilter, listSort])
 
   const stats = useMemo(
     () => ({
@@ -779,11 +805,15 @@ function App() {
       <main className="content">
         <header className="page-header">
           <div>
-            <h2>학습 노트</h2>
-            <p>프로토타입 기반 모달 + 카드 학습 흐름</p>
+            <h2>{page === 'list' ? '📋 전체 목록' : '학습 노트'}</h2>
+            <p>
+              {page === 'list'
+                ? '단어·구문·뜻을 한눈에 보고 복습해 보세요.'
+                : '프로토타입 기반 모달 + 카드 학습 흐름'}
+            </p>
           </div>
           <button className="primary" onClick={() => openCreateModal()}>
-            단어 / 구문 추가
+            {page === 'list' ? '+ 추가' : '단어 / 구문 추가'}
           </button>
         </header>
 
@@ -922,13 +952,15 @@ function App() {
 
         {page === 'list' && (
           <>
-            <section className="toolbar">
+            <section className="list-toolbar">
               <input
+                className="list-search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="구문, 해석, 태그 검색"
+                placeholder="단어, 구문, 뜻 검색..."
               />
               <select
+                className="list-filter-select"
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as 'all' | Status)}
               >
@@ -937,22 +969,145 @@ function App() {
                 <option value="learning">학습 중</option>
                 <option value="mastered">완료</option>
               </select>
+              <select
+                className="list-filter-select"
+                value={listShowFilter}
+                onChange={(event) => setListShowFilter(event.target.value)}
+              >
+                <option value="all">전체 드라마</option>
+                {listShowOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+                <option value="__none__">작품 미입력</option>
+              </select>
+              <select
+                className="list-filter-select"
+                value={listSort}
+                onChange={(event) => setListSort(event.target.value as ListSort)}
+              >
+                <option value="latest">최신순</option>
+                <option value="oldest">오래된순</option>
+                <option value="phrase">가나다·ABC순</option>
+              </select>
             </section>
-            <section className="list-grid">
-              {filteredItems.map((item) => (
-                <button key={item.id} className="item-card" onClick={() => openDetailModal(item.id)}>
-                  <strong>{item.phrase}</strong>
-                  <p>{item.translation}</p>
-                  <div className="chips">
-                    <span>{STATUS_LABEL[item.status]}</span>
-                    <span>{item.show || '작품 미입력'}</span>
-                  </div>
-                </button>
-              ))}
-            </section>
+
+            <div className="study-table-wrap">
+              <table className="study-table">
+                <thead>
+                  <tr>
+                    <th className="col-phrase">영어 단어 / 구문</th>
+                    <th className="col-meaning">한국어 뜻</th>
+                    <th className="col-source">출처</th>
+                    <th className="col-tags">태그</th>
+                    <th className="col-status">상태</th>
+                    <th className="col-stars">난이도</th>
+                    <th className="col-actions" aria-label="작업" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems.map((item) => {
+                    const koPrimary = splitTranslationParts(item.translation).primary || item.translation
+                    const phraseWords = splitPhraseWords(item.phrase)
+                    const exampleLine = item.example.trim()
+                      ? item.example.split('\n')[0]?.trim() ?? ''
+                      : ''
+                    return (
+                      <tr key={item.id} className="study-row" onClick={() => openDetailModal(item.id)}>
+                        <td className="col-phrase">
+                          <strong className="list-phrase-main">{item.phrase}</strong>
+                          {exampleLine && <div className="list-phrase-example">"{exampleLine}"</div>}
+                          {phraseWords.length >= 2 && (
+                            <div
+                              className="list-phrase-words"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              {phraseWords.map((word, index) => (
+                                <button
+                                  key={`${item.id}-${index}-${word}`}
+                                  type="button"
+                                  className="list-phrase-word"
+                                  onClick={() => openCreateModalWithPhrase(word, item.deck)}
+                                >
+                                  {word}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="col-meaning">
+                          <span className="list-meaning-text">{koPrimary}</span>
+                        </td>
+                        <td className="col-source">
+                          <span className="list-source-badge">
+                            <span className="list-source-icon" aria-hidden>
+                              🎬
+                            </span>{' '}
+                            {(item.show ?? '').trim() || '작품 미입력'}
+                          </span>
+                        </td>
+                        <td className="col-tags">
+                          <div className="list-tag-cell" onClick={(event) => event.stopPropagation()}>
+                            {item.tags.length > 0 ? (
+                              item.tags.map((tag) => (
+                                <span key={tag} className="list-tag-pill">
+                                  {tag}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="list-tag-empty">—</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="col-status">
+                          <span className={`list-status-pill list-status-${item.status}`}>
+                            {STATUS_LABEL[item.status]}
+                          </span>
+                        </td>
+                        <td className="col-stars">
+                          <span
+                            className="list-star-row"
+                            aria-label={`난이도 ${item.difficulty}에 가까운 평점`}
+                          >
+                            {[1, 2, 3].map((n) => (
+                              <span key={n} className={n <= item.difficulty ? 'star on' : 'star off'}>
+                                ★
+                              </span>
+                            ))}
+                          </span>
+                        </td>
+                        <td className="col-actions">
+                          <div className="list-actions" onClick={(event) => event.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="list-icon-btn list-icon-edit"
+                              title="수정"
+                              onClick={() => openEditModal(item)}
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              type="button"
+                              className="list-icon-btn list-icon-del"
+                              title="삭제"
+                              onClick={() => removeItem(item.id)}
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              {filteredItems.length === 0 && (
+                <p className="list-empty">조건에 맞는 항목이 없습니다. 검색이나 필터를 바꿔 보세요.</p>
+              )}
+            </div>
           </>
         )}
-
         {page === 'board' && (
           <section className="board">
             {(['new', 'learning', 'mastered'] as Status[]).map((status) => (
