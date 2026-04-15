@@ -873,14 +873,154 @@ button.danger {
   background: #31256a;
 }
 
-.ocr-placeholder {
+.ocr-panel {
   border: 1px dashed #52527c;
   background: #25273a;
-  color: #a8abc7;
   border-radius: 10px;
-  padding: 11px;
-  margin-bottom: 11px;
+  padding: 12px;
+  margin-bottom: 12px;
   font-size: 13px;
+  color: #cfd1e6;
+}
+
+.ocr-hint {
+  margin: 0 0 10px;
+  color: #a8abc7;
+  line-height: 1.45;
+}
+
+.ocr-hint kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid #4b4b6d;
+  background: #1a1a2a;
+  font-size: 11px;
+  font-family: inherit;
+}
+
+.ocr-dropzone {
+  position: relative;
+  min-height: 120px;
+  border: 1px dashed #5a5a7a;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #1e1e30;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ocr-dropzone-active {
+  border-color: #7458ec;
+  background: #2a2157;
+}
+
+.ocr-dropzone-filled {
+  padding: 8px;
+}
+
+.ocr-file-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ocr-dropzone-label {
+  color: #9699b6;
+  padding: 16px;
+  text-align: center;
+}
+
+.ocr-preview-img {
+  max-width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.ocr-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ocr-error {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #3d1f28;
+  border: 1px solid #7b3446;
+  color: #ffbecd;
+  font-size: 12px;
+}
+
+.ocr-results {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #3a3a55;
+}
+
+.ocr-results-title {
+  margin: 0 0 8px;
+  color: #b4b7d4;
+  font-size: 12px;
+}
+
+.ocr-line-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ocr-line-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: start;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #1a1a2a;
+  border: 1px solid #34344c;
+}
+
+.ocr-line-label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+  margin: 0;
+  font-weight: normal;
+}
+
+.ocr-line-label input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.ocr-line-text {
+  color: #e8e9f5;
+  word-break: break-word;
+}
+
+.ocr-line-apply {
+  padding: 5px 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ocr-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .modal-form {

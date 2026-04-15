@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
 
@@ -200,6 +200,94 @@ function App() {
   const [isAutoFilling, setIsAutoFilling] = useState(false)
   const [autoFillMsg, setAutoFillMsg] = useState('')
 
+  const [ocrPreviewUrl, setOcrPreviewUrl] = useState<string | null>(null)
+  const [ocrLines, setOcrLines] = useState<string[]>([])
+  const [ocrLineSelected, setOcrLineSelected] = useState<number[]>([])
+  const [ocrError, setOcrError] = useState('')
+  const [ocrProgress, setOcrProgress] = useState(0)
+  const [isOcrRunning, setIsOcrRunning] = useState(false)
+  const [ocrDragOver, setOcrDragOver] = useState(false)
+  const ocrFileInputRef = useRef<HTMLInputElement>(null)
+
+  const resetOcrState = useCallback(() => {
+    setOcrPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+    setOcrLines([])
+    setOcrLineSelected([])
+    setOcrError('')
+    setOcrProgress(0)
+    setIsOcrRunning(false)
+    setOcrDragOver(false)
+  }, [])
+
+  const loadOcrImageFile = useCallback((file: File | null | undefined) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setOcrError('이미지 파일만 지원합니다 (PNG, JPEG, WebP 등).')
+      return
+    }
+    setOcrError('')
+    setOcrLines([])
+    setOcrLineSelected([])
+    setOcrPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return URL.createObjectURL(file)
+    })
+  }, [])
+
+  const toggleOcrLine = (index: number) => {
+    setOcrLineSelected((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index].sort((a, b) => a - b),
+    )
+  }
+
+  const applyOcrSelectionToPhrase = () => {
+    if (ocrLineSelected.length === 0) return
+    const phrase = ocrLineSelected
+      .map((i) => ocrLines[i] ?? '')
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (phrase) setForm((prev) => ({ ...prev, phrase }))
+  }
+
+  const runOcrRecognize = async () => {
+    if (!ocrPreviewUrl || isOcrRunning) return
+    setIsOcrRunning(true)
+    setOcrError('')
+    setOcrProgress(0)
+    setOcrLines([])
+    setOcrLineSelected([])
+    try {
+      const { createWorker } = await import('tesseract.js')
+      const worker = await createWorker('eng', undefined, {
+        logger: (m) => {
+          if (typeof m.progress === 'number') {
+            setOcrProgress(Math.min(100, Math.round(m.progress * 100)))
+          }
+        },
+      })
+      const { data } = await worker.recognize(ocrPreviewUrl)
+      await worker.terminate()
+      const text = data.text ?? ''
+      const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+      setOcrLines(lines)
+      if (lines.length === 0) {
+        setOcrError('인식된 텍스트가 없습니다. 더 선명한 이미지로 다시 시도해 보세요.')
+      }
+    } catch (err) {
+      setOcrError(err instanceof Error ? err.message : 'OCR 처리 중 오류가 발생했습니다.')
+    } finally {
+      setIsOcrRunning(false)
+      setOcrProgress(0)
+    }
+  }
+
   const [cardIndex, setCardIndex] = useState(0)
   const [activeDeck, setActiveDeck] = useState<string>('all')
   const [openedDeck, setOpenedDeck] = useState<string | null>(null)
@@ -354,8 +442,26 @@ function App() {
   }, [cardItems.length, cardIndex])
 
   useEffect(() => {
+    if (!isAddOpen || inputTab !== 'ocr') return
+    const onPaste = (event: ClipboardEvent) => {
+      const clipItems = event.clipboardData?.items
+      if (!clipItems?.length) return
+      for (const item of clipItems) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          event.preventDefault()
+          loadOcrImageFile(item.getAsFile())
+          return
+        }
+      }
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [isAddOpen, inputTab, loadOcrImageFile])
+
+  useEffect(() => {
     const onKeydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        resetOcrState()
         setIsAddOpen(false)
         setIsDetailOpen(false)
       }
@@ -373,9 +479,10 @@ function App() {
     }
     window.addEventListener('keydown', onKeydown)
     return () => window.removeEventListener('keydown', onKeydown)
-  }, [page, isAddOpen, isDetailOpen, currentCard])
+  }, [page, isAddOpen, isDetailOpen, currentCard, resetOcrState])
 
   const openCreateModal = (deckPreset?: string) => {
+    resetOcrState()
     setEditingId(null)
     setForm({ ...EMPTY_FORM, deck: deckPreset || EMPTY_FORM.deck })
     setInputTab('text')
@@ -383,6 +490,7 @@ function App() {
   }
 
   const openEditModal = (item: StudyItem) => {
+    resetOcrState()
     setEditingId(item.id)
     setForm(toFormState(item))
     setInputTab('text')
@@ -396,6 +504,7 @@ function App() {
   }
 
   const closeAddModal = () => {
+    resetOcrState()
     setIsAddOpen(false)
   }
 
@@ -482,6 +591,7 @@ function App() {
       persist(next)
     }
     setIsAddOpen(false)
+    resetOcrState()
   }
 
   const autoFillFromEnglish = async () => {
@@ -1190,8 +1300,117 @@ function App() {
               </button>
             </div>
             {inputTab === 'ocr' && (
-              <div className="ocr-placeholder">
-                OCR 탭 UI만 우선 연결했습니다. 실제 OCR 엔진 연동은 다음 단계에서 추가 가능합니다.
+              <div className="ocr-panel">
+                <p className="ocr-hint">
+                  이미지를 드래그해서 놓거나 클릭해서 파일을 선택하세요. 이 탭이 열린 상태에서 {' '}
+                  <kbd>Ctrl</kbd>+<kbd>V</kbd>로 클립보드 이미지를 붙여넣을 수 있습니다.
+                </p>
+                <div
+                  className={`ocr-dropzone ${ocrDragOver ? 'ocr-dropzone-active' : ''} ${ocrPreviewUrl ? 'ocr-dropzone-filled' : ''}`}
+                  onClick={() => ocrFileInputRef.current?.click()}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    setOcrDragOver(true)
+                  }}
+                  onDragLeave={() => setOcrDragOver(false)}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    setOcrDragOver(false)
+                    const file = event.dataTransfer.files?.[0]
+                    loadOcrImageFile(file)
+                  }}
+                >
+                  <input
+                    ref={ocrFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="ocr-file-input"
+                    onChange={(event) => {
+                      loadOcrImageFile(event.target.files?.[0])
+                      event.target.value = ''
+                    }}
+                  />
+                  {ocrPreviewUrl ? (
+                    <img src={ocrPreviewUrl} alt="" className="ocr-preview-img" />
+                  ) : (
+                    <span className="ocr-dropzone-label">여기에 놓거나 클릭해서 업로드</span>
+                  )}
+                </div>
+                <div className="ocr-toolbar">
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={!ocrPreviewUrl || isOcrRunning}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void runOcrRecognize()
+                    }}
+                  >
+                    {isOcrRunning ? `텍스트 인식 중… ${ocrProgress}%` : '텍스트 인식 (OCR)'}
+                  </button>
+                  {ocrPreviewUrl && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={isOcrRunning}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        resetOcrState()
+                      }}
+                    >
+                      이미지 지우기
+                    </button>
+                  )}
+                </div>
+                {ocrError && <div className="ocr-error">{ocrError}</div>}
+                {ocrLines.length > 0 && (
+                  <div className="ocr-results">
+                    <p className="ocr-results-title">인식된 줄 — 영어 구문으로 쓸 줄을 체크하세요.</p>
+                    <ul className="ocr-line-list">
+                      {ocrLines.map((line, index) => (
+                        <li key={`${index}-${line.slice(0, 24)}`} className="ocr-line-row">
+                          <label className="ocr-line-label">
+                            <input
+                              type="checkbox"
+                              checked={ocrLineSelected.includes(index)}
+                              onChange={() => toggleOcrLine(index)}
+                            />
+                            <span className="ocr-line-text">{line}</span>
+                          </label>
+                          <button
+                            type="button"
+                            className="secondary ocr-line-apply"
+                            onClick={() => setForm((prev) => ({ ...prev, phrase: line }))}
+                          >
+                            이 줄만 적용
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="ocr-result-actions">
+                      <button
+                        type="button"
+                        className="primary"
+                        disabled={ocrLineSelected.length === 0}
+                        onClick={applyOcrSelectionToPhrase}
+                      >
+                        선택한 줄을 영어 구문에 적용
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() =>
+                          setForm((prev) => ({
+                            ...prev,
+                            phrase: ocrLines.join(' ').replace(/\s+/g, ' ').trim(),
+                          }))
+                        }
+                      >
+                        전체 텍스트 적용
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             <form onSubmit={onSubmitAdd} className="modal-form">
