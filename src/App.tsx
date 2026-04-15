@@ -472,12 +472,12 @@ function App() {
     setIsAutoFilling(true)
     setAutoFillMsg('자동 생성 중...')
 
-    try {
-      let koMeaning = ''
-      let enExample = ''
-      let koExample = ''
-      let altMeanings: string[] = []
+    let koMeaning = ''
+    let enExample = ''
+    let koExample = ''
+    let altMeanings: string[] = []
 
+    try {
       const transRes = await fetch(
         `https://api.mymemory.translated.net/get?q=${encodeURIComponent(phrase)}&langpair=en|ko`,
       )
@@ -492,10 +492,16 @@ function App() {
           .filter((line) => line && line !== koMeaning)
           .slice(0, 2)
       }
+    } catch {
+      // Ignore translation API failures and fallback below.
+    }
 
+    try {
       const keyword = phrase.split(/\s+/)[0]?.replace(/[^a-zA-Z'-]/g, '')
       if (keyword) {
-        const dictRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(keyword)}`)
+        const dictRes = await fetch(
+          `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(keyword)}`,
+        )
         if (dictRes.ok) {
           const dictData = (await dictRes.json()) as Array<{
             meanings?: Array<{ definitions?: Array<{ example?: string }> }>
@@ -514,64 +520,47 @@ function App() {
             ''
         }
       }
+    } catch {
+      // Ignore dictionary API failures and fallback below.
+    }
 
-      if (enExample) {
-        const exRes = await fetch(
-          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(enExample)}&langpair=en|ko`,
-        )
-        if (exRes.ok) {
-          const exData = (await exRes.json()) as {
-            responseData?: { translatedText?: string }
-          }
-          koExample = exData.responseData?.translatedText?.trim() || ''
+    if (!koMeaning) {
+      koMeaning = `"${phrase}"의 의미를 확인해 주세요.`
+    }
+    if (!enExample) {
+      enExample = `People often say "${phrase}" in everyday conversation.`
+    }
+
+    try {
+      const exRes = await fetch(
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(enExample)}&langpair=en|ko`,
+      )
+      if (exRes.ok) {
+        const exData = (await exRes.json()) as {
+          responseData?: { translatedText?: string }
         }
-      }
-
-      if (!enExample) {
-        enExample = `People often say "${phrase}" in everyday conversation.`
-      }
-      if (!koExample && enExample) {
-        const fallbackExRes = await fetch(
-          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(enExample)}&langpair=en|ko`,
-        )
-        if (fallbackExRes.ok) {
-          const fallbackExData = (await fallbackExRes.json()) as {
-            responseData?: { translatedText?: string }
-          }
-          koExample = fallbackExData.responseData?.translatedText?.trim() || ''
-        }
-      }
-
-      const meaningLines = [koMeaning, ...altMeanings].filter(Boolean)
-      const translationText =
-        meaningLines.length > 0
-          ? meaningLines.length === 1
-            ? meaningLines[0]
-            : `${meaningLines[0]}\n\n대체 표현:\n- ${meaningLines.slice(1).join('\n- ')}`
-          : ''
-
-      const exampleText = enExample
-        ? koExample
-          ? `${enExample}\n→ ${koExample}`
-          : enExample
-        : ''
-
-      setForm((prev) => ({
-        ...prev,
-        translation: prev.translation.trim() ? prev.translation : translationText,
-        example: prev.example.trim() ? prev.example : exampleText,
-      }))
-
-      if (translationText || exampleText) {
-        setAutoFillMsg('뜻/예문 자동 채우기를 완료했습니다.')
-      } else {
-        setAutoFillMsg('자동 생성 결과가 없어 직접 입력해 주세요.')
+        koExample = exData.responseData?.translatedText?.trim() || ''
       }
     } catch {
-      setAutoFillMsg('자동 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.')
-    } finally {
-      setIsAutoFilling(false)
+      // Ignore example translation failure; keep English example.
     }
+
+    const meaningLines = [koMeaning, ...altMeanings].filter(Boolean)
+    const translationText =
+      meaningLines.length === 1
+        ? meaningLines[0]
+        : `${meaningLines[0]}\n\n대체 표현:\n- ${meaningLines.slice(1).join('\n- ')}`
+
+    const exampleText = koExample ? `${enExample}\n→ ${koExample}` : enExample
+
+    setForm((prev) => ({
+      ...prev,
+      translation: prev.translation.trim() ? prev.translation : translationText,
+      example: prev.example.trim() ? prev.example : exampleText,
+    }))
+
+    setAutoFillMsg('뜻/예문 자동 채우기를 완료했습니다.')
+    setIsAutoFilling(false)
   }
 
   const nextCard = () => {
@@ -1204,6 +1193,7 @@ function App() {
                 한국어 뜻 *
                 <textarea
                   className="translation-box"
+                  rows={4}
                   value={form.translation}
                   onChange={(event) => setForm((prev) => ({ ...prev, translation: event.target.value }))}
                 />
@@ -1211,6 +1201,7 @@ function App() {
               <label>
                 예문
                 <textarea
+                  rows={4}
                   value={form.example}
                   onChange={(event) => setForm((prev) => ({ ...prev, example: event.target.value }))}
                 />
