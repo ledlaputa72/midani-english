@@ -908,8 +908,60 @@ button.danger {
   transform: translateX(calc(-50% + 420px)) scale(0.72);
 }
 
+.flashcard-slot {
+  display: contents;
+}
+
+.flashcard-motion {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  width: min(620px, calc(100% - 40px));
+  z-index: 5;
+  pointer-events: auto;
+}
+
+.flashcard-motion .flashcard.stack-pos-0 {
+  position: relative;
+  left: 0;
+  top: 0;
+  width: 100%;
+  transform: none;
+  z-index: 5;
+}
+
+.flashcard-motion--next {
+  animation: flashcard-enter-next 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.flashcard-motion--prev {
+  animation: flashcard-enter-prev 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes flashcard-enter-next {
+  from {
+    transform: translateX(calc(-50% + 48px));
+    opacity: 0.88;
+  }
+  to {
+    transform: translateX(-50%);
+    opacity: 1;
+  }
+}
+
+@keyframes flashcard-enter-prev {
+  from {
+    transform: translateX(calc(-50% - 48px));
+    opacity: 0.88;
+  }
+  to {
+    transform: translateX(-50%);
+    opacity: 1;
+  }
+}
+
 .card-timer-wrap {
-  width: min(620px, calc(100% - 100px));
+  width: min(310px, calc((100% - 100px) / 2));
   margin: 14px auto 4px;
 }
 
@@ -930,7 +982,7 @@ button.danger {
 .card-timer-fill {
   height: 100%;
   width: 100%;
-  transform-origin: left center;
+  transform-origin: right center;
   background: linear-gradient(90deg, #7458ec, #a78bfa);
   border-radius: 999px;
   will-change: transform;
@@ -1514,6 +1566,11 @@ button.danger {
   }
 
   .flashcard {
+    top: 10px;
+    width: min(620px, calc(100% - 18px));
+  }
+
+  .flashcard-motion {
     top: 10px;
     width: min(620px, calc(100% - 18px));
   }

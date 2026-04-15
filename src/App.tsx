@@ -7,6 +7,7 @@ type Page = 'dashboard' | 'list' | 'board' | 'cards' | 'calendar'
 type InputTab = 'text' | 'ocr'
 type ListSort = 'latest' | 'oldest' | 'phrase'
 type CardRating = 'again' | 'good' | 'easy' | 'skip'
+type CardEnterDir = 'next' | 'prev'
 
 type StudyItem = {
   id: string
@@ -320,6 +321,7 @@ function App() {
   const [activeDeck, setActiveDeck] = useState<string>('all')
   const [openedDeck, setOpenedDeck] = useState<string | null>(null)
   const [cardFlipped, setCardFlipped] = useState(false)
+  const [cardEnterDir, setCardEnterDir] = useState<CardEnterDir>('next')
   const [calendarMonth, setCalendarMonth] = useState(() => new Date())
   const [weekStart, setWeekStart] = useState(() => {
     const today = new Date()
@@ -759,6 +761,7 @@ function App() {
 
   const nextCard = useCallback(() => {
     if (cardItems.length === 0) return
+    setCardEnterDir('next')
     setCardIndex((prev) => (prev + 1 >= cardItems.length ? 0 : prev + 1))
     setCardFlipped(false)
     setCardSlideTick((t) => t + 1)
@@ -766,6 +769,7 @@ function App() {
 
   const prevCard = useCallback(() => {
     if (cardItems.length === 0) return
+    setCardEnterDir('prev')
     setCardIndex((prev) => (prev - 1 < 0 ? cardItems.length - 1 : prev - 1))
     setCardFlipped(false)
     setCardSlideTick((t) => t + 1)
@@ -1195,14 +1199,18 @@ function App() {
                       const stackCard = cardItems[idx]
                       if (!stackCard) return null
                       const isCenter = offset === 0
-                      return (
+                      const card = (
                         <button
-                          key={`${stackCard.id}-${offset}`}
+                          type="button"
                           className={`flashcard stack-pos-${offset} ${isCenter && cardFlipped ? 'flipped' : ''}`}
                           onClick={() => {
                             if (isCenter) {
                               setCardFlipped((prev) => !prev)
                             } else {
+                              const n = cardItems.length
+                              const forward = (idx - cardIndex + n) % n
+                              const backward = (cardIndex - idx + n) % n
+                              setCardEnterDir(forward <= backward ? 'next' : 'prev')
                               setCardIndex(idx)
                               setCardFlipped(false)
                               setCardSlideTick((t) => t + 1)
@@ -1222,6 +1230,21 @@ function App() {
                             </div>
                           </div>
                         </button>
+                      )
+                      if (isCenter) {
+                        return (
+                          <div
+                            key={stackCard.id}
+                            className={`flashcard-motion flashcard-motion--${cardEnterDir}`}
+                          >
+                            {card}
+                          </div>
+                        )
+                      }
+                      return (
+                        <div key={`${stackCard.id}-${offset}`} className="flashcard-slot">
+                          {card}
+                        </div>
                       )
                     })}
                   </div>
