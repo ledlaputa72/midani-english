@@ -935,6 +935,10 @@ button.danger {
   resize: vertical;
 }
 
+.translation-box {
+  min-height: 92px;
+}
+
 .row2 {
   display: grid;
   grid-template-columns: 1fr 1fr;

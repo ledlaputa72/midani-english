@@ -476,6 +476,7 @@ function App() {
       let koMeaning = ''
       let enExample = ''
       let koExample = ''
+      let altMeanings: string[] = []
 
       const transRes = await fetch(
         `https://api.mymemory.translated.net/get?q=${encodeURIComponent(phrase)}&langpair=en|ko`,
@@ -483,8 +484,13 @@ function App() {
       if (transRes.ok) {
         const transData = (await transRes.json()) as {
           responseData?: { translatedText?: string }
+          matches?: Array<{ translation?: string }>
         }
         koMeaning = transData.responseData?.translatedText?.trim() || ''
+        altMeanings = (transData.matches ?? [])
+          .map((m) => m.translation?.trim() || '')
+          .filter((line) => line && line !== koMeaning)
+          .slice(0, 2)
       }
 
       const keyword = phrase.split(/\s+/)[0]?.replace(/[^a-zA-Z'-]/g, '')
@@ -521,19 +527,42 @@ function App() {
         }
       }
 
+      if (!enExample) {
+        enExample = `People often say "${phrase}" in everyday conversation.`
+      }
+      if (!koExample && enExample) {
+        const fallbackExRes = await fetch(
+          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(enExample)}&langpair=en|ko`,
+        )
+        if (fallbackExRes.ok) {
+          const fallbackExData = (await fallbackExRes.json()) as {
+            responseData?: { translatedText?: string }
+          }
+          koExample = fallbackExData.responseData?.translatedText?.trim() || ''
+        }
+      }
+
+      const meaningLines = [koMeaning, ...altMeanings].filter(Boolean)
+      const translationText =
+        meaningLines.length > 0
+          ? meaningLines.length === 1
+            ? meaningLines[0]
+            : `${meaningLines[0]}\n\n대체 표현:\n- ${meaningLines.slice(1).join('\n- ')}`
+          : ''
+
+      const exampleText = enExample
+        ? koExample
+          ? `${enExample}\n→ ${koExample}`
+          : enExample
+        : ''
+
       setForm((prev) => ({
         ...prev,
-        translation: prev.translation.trim() ? prev.translation : koMeaning,
-        example: prev.example.trim()
-          ? prev.example
-          : enExample
-            ? koExample
-              ? `${enExample}\n→ ${koExample}`
-              : enExample
-            : prev.example,
+        translation: prev.translation.trim() ? prev.translation : translationText,
+        example: prev.example.trim() ? prev.example : exampleText,
       }))
 
-      if (koMeaning || enExample || koExample) {
+      if (translationText || exampleText) {
         setAutoFillMsg('뜻/예문 자동 채우기를 완료했습니다.')
       } else {
         setAutoFillMsg('자동 생성 결과가 없어 직접 입력해 주세요.')
@@ -1173,7 +1202,8 @@ function App() {
               </label>
               <label>
                 한국어 뜻 *
-                <input
+                <textarea
+                  className="translation-box"
                   value={form.translation}
                   onChange={(event) => setForm((prev) => ({ ...prev, translation: event.target.value }))}
                 />
