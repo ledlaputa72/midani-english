@@ -1,0 +1,275 @@
+.app {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid #2d2d3d;
+  background: #171722;
+  padding: 20px 14px;
+}
+
+.sidebar h1 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.sidebar p {
+  color: #9da0b7;
+  margin: 6px 0 18px;
+  font-size: 12px;
+}
+
+.sidebar nav {
+  display: grid;
+  gap: 8px;
+}
+
+.sidebar button {
+  background: transparent;
+  color: #c4c6dd;
+  border: 1px solid #2d2d3d;
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar button.active {
+  border-color: #7c5cfc;
+  background: #261f4d;
+  color: #ffffff;
+}
+
+.content {
+  padding: 24px 28px;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.top h2 {
+  margin: 0;
+}
+
+.top span {
+  font-size: 13px;
+  color: #9da0b7;
+}
+
+.summary {
+  border: 1px solid #2d2d3d;
+  border-radius: 10px;
+  padding: 7px 12px;
+  color: #9da0b7;
+}
+
+.summary strong {
+  color: #ffffff;
+}
+
+.add-form-wrap {
+  margin-bottom: 14px;
+}
+
+.add-form {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.add-form input,
+.filters input,
+.filters select {
+  background: #181826;
+  border: 1px solid #2d2d3d;
+  border-radius: 8px;
+  color: #e9e9f4;
+  padding: 10px 11px;
+}
+
+.add-form button,
+.card-actions button,
+.rate-buttons button {
+  background: #7c5cfc;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stats-grid article {
+  background: #171722;
+  border: 1px solid #2d2d3d;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.stats-grid small {
+  color: #9da0b7;
+}
+
+.stats-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 30px;
+}
+
+.filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.filters input {
+  flex: 1;
+}
+
+.table-wrap {
+  border: 1px solid #2d2d3d;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #2d2d3d;
+  text-align: left;
+}
+
+th {
+  color: #9da0b7;
+  font-size: 12px;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.column {
+  background: #171722;
+  border: 1px solid #2d2d3d;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.column h3 {
+  margin: 4px 0 10px;
+  font-size: 14px;
+}
+
+.card {
+  border: 1px solid #2d2d3d;
+  border-radius: 10px;
+  background: #1e1e2f;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.card p {
+  margin: 0;
+  color: #c4c6dd;
+  font-size: 14px;
+}
+
+.card small {
+  color: #9da0b7;
+}
+
+.card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.card-actions button {
+  font-size: 12px;
+  padding: 6px 8px;
+}
+
+.flashcard-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+
+.flashcard {
+  width: min(460px, 100%);
+  min-height: 220px;
+  background: #171722;
+  color: #ffffff;
+  border: 1px solid #2d2d3d;
+  border-radius: 14px;
+  cursor: pointer;
+  padding: 20px;
+  position: relative;
+}
+
+.flashcard .back {
+  display: none;
+}
+
+.flashcard.flipped .front {
+  display: none;
+}
+
+.flashcard.flipped .back {
+  display: block;
+}
+
+.front,
+.back {
+  font-size: 30px;
+  text-align: center;
+}
+
+.rate-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 1024px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .add-form {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid,
+  .board {
+    grid-template-columns: 1fr;
+  }
+}

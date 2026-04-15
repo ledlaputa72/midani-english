@@ -1,0 +1,20 @@
+:root {
+  font-family: 'Segoe UI', 'Noto Sans KR', Arial, sans-serif;
+  line-height: 1.4;
+  color: #e9e9f4;
+  background-color: #0f0f15;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #0f0f15;
+}
+
+a {
+  color: inherit;
+}
