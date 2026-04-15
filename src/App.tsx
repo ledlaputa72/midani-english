@@ -17,6 +17,7 @@ type StudyItem = {
   tags: string[]
   difficulty: 1 | 2 | 3
   notes: string
+  deck: string
   status: Status
   reviewCount: number
   createdAt: string
@@ -33,6 +34,7 @@ type FormState = {
   tags: string
   difficulty: 1 | 2 | 3
   notes: string
+  deck: string
 }
 
 const STORAGE_KEY = 'midani.study.items.v2'
@@ -52,6 +54,7 @@ const EMPTY_FORM: FormState = {
   tags: '',
   difficulty: 2,
   notes: '',
+  deck: '기본 덱',
 }
 
 const SAMPLE_ITEMS: StudyItem[] = [
@@ -65,6 +68,7 @@ const SAMPLE_ITEMS: StudyItem[] = [
     tags: ['idiom'],
     difficulty: 2,
     notes: '연기하다, 다음에 하겠다는 의미',
+    deck: '일상 회화',
     status: 'new',
     reviewCount: 0,
     createdAt: '2026-04-11',
@@ -79,6 +83,7 @@ const SAMPLE_ITEMS: StudyItem[] = [
     tags: ['idiom'],
     difficulty: 2,
     notes: '기회 상실을 표현',
+    deck: '일상 회화',
     status: 'learning',
     reviewCount: 1,
     createdAt: '2026-04-12',
@@ -93,6 +98,7 @@ const SAMPLE_ITEMS: StudyItem[] = [
     tags: ['phrasal-verb', 'emotion'],
     difficulty: 3,
     notes: '감정을 수습할 때 자주 쓰는 표현',
+    deck: '감정 표현',
     status: 'mastered',
     reviewCount: 4,
     createdAt: '2026-04-10',
@@ -105,7 +111,11 @@ function loadItems(): StudyItem[] {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return SAMPLE_ITEMS
     const parsed = JSON.parse(raw) as StudyItem[]
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : SAMPLE_ITEMS
+    if (!Array.isArray(parsed) || parsed.length === 0) return SAMPLE_ITEMS
+    return parsed.map((item) => ({
+      ...item,
+      deck: item.deck?.trim() || '기본 덱',
+    }))
   } catch {
     return SAMPLE_ITEMS
   }
@@ -127,6 +137,11 @@ function monthTitle(date: Date): string {
   return `${date.getFullYear()}년 ${date.getMonth() + 1}월`
 }
 
+function cyclicIndex(index: number, total: number): number {
+  if (total === 0) return 0
+  return ((index % total) + total) % total
+}
+
 function toFormState(item: StudyItem): FormState {
   return {
     phrase: item.phrase,
@@ -137,6 +152,7 @@ function toFormState(item: StudyItem): FormState {
     tags: item.tags.join(', '),
     difficulty: item.difficulty,
     notes: item.notes,
+    deck: item.deck || '기본 덱',
   }
 }
 
@@ -154,6 +170,7 @@ function App() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
 
   const [cardIndex, setCardIndex] = useState(0)
+  const [activeDeck, setActiveDeck] = useState<string>('all')
   const [cardFlipped, setCardFlipped] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(() => new Date())
 
@@ -203,9 +220,19 @@ function App() {
       .slice(0, 6)
   }, [items])
 
-  const cardItems = useMemo(() => {
-    return items.filter((item) => item.status !== 'mastered' || item.reviewCount < 3)
+  const deckNames = useMemo(() => {
+    return [...new Set(items.map((item) => item.deck || '기본 덱'))].sort((a, b) =>
+      a.localeCompare(b),
+    )
   }, [items])
+
+  const cardItems = useMemo(() => {
+    return items.filter((item) => {
+      const passDeck = activeDeck === 'all' ? true : item.deck === activeDeck
+      const passLearning = item.status !== 'mastered' || item.reviewCount < 3
+      return passDeck && passLearning
+    })
+  }, [items, activeDeck])
 
   const currentCard = cardItems[cardIndex] ?? null
   const detailItem = detailId ? items.find((item) => item.id === detailId) ?? null : null
@@ -238,6 +265,15 @@ function App() {
   )
 
   useEffect(() => {
+    if (activeDeck === 'all') return
+    if (!deckNames.includes(activeDeck)) {
+      setActiveDeck('all')
+      setCardIndex(0)
+      setCardFlipped(false)
+    }
+  }, [activeDeck, deckNames])
+
+  useEffect(() => {
     if (cardItems.length === 0) {
       setCardIndex(0)
       return
@@ -258,6 +294,8 @@ function App() {
           event.preventDefault()
           setCardFlipped((prev) => !prev)
         }
+        if (event.key === 'ArrowLeft') prevCard()
+        if (event.key === 'ArrowRight') nextCard()
         if (event.key === '1') rateCard('again')
         if (event.key === '2') rateCard('good')
         if (event.key === '3') rateCard('easy')
@@ -337,6 +375,7 @@ function App() {
         .filter(Boolean),
       difficulty: form.difficulty,
       notes: form.notes.trim(),
+      deck: form.deck.trim() || '기본 덱',
     }
 
     if (editingId) {
@@ -368,6 +407,12 @@ function App() {
   const nextCard = () => {
     if (cardItems.length === 0) return
     setCardIndex((prev) => (prev + 1 >= cardItems.length ? 0 : prev + 1))
+    setCardFlipped(false)
+  }
+
+  const prevCard = () => {
+    if (cardItems.length === 0) return
+    setCardIndex((prev) => (prev - 1 < 0 ? cardItems.length - 1 : prev - 1))
     setCardFlipped(false)
   }
 
@@ -575,25 +620,76 @@ function App() {
 
         {page === 'cards' && (
           <section className="cards-page">
+            <div className="deck-toolbar">
+              <label>
+                덱
+                <select
+                  value={activeDeck}
+                  onChange={(event) => {
+                    setActiveDeck(event.target.value)
+                    setCardIndex(0)
+                    setCardFlipped(false)
+                  }}
+                >
+                  <option value="all">전체 덱</option>
+                  {deckNames.map((deck) => (
+                    <option key={deck} value={deck}>
+                      {deck}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="card-counter">
+                {cardItems.length === 0
+                  ? '카드 없음'
+                  : `${cardIndex + 1} / ${cardItems.length} 카드 · ${currentCard?.deck ?? ''}`}
+              </p>
+            </div>
             {currentCard ? (
               <>
-                <p className="card-counter">
-                  {cardIndex + 1} / {cardItems.length} 카드 · {currentCard.show || 'Unknown'}
-                </p>
-                <button className={`flashcard ${cardFlipped ? 'flipped' : ''}`} onClick={() => setCardFlipped((prev) => !prev)}>
-                  <div className="flashcard-inner">
-                    <div className="flashcard-face flashcard-front">
-                      <span>클릭해서 뜻 확인</span>
-                      <h3>{currentCard.phrase}</h3>
-                      {currentCard.example && <p>"{currentCard.example}"</p>}
-                    </div>
-                    <div className="flashcard-face flashcard-back">
-                      <span>뜻</span>
-                      <h3>{currentCard.translation}</h3>
-                      {currentCard.notes && <p>{currentCard.notes}</p>}
-                    </div>
+                <div className="carousel-wrap">
+                  <button className="carousel-nav left" onClick={prevCard}>
+                    ◀
+                  </button>
+                  <div className="card-stack">
+                    {[-2, -1, 0, 1, 2].map((offset) => {
+                      const idx = cyclicIndex(cardIndex + offset, cardItems.length)
+                      const stackCard = cardItems[idx]
+                      if (!stackCard) return null
+                      const isCenter = offset === 0
+                      return (
+                        <button
+                          key={`${stackCard.id}-${offset}`}
+                          className={`flashcard stack-pos-${offset} ${isCenter && cardFlipped ? 'flipped' : ''}`}
+                          onClick={() => {
+                            if (isCenter) {
+                              setCardFlipped((prev) => !prev)
+                            } else {
+                              setCardIndex(idx)
+                              setCardFlipped(false)
+                            }
+                          }}
+                        >
+                          <div className="flashcard-inner">
+                            <div className="flashcard-face flashcard-front">
+                              <span>{isCenter ? '클릭해서 뜻 확인' : stackCard.deck}</span>
+                              <h3>{stackCard.phrase}</h3>
+                              {stackCard.example && <p>"{stackCard.example}"</p>}
+                            </div>
+                            <div className="flashcard-face flashcard-back">
+                              <span>뜻</span>
+                              <h3>{stackCard.translation}</h3>
+                              {stackCard.notes && <p>{stackCard.notes}</p>}
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
-                </button>
+                  <button className="carousel-nav right" onClick={nextCard}>
+                    ▶
+                  </button>
+                </div>
                 <div className="rate-buttons">
                   <button className="again" onClick={() => rateCard('again')}>
                     다시
@@ -773,6 +869,16 @@ function App() {
                   />
                 </label>
                 <label>
+                  덱(그룹)
+                  <input
+                    value={form.deck}
+                    onChange={(event) => setForm((prev) => ({ ...prev, deck: event.target.value }))}
+                    placeholder="예: 일상 회화, 비즈니스, 시험"
+                  />
+                </label>
+              </div>
+              <div className="row2">
+                <label>
                   난이도
                   <select
                     value={form.difficulty}
@@ -822,6 +928,7 @@ function App() {
             <div className="chips">
               <span>{STATUS_LABEL[detailItem.status]}</span>
               <span>{detailItem.show || '작품 미입력'}</span>
+              <span>{detailItem.deck}</span>
               <span>{'★'.repeat(detailItem.difficulty)}</span>
               {detailItem.tags.map((tag) => (
                 <span key={tag}>{tag}</span>
