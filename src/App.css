@@ -895,6 +895,27 @@ button.danger {
   color: #cfd1e6;
 }
 
+.af-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.af-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.af-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.af-msg {
+  color: #9da2c2;
+  font-size: 11px;
+}
+
 .modal-form textarea {
   min-height: 70px;
   resize: vertical;

@@ -179,6 +179,8 @@ function App() {
   const [detailId, setDetailId] = useState<string | null>(null)
   const [inputTab, setInputTab] = useState<InputTab>('text')
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [isAutoFilling, setIsAutoFilling] = useState(false)
+  const [autoFillMsg, setAutoFillMsg] = useState('')
 
   const [cardIndex, setCardIndex] = useState(0)
   const [activeDeck, setActiveDeck] = useState<string>('all')
@@ -461,6 +463,86 @@ function App() {
       persist(next)
     }
     setIsAddOpen(false)
+  }
+
+  const autoFillFromEnglish = async () => {
+    const phrase = form.phrase.trim()
+    if (!phrase || isAutoFilling) return
+
+    setIsAutoFilling(true)
+    setAutoFillMsg('자동 생성 중...')
+
+    try {
+      let koMeaning = ''
+      let enExample = ''
+      let koExample = ''
+
+      const transRes = await fetch(
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(phrase)}&langpair=en|ko`,
+      )
+      if (transRes.ok) {
+        const transData = (await transRes.json()) as {
+          responseData?: { translatedText?: string }
+        }
+        koMeaning = transData.responseData?.translatedText?.trim() || ''
+      }
+
+      const keyword = phrase.split(/\s+/)[0]?.replace(/[^a-zA-Z'-]/g, '')
+      if (keyword) {
+        const dictRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(keyword)}`)
+        if (dictRes.ok) {
+          const dictData = (await dictRes.json()) as Array<{
+            meanings?: Array<{ definitions?: Array<{ example?: string }> }>
+          }>
+          const examples: string[] = []
+          for (const entry of dictData) {
+            for (const meaning of entry.meanings ?? []) {
+              for (const def of meaning.definitions ?? []) {
+                if (def.example) examples.push(def.example)
+              }
+            }
+          }
+          enExample =
+            examples.find((line) => line.toLowerCase().includes(phrase.toLowerCase())) ||
+            examples[0] ||
+            ''
+        }
+      }
+
+      if (enExample) {
+        const exRes = await fetch(
+          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(enExample)}&langpair=en|ko`,
+        )
+        if (exRes.ok) {
+          const exData = (await exRes.json()) as {
+            responseData?: { translatedText?: string }
+          }
+          koExample = exData.responseData?.translatedText?.trim() || ''
+        }
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        translation: prev.translation.trim() ? prev.translation : koMeaning,
+        example: prev.example.trim()
+          ? prev.example
+          : enExample
+            ? koExample
+              ? `${enExample}\n→ ${koExample}`
+              : enExample
+            : prev.example,
+      }))
+
+      if (koMeaning || enExample || koExample) {
+        setAutoFillMsg('뜻/예문 자동 채우기를 완료했습니다.')
+      } else {
+        setAutoFillMsg('자동 생성 결과가 없어 직접 입력해 주세요.')
+      }
+    } catch {
+      setAutoFillMsg('자동 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+    } finally {
+      setIsAutoFilling(false)
+    }
   }
 
   const nextCard = () => {
@@ -1078,6 +1160,12 @@ function App() {
             <form onSubmit={onSubmitAdd} className="modal-form">
               <label>
                 영어 단어 / 구문 *
+                <div className="af-row">
+                  <button type="button" className="secondary af-btn" onClick={autoFillFromEnglish} disabled={isAutoFilling}>
+                    {isAutoFilling ? '생성 중...' : '자동 채우기'}
+                  </button>
+                  {autoFillMsg && <small className="af-msg">{autoFillMsg}</small>}
+                </div>
                 <input
                   value={form.phrase}
                   onChange={(event) => setForm((prev) => ({ ...prev, phrase: event.target.value }))}
