@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import './App.css'
 
 type Status = 'new' | 'learning' | 'mastered'
-type Page = 'dashboard' | 'list' | 'board' | 'cards'
+type Page = 'dashboard' | 'list' | 'board' | 'cards' | 'calendar'
 type InputTab = 'text' | 'ocr'
 type CardRating = 'again' | 'good' | 'easy' | 'skip'
 
@@ -21,6 +21,7 @@ type StudyItem = {
   reviewCount: number
   createdAt: string
   lastReviewedAt?: string
+  scheduledDate?: string
 }
 
 type FormState = {
@@ -115,6 +116,17 @@ function dateText(value?: string): string {
   return value
 }
 
+function toDateKey(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function monthTitle(date: Date): string {
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`
+}
+
 function toFormState(item: StudyItem): FormState {
   return {
     phrase: item.phrase,
@@ -143,6 +155,7 @@ function App() {
 
   const [cardIndex, setCardIndex] = useState(0)
   const [cardFlipped, setCardFlipped] = useState(false)
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date())
 
   const persist = (next: StudyItem[]) => {
     setItems(next)
@@ -173,12 +186,56 @@ function App() {
     [items],
   )
 
+  const dashboardRecent = useMemo(() => {
+    return [...items]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 6)
+  }, [items])
+
+  const dashboardDue = useMemo(() => {
+    return items
+      .filter((item) => item.status !== 'mastered')
+      .sort((a, b) => {
+        const aScore = (a.status === 'learning' ? 2 : 1) + a.reviewCount
+        const bScore = (b.status === 'learning' ? 2 : 1) + b.reviewCount
+        return bScore - aScore
+      })
+      .slice(0, 6)
+  }, [items])
+
   const cardItems = useMemo(() => {
     return items.filter((item) => item.status !== 'mastered' || item.reviewCount < 3)
   }, [items])
 
   const currentCard = cardItems[cardIndex] ?? null
   const detailItem = detailId ? items.find((item) => item.id === detailId) ?? null : null
+
+  const calendarDays = useMemo(() => {
+    const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1)
+    const startWeekday = first.getDay()
+    const start = new Date(first)
+    start.setDate(first.getDate() - startWeekday)
+    return Array.from({ length: 42 }, (_, i) => {
+      const day = new Date(start)
+      day.setDate(start.getDate() + i)
+      return day
+    })
+  }, [calendarMonth])
+
+  const itemsByDate = useMemo(() => {
+    const map: Record<string, StudyItem[]> = {}
+    for (const item of items) {
+      if (!item.scheduledDate) continue
+      if (!map[item.scheduledDate]) map[item.scheduledDate] = []
+      map[item.scheduledDate].push(item)
+    }
+    return map
+  }, [items])
+
+  const unscheduledItems = useMemo(
+    () => items.filter((item) => !item.scheduledDate),
+    [items],
+  )
 
   useEffect(() => {
     if (cardItems.length === 0) {
@@ -244,6 +301,24 @@ function App() {
     const next = items.filter((item) => item.id !== id)
     persist(next)
     setIsDetailOpen(false)
+  }
+
+  const moveMonth = (delta: number) => {
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1))
+  }
+
+  const scheduleItem = (itemId: string, dateKey: string) => {
+    const next = items.map((item) =>
+      item.id === itemId ? { ...item, scheduledDate: dateKey } : item,
+    )
+    persist(next)
+  }
+
+  const clearSchedule = (itemId: string) => {
+    const next = items.map((item) =>
+      item.id === itemId ? { ...item, scheduledDate: undefined } : item,
+    )
+    persist(next)
   }
 
   const onSubmitAdd = (event: FormEvent) => {
@@ -337,6 +412,9 @@ function App() {
           <button className={page === 'cards' ? 'active' : ''} onClick={() => setPage('cards')}>
             플래시카드
           </button>
+          <button className={page === 'calendar' ? 'active' : ''} onClick={() => setPage('calendar')}>
+            캘린더
+          </button>
         </nav>
       </aside>
 
@@ -352,24 +430,83 @@ function App() {
         </header>
 
         {page === 'dashboard' && (
-          <section className="stats-grid">
-            <article>
-              <small>전체</small>
-              <strong>{stats.total}</strong>
-            </article>
-            <article>
-              <small>학습중</small>
-              <strong>{stats.learning}</strong>
-            </article>
-            <article>
-              <small>완료</small>
-              <strong>{stats.mastered}</strong>
-            </article>
-            <article>
-              <small>작품수</small>
-              <strong>{stats.shows}</strong>
-            </article>
-          </section>
+          <>
+            <section className="dash-welcome">
+              <div>
+                <h3>👋 안녕하세요, Steve!</h3>
+                <p>오늘도 영어 한 구문씩 꾸준히 💪</p>
+              </div>
+            </section>
+
+            <section className="stats-grid">
+              <article>
+                <small>전체 등록</small>
+                <strong className="c-accent">{stats.total}</strong>
+                <span>단어 · 구문</span>
+              </article>
+              <article>
+                <small>학습 중</small>
+                <strong className="c-yellow">{stats.learning}</strong>
+                <span>복습 필요</span>
+              </article>
+              <article>
+                <small>완료</small>
+                <strong className="c-green">{stats.mastered}</strong>
+                <span>마스터!</span>
+              </article>
+              <article>
+                <small>드라마 수</small>
+                <strong className="c-blue">{stats.shows}</strong>
+                <span>작품에서 수집</span>
+              </article>
+            </section>
+
+            {dashboardDue.length > 0 && (
+              <section className="due-banner">
+                <div>
+                  <h4>🔔 오늘의 복습</h4>
+                  <p>복습할 단어가 {dashboardDue.length}개 있어요!</p>
+                </div>
+                <button className="primary" onClick={() => setPage('cards')}>
+                  지금 복습하기 →
+                </button>
+              </section>
+            )}
+
+            <section className="dash-columns">
+              <div>
+                <div className="dash-title">🕐 최근 추가</div>
+                <div className="dash-list">
+                  {dashboardRecent.map((item) => (
+                    <button key={item.id} className="item-card" onClick={() => openDetailModal(item.id)}>
+                      <strong>{item.phrase}</strong>
+                      <p>{item.translation}</p>
+                      <div className="chips">
+                        <span>{STATUS_LABEL[item.status]}</span>
+                        <span>{item.show || '작품 미입력'}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="dash-title">🔔 복습 필요</div>
+                <div className="dash-list">
+                  {dashboardDue.map((item) => (
+                    <button key={item.id} className="item-card" onClick={() => openDetailModal(item.id)}>
+                      <strong>{item.phrase}</strong>
+                      <p>{item.translation}</p>
+                      <div className="chips">
+                        <span>{STATUS_LABEL[item.status]}</span>
+                        <span>{item.show || '작품 미입력'}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </>
         )}
 
         {page === 'list' && (
@@ -444,19 +581,18 @@ function App() {
                   {cardIndex + 1} / {cardItems.length} 카드 · {currentCard.show || 'Unknown'}
                 </p>
                 <button className={`flashcard ${cardFlipped ? 'flipped' : ''}`} onClick={() => setCardFlipped((prev) => !prev)}>
-                  {!cardFlipped ? (
-                    <div>
+                  <div className="flashcard-inner">
+                    <div className="flashcard-face flashcard-front">
                       <span>클릭해서 뜻 확인</span>
                       <h3>{currentCard.phrase}</h3>
                       {currentCard.example && <p>"{currentCard.example}"</p>}
                     </div>
-                  ) : (
-                    <div>
+                    <div className="flashcard-face flashcard-back">
                       <span>뜻</span>
                       <h3>{currentCard.translation}</h3>
                       {currentCard.notes && <p>{currentCard.notes}</p>}
                     </div>
-                  )}
+                  </div>
                 </button>
                 <div className="rate-buttons">
                   <button className="again" onClick={() => rateCard('again')}>
@@ -476,6 +612,96 @@ function App() {
             ) : (
               <div className="empty">복습할 카드가 없습니다.</div>
             )}
+          </section>
+        )}
+
+        {page === 'calendar' && (
+          <section className="calendar-page">
+            <div className="calendar-header">
+              <h3>학습 캘린더</h3>
+              <div className="calendar-nav">
+                <button className="secondary" onClick={() => moveMonth(-1)}>
+                  ←
+                </button>
+                <strong>{monthTitle(calendarMonth)}</strong>
+                <button className="secondary" onClick={() => moveMonth(1)}>
+                  →
+                </button>
+              </div>
+            </div>
+
+            <div className="calendar-layout">
+              <aside className="unscheduled-panel">
+                <h4>미배정 카드</h4>
+                <p>카드를 원하는 날짜로 드래그하세요</p>
+                <div
+                  className="unscheduled-drop"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    const itemId = event.dataTransfer.getData('text/plain')
+                    if (itemId) clearSchedule(itemId)
+                  }}
+                >
+                  {unscheduledItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="cal-card"
+                      draggable
+                      onDragStart={(event) => event.dataTransfer.setData('text/plain', item.id)}
+                      onClick={() => openDetailModal(item.id)}
+                    >
+                      <strong>{item.phrase}</strong>
+                      <small>{item.translation}</small>
+                    </div>
+                  ))}
+                  {unscheduledItems.length === 0 && <div className="cal-empty">미배정 카드 없음</div>}
+                </div>
+              </aside>
+
+              <div className="calendar-grid-wrap">
+                <div className="calendar-weekdays">
+                  {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
+                    <div key={day}>{day}</div>
+                  ))}
+                </div>
+                <div className="calendar-grid">
+                  {calendarDays.map((day) => {
+                    const key = toDateKey(day)
+                    const inMonth = day.getMonth() === calendarMonth.getMonth()
+                    const dayItems = itemsByDate[key] ?? []
+                    return (
+                      <div
+                        key={key}
+                        className={`calendar-cell ${inMonth ? '' : 'out-month'}`}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          const itemId = event.dataTransfer.getData('text/plain')
+                          if (itemId) scheduleItem(itemId, key)
+                        }}
+                      >
+                        <div className="cell-date">{day.getDate()}</div>
+                        <div className="cell-cards">
+                          {dayItems.map((item) => (
+                            <div
+                              key={item.id}
+                              className="cal-card"
+                              draggable
+                              onDragStart={(event) => event.dataTransfer.setData('text/plain', item.id)}
+                              onClick={() => openDetailModal(item.id)}
+                            >
+                              <strong>{item.phrase}</strong>
+                              <small>{item.show || '작품 미입력'}</small>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
           </section>
         )}
       </main>
