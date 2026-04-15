@@ -167,6 +167,24 @@ function toFormState(item: StudyItem): FormState {
   }
 }
 
+function splitTranslationParts(text: string): { primary: string; secondary: string[] } {
+  const raw = text.trim()
+  if (!raw) return { primary: '', secondary: [] }
+
+  const marker = '대체 표현:'
+  const markerIdx = raw.indexOf(marker)
+  if (markerIdx === -1) return { primary: raw, secondary: [] }
+
+  const primary = raw.slice(0, markerIdx).trim()
+  const remainder = raw.slice(markerIdx + marker.length).trim()
+  const secondary = remainder
+    .split('\n')
+    .map((line) => line.replace(/^-+\s*/, '').trim())
+    .filter(Boolean)
+
+  return { primary, secondary }
+}
+
 function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [items, setItems] = useState<StudyItem[]>(() => loadItems())
@@ -265,6 +283,7 @@ function App() {
 
   const currentCard = cardItems[cardIndex] ?? null
   const detailItem = detailId ? items.find((item) => item.id === detailId) ?? null : null
+  const detailTranslation = splitTranslationParts(detailItem?.translation ?? '')
 
   const calendarDays = useMemo(() => {
     const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1)
@@ -1285,7 +1304,14 @@ function App() {
               <button onClick={() => setIsDetailOpen(false)}>✕</button>
             </header>
             <h2>{detailItem.phrase}</h2>
-            <p className="det-trans">{detailItem.translation}</p>
+            <p className="det-trans">{detailTranslation.primary || detailItem.translation}</p>
+            {detailTranslation.secondary.length > 0 && (
+              <div className="det-trans-sub">
+                {detailTranslation.secondary.map((line) => (
+                  <div key={line}>- {line}</div>
+                ))}
+              </div>
+            )}
             {detailItem.example && <div className="det-box">"{detailItem.example}"</div>}
             <div className="chips">
               <span>{STATUS_LABEL[detailItem.status]}</span>

@@ -963,6 +963,13 @@ button.danger {
   font-size: 28px;
 }
 
+.det-trans-sub {
+  margin: -4px 0 10px;
+  color: #aeb2cd;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
 .det-box {
   border: 1px solid #3b3b5a;
   background: #26263d;
