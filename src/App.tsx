@@ -1550,6 +1550,7 @@ function App() {
                       const stackCard = cardItems[idx]
                       if (!stackCard) return null
                       const isCenter = offset === 0
+                      const isExampleRevealed = !isCenter || cardTimerProgress <= 0.5
                       const card = (
                         <button
                           type="button"
@@ -1572,7 +1573,13 @@ function App() {
                             <div className="flashcard-face flashcard-front">
                               <span>{isCenter ? '클릭해서 뜻 확인' : stackCard.deck}</span>
                               <h3>{stackCard.phrase}</h3>
-                              {stackCard.example && <p>"{stackCard.example}"</p>}
+                              {stackCard.example && (
+                                <p
+                                  className={`flashcard-example ${isExampleRevealed ? 'is-revealed' : ''}`}
+                                >
+                                  "{stackCard.example}"
+                                </p>
+                              )}
                             </div>
                             <div className="flashcard-face flashcard-back">
                               <span>뜻</span>

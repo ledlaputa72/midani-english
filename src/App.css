@@ -1336,6 +1336,17 @@ button.danger {
   color: #afb1c5;
 }
 
+.flashcard-example {
+  filter: blur(7px);
+  opacity: 0.5;
+  transition: filter 0.25s ease, opacity 0.25s ease;
+}
+
+.flashcard-example.is-revealed {
+  filter: blur(0);
+  opacity: 1;
+}
+
 .stack-pos-0 {
   transform: translateX(-50%) scale(1);
   z-index: 5;
