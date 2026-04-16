@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { DragEvent as ReactDragEvent, FormEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type { User } from 'firebase/auth'
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
@@ -2115,17 +2116,21 @@ function App() {
         )}
       </main>
 
-      <nav className="mobile-bottom-nav" aria-label="모바일 주 메뉴">
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={`mobile-${item.id}`}
-            className={page === item.id ? 'active' : ''}
-            onClick={() => setPage(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      {createPortal(
+        <nav className="mobile-bottom-nav" aria-label="모바일 주 메뉴">
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={`mobile-${item.id}`}
+              type="button"
+              className={page === item.id ? 'active' : ''}
+              onClick={() => setPage(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>,
+        document.body,
+      )}
 
       {isSettingsOpen && (
         <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
