@@ -2218,11 +2218,13 @@ button.danger {
 
   .calendar-grid-wrap {
     order: 1;
-    height: 62vh;
-    max-height: 540px;
+    height: 50vh;
+    max-height: 430px;
     position: sticky;
     top: 8px;
     z-index: 2;
+    overflow: hidden;
+    touch-action: none;
   }
 
   .calendar-weekdays {
@@ -2232,6 +2234,7 @@ button.danger {
   .calendar-grid {
     height: calc(100% - 34px);
     grid-template-rows: repeat(6, minmax(0, 1fr));
+    overflow: hidden;
   }
 
   .calendar-cell {
