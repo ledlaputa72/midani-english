@@ -2058,7 +2058,6 @@ button.danger {
   }
 
   .board,
-  .stats-grid,
   .meta-grid,
   .dash-columns,
   .calendar-layout {
@@ -2185,8 +2184,29 @@ button.danger {
     padding: 5px 8px;
   }
 
+  .stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
   .stats-grid article {
-    padding: 11px;
+    padding: 8px 6px;
+    min-width: 0;
+  }
+
+  .stats-grid small {
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  .stats-grid strong {
+    font-size: 18px;
+    margin-top: 4px;
+  }
+
+  .stats-grid span {
+    font-size: 9px;
+    line-height: 1.25;
   }
 
   .dash-welcome h3 {
@@ -2339,7 +2359,25 @@ button.danger {
   }
 
   .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .stats-grid article {
+    padding: 10px 8px;
+    min-width: 0;
+  }
+
+  .stats-grid strong {
+    font-size: 22px;
+  }
+
+  .stats-grid small {
+    font-size: 11px;
+  }
+
+  .stats-grid span {
+    font-size: 10px;
   }
 
   .board,
