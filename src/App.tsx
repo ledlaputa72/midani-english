@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type { User } from 'firebase/auth'
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
@@ -411,6 +411,10 @@ function App() {
   const googleProviderRef = useRef(new GoogleAuthProvider())
   const accountMenuRef = useRef<HTMLDivElement>(null)
   const importFileRef = useRef<HTMLInputElement>(null)
+  const swipeStartXRef = useRef<number | null>(null)
+  const swipeStartYRef = useRef<number | null>(null)
+  const swipePointerIdRef = useRef<number | null>(null)
+  const suppressCardClickRef = useRef(false)
   const [weekStart, setWeekStart] = useState(() => {
     const today = new Date()
     const day = today.getDay()
@@ -1001,6 +1005,39 @@ function App() {
     )
     persist(next)
     nextCard()
+  }
+
+  const onCardSwipeStart = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (cardItems.length <= 1) return
+    swipePointerIdRef.current = event.pointerId
+    swipeStartXRef.current = event.clientX
+    swipeStartYRef.current = event.clientY
+  }
+
+  const onCardSwipeEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (swipePointerIdRef.current !== event.pointerId) return
+    const startX = swipeStartXRef.current
+    const startY = swipeStartYRef.current
+    swipePointerIdRef.current = null
+    swipeStartXRef.current = null
+    swipeStartYRef.current = null
+    if (startX === null || startY === null) return
+
+    const deltaX = event.clientX - startX
+    const deltaY = event.clientY - startY
+    const horizontalEnough = Math.abs(deltaX) >= 50
+    const mostlyHorizontal = Math.abs(deltaX) > Math.abs(deltaY) * 1.2
+    if (!horizontalEnough || !mostlyHorizontal) return
+
+    suppressCardClickRef.current = true
+    if (deltaX < 0) {
+      nextCard()
+    } else {
+      prevCard()
+    }
+    window.setTimeout(() => {
+      suppressCardClickRef.current = false
+    }, 120)
   }
 
   const loginWithGoogle = async () => {
@@ -1628,7 +1665,12 @@ function App() {
                   <button className="carousel-nav left" onClick={prevCard}>
                     ◀
                   </button>
-                  <div className="card-stack">
+                  <div
+                    className="card-stack"
+                    onPointerDown={onCardSwipeStart}
+                    onPointerUp={onCardSwipeEnd}
+                    onPointerCancel={onCardSwipeEnd}
+                  >
                     {[-2, -1, 0, 1, 2].map((offset) => {
                       const idx = cyclicIndex(cardIndex + offset, cardItems.length)
                       const stackCard = cardItems[idx]
@@ -1640,6 +1682,7 @@ function App() {
                           type="button"
                           className={`flashcard stack-pos-${offset} ${isCenter && cardFlipped ? 'flipped' : ''}`}
                           onClick={() => {
+                            if (suppressCardClickRef.current) return
                             if (isCenter) {
                               setCardFlipped((prev) => !prev)
                             } else {

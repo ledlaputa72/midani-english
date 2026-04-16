@@ -1275,6 +1275,7 @@ button.danger {
   position: relative;
   height: 310px;
   overflow: hidden;
+  touch-action: pan-y;
 }
 
 .flashcard {
