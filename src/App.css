@@ -840,6 +840,11 @@ button.danger {
   padding: 10px;
 }
 
+.board-column.is-drop-target {
+  border-color: #7b5dff;
+  box-shadow: 0 0 0 1px rgba(123, 93, 255, 0.35) inset;
+}
+
 .column h3 {
   margin: 4px 0 11px;
   font-size: 14px;
@@ -909,6 +914,10 @@ button.danger {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.board-card[draggable='true'] {
+  cursor: grab;
 }
 
 .board-card-main {

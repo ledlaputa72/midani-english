@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { FormEvent, PointerEvent as ReactPointerEvent } from 'react'
+import type { DragEvent as ReactDragEvent, FormEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type { User } from 'firebase/auth'
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
@@ -298,6 +298,7 @@ function App() {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settingsMsg, setSettingsMsg] = useState('')
+  const [boardDragOverStatus, setBoardDragOverStatus] = useState<Status | null>(null)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | Status>('all')
   const [listShowFilter, setListShowFilter] = useState<string>('all')
@@ -783,6 +784,24 @@ function App() {
       item.id === itemId ? { ...item, scheduledDate: undefined } : item,
     )
     persist(next)
+  }
+
+  const onBoardCardDragStart = (event: ReactDragEvent<HTMLElement>, itemId: string) => {
+    event.dataTransfer.setData('text/plain', itemId)
+    event.dataTransfer.effectAllowed = 'move'
+  }
+
+  const onBoardColumnDragOver = (event: ReactDragEvent<HTMLElement>, status: Status) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    if (boardDragOverStatus !== status) setBoardDragOverStatus(status)
+  }
+
+  const onBoardColumnDrop = (event: ReactDragEvent<HTMLElement>, status: Status) => {
+    event.preventDefault()
+    const itemId = event.dataTransfer.getData('text/plain')
+    if (itemId) updateStatus(itemId, status)
+    setBoardDragOverStatus(null)
   }
 
   const openedDeckItems = useMemo(() => {
@@ -1537,7 +1556,13 @@ function App() {
             {(['new', 'learning', 'mastered'] as Status[]).map((status) => {
               const columnItems = items.filter((item) => item.status === status)
               return (
-                <div className="column board-column" key={status}>
+                <div
+                  className={`column board-column ${boardDragOverStatus === status ? 'is-drop-target' : ''}`}
+                  key={status}
+                  onDragOver={(event) => onBoardColumnDragOver(event, status)}
+                  onDragLeave={() => setBoardDragOverStatus(null)}
+                  onDrop={(event) => onBoardColumnDrop(event, status)}
+                >
                   <div className="board-column-head">
                     <span className={`board-dot board-dot--${status}`} aria-hidden />
                     <h3>{STATUS_LABEL[status]}</h3>
@@ -1553,7 +1578,13 @@ function App() {
                         ? item.example.split('\n')[0]?.trim() ?? ''
                         : ''
                       return (
-                        <article key={item.id} className="board-card">
+                        <article
+                          key={item.id}
+                          className="board-card"
+                          draggable
+                          onDragStart={(event) => onBoardCardDragStart(event, item.id)}
+                          onDragEnd={() => setBoardDragOverStatus(null)}
+                        >
                           <button
                             type="button"
                             className="board-card-main plain-trigger"
