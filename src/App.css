@@ -1227,6 +1227,31 @@ button.danger {
   gap: 7px;
 }
 
+.deck-group-section {
+  display: grid;
+  gap: 7px;
+}
+
+.deck-group-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px 2px;
+  border-bottom: 1px solid #333754;
+  margin-top: 2px;
+}
+
+.deck-group-title strong {
+  font-size: 12px;
+  color: #e3e5f5;
+}
+
+.deck-group-title small {
+  font-size: 11px;
+  color: #a7accd;
+}
+
 .deck-file-row {
   display: flex;
   justify-content: space-between;

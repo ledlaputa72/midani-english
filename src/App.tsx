@@ -658,7 +658,7 @@ function App() {
   }, [activeDeck, deckNames])
 
   useEffect(() => {
-    if (!openedDeck) return
+    if (!openedDeck || openedDeck === 'all') return
     if (!deckNames.includes(openedDeck)) {
       setOpenedDeck(null)
     }
@@ -806,8 +806,25 @@ function App() {
 
   const openedDeckItems = useMemo(() => {
     if (!openedDeck) return []
+    if (openedDeck === 'all') return items
     return items.filter((item) => item.deck === openedDeck)
   }, [items, openedDeck])
+
+  const openedDeckGroups = useMemo(() => {
+    if (!openedDeck) return []
+    if (openedDeck !== 'all') {
+      return [{ deck: openedDeck, items: openedDeckItems }]
+    }
+    const map: Record<string, StudyItem[]> = {}
+    for (const item of openedDeckItems) {
+      const key = item.deck || '기본 덱'
+      if (!map[key]) map[key] = []
+      map[key].push(item)
+    }
+    return Object.entries(map)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([deck, grouped]) => ({ deck, items: grouped }))
+  }, [openedDeck, openedDeckItems])
 
   const onSubmitAdd = (event: FormEvent) => {
     event.preventDefault()
@@ -1805,7 +1822,13 @@ function App() {
                         setCardFlipped(false)
                         setCardSlideTick((t) => t + 1)
                       }}
-                      onDoubleClick={() => setOpenedDeck(null)}
+                      onDoubleClick={() => {
+                        setOpenedDeck('all')
+                        setActiveDeck('all')
+                        setCardIndex(0)
+                        setCardFlipped(false)
+                        setCardSlideTick((t) => t + 1)
+                      }}
                     >
                       <div className="folder-icon">📁</div>
                       <strong>전체 덱</strong>
@@ -1841,11 +1864,14 @@ function App() {
                   <section className="deck-explorer">
                     <header className="deck-explorer-head">
                       <div>
-                        <strong>📁 {openedDeck}</strong>
+                        <strong>📁 {openedDeck === 'all' ? '전체 덱' : openedDeck}</strong>
                         <small>{openedDeckItems.length} cards</small>
                       </div>
                       <div className="deck-explorer-actions">
-                        <button className="secondary" onClick={() => openCreateModal(openedDeck)}>
+                        <button
+                          className="secondary"
+                          onClick={() => openCreateModal(openedDeck === 'all' ? undefined : openedDeck)}
+                        >
                           + 카드 추가
                         </button>
                         <button className="secondary" onClick={() => setOpenedDeck(null)}>
@@ -1854,21 +1880,31 @@ function App() {
                       </div>
                     </header>
                     <div className="deck-file-list">
-                      {openedDeckItems.map((item) => (
-                        <div key={item.id} className="deck-file-row">
-                          <button className="deck-file-main" onClick={() => openDetailModal(item.id)}>
-                            <strong>{item.phrase}</strong>
-                            <small>{item.translation}</small>
-                          </button>
-                          <div className="deck-file-actions">
-                            <button className="secondary" onClick={() => openEditModal(item)}>
-                              수정
-                            </button>
-                            <button className="danger" onClick={() => removeItemFromDeck(item.id)}>
-                              삭제
-                            </button>
-                          </div>
-                        </div>
+                      {openedDeckGroups.map((group) => (
+                        <section key={group.deck} className="deck-group-section">
+                          {openedDeck === 'all' && (
+                            <div className="deck-group-title">
+                              <strong>📂 {group.deck}</strong>
+                              <small>{group.items.length} cards</small>
+                            </div>
+                          )}
+                          {group.items.map((item) => (
+                            <div key={item.id} className="deck-file-row">
+                              <button className="deck-file-main" onClick={() => openDetailModal(item.id)}>
+                                <strong>{item.phrase}</strong>
+                                <small>{item.translation}</small>
+                              </button>
+                              <div className="deck-file-actions">
+                                <button className="secondary" onClick={() => openEditModal(item)}>
+                                  수정
+                                </button>
+                                <button className="danger" onClick={() => removeItemFromDeck(item.id)}>
+                                  삭제
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </section>
                       ))}
                       {openedDeckItems.length === 0 && (
                         <div className="deck-file-empty">폴더 안 카드가 없습니다. + 카드 추가를 눌러주세요.</div>
@@ -1891,7 +1927,13 @@ function App() {
                         setCardFlipped(false)
                         setCardSlideTick((t) => t + 1)
                       }}
-                      onDoubleClick={() => setOpenedDeck(null)}
+                      onDoubleClick={() => {
+                        setOpenedDeck('all')
+                        setActiveDeck('all')
+                        setCardIndex(0)
+                        setCardFlipped(false)
+                        setCardSlideTick((t) => t + 1)
+                      }}
                     >
                       <div className="folder-icon">📁</div>
                       <strong>전체 덱</strong>
@@ -1927,11 +1969,14 @@ function App() {
                   <section className="deck-explorer">
                     <header className="deck-explorer-head">
                       <div>
-                        <strong>📁 {openedDeck}</strong>
+                        <strong>📁 {openedDeck === 'all' ? '전체 덱' : openedDeck}</strong>
                         <small>{openedDeckItems.length} cards</small>
                       </div>
                       <div className="deck-explorer-actions">
-                        <button className="secondary" onClick={() => openCreateModal(openedDeck)}>
+                        <button
+                          className="secondary"
+                          onClick={() => openCreateModal(openedDeck === 'all' ? undefined : openedDeck)}
+                        >
                           + 카드 추가
                         </button>
                         <button className="secondary" onClick={() => setOpenedDeck(null)}>
@@ -1940,21 +1985,31 @@ function App() {
                       </div>
                     </header>
                     <div className="deck-file-list">
-                      {openedDeckItems.map((item) => (
-                        <div key={item.id} className="deck-file-row">
-                          <button className="deck-file-main" onClick={() => openDetailModal(item.id)}>
-                            <strong>{item.phrase}</strong>
-                            <small>{item.translation}</small>
-                          </button>
-                          <div className="deck-file-actions">
-                            <button className="secondary" onClick={() => openEditModal(item)}>
-                              수정
-                            </button>
-                            <button className="danger" onClick={() => removeItemFromDeck(item.id)}>
-                              삭제
-                            </button>
-                          </div>
-                        </div>
+                      {openedDeckGroups.map((group) => (
+                        <section key={group.deck} className="deck-group-section">
+                          {openedDeck === 'all' && (
+                            <div className="deck-group-title">
+                              <strong>📂 {group.deck}</strong>
+                              <small>{group.items.length} cards</small>
+                            </div>
+                          )}
+                          {group.items.map((item) => (
+                            <div key={item.id} className="deck-file-row">
+                              <button className="deck-file-main" onClick={() => openDetailModal(item.id)}>
+                                <strong>{item.phrase}</strong>
+                                <small>{item.translation}</small>
+                              </button>
+                              <div className="deck-file-actions">
+                                <button className="secondary" onClick={() => openEditModal(item)}>
+                                  수정
+                                </button>
+                                <button className="danger" onClick={() => removeItemFromDeck(item.id)}>
+                                  삭제
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </section>
                       ))}
                       {openedDeckItems.length === 0 && (
                         <div className="deck-file-empty">폴더 안 카드가 없습니다. + 카드 추가를 눌러주세요.</div>
