@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import type { User } from 'firebase/auth'
+import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
+import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
+import { auth, db, firebaseReady } from './firebase'
 import './App.css'
 
 type Status = 'new' | 'learning' | 'mastered'
@@ -40,6 +44,7 @@ type FormState = {
 }
 
 const STORAGE_KEY = 'midani.study.items.v2'
+const FIREBASE_DOC_KEY = 'studyItems'
 
 /** 플래시카드 자동 넘김 간격 (롤링 배너, ms) */
 const CARD_AUTO_ADVANCE_MS = 8000
@@ -111,18 +116,21 @@ const SAMPLE_ITEMS: StudyItem[] = [
   },
 ]
 
+function normalizeItems(source: StudyItem[] | unknown): StudyItem[] {
+  if (!Array.isArray(source)) return []
+  return source.map((item) => ({
+    ...(item as StudyItem),
+    deck: (item as StudyItem).deck?.trim() || '기본 덱',
+  }))
+}
+
 function loadItems(): StudyItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return SAMPLE_ITEMS
-    const parsed = JSON.parse(raw) as StudyItem[]
-    if (!Array.isArray(parsed) || parsed.length === 0) return SAMPLE_ITEMS
-    return parsed.map((item) => ({
-      ...item,
-      deck: item.deck?.trim() || '기본 덱',
-    }))
+    if (!raw) return []
+    return normalizeItems(JSON.parse(raw))
   } catch {
-    return SAMPLE_ITEMS
+    return []
   }
 }
 
@@ -212,7 +220,15 @@ function sanitizeTranslationApiText(text: string): string {
 
 function App() {
   const [page, setPage] = useState<Page>('dashboard')
-  const [items, setItems] = useState<StudyItem[]>(() => loadItems())
+  const [items, setItems] = useState<StudyItem[]>([])
+  const [authUser, setAuthUser] = useState<User | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [syncLoading, setSyncLoading] = useState(false)
+  const [authError, setAuthError] = useState('')
+  const [syncError, setSyncError] = useState('')
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [settingsMsg, setSettingsMsg] = useState('')
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | Status>('all')
   const [listShowFilter, setListShowFilter] = useState<string>('all')
@@ -323,6 +339,9 @@ function App() {
   const [cardFlipped, setCardFlipped] = useState(false)
   const [cardEnterDir, setCardEnterDir] = useState<CardEnterDir>('next')
   const [calendarMonth, setCalendarMonth] = useState(() => new Date())
+  const googleProviderRef = useRef(new GoogleAuthProvider())
+  const accountMenuRef = useRef<HTMLDivElement>(null)
+  const importFileRef = useRef<HTMLInputElement>(null)
   const [weekStart, setWeekStart] = useState(() => {
     const today = new Date()
     const day = today.getDay()
@@ -330,9 +349,73 @@ function App() {
     return addDays(today, diff)
   })
 
-  const persist = (next: StudyItem[]) => {
+  useEffect(() => {
+    if (!firebaseReady || !auth) {
+      setAuthLoading(false)
+      return
+    }
+    const unsub = onAuthStateChanged(auth, (nextUser) => {
+      setAuthUser(nextUser)
+      setAuthLoading(false)
+      setAuthError('')
+    })
+    return () => unsub()
+  }, [])
+
+  useEffect(() => {
+    if (!authUser || !db) {
+      setItems([])
+      setIsAccountMenuOpen(false)
+      return
+    }
+    setSyncLoading(true)
+    const ref = doc(db, 'users', authUser.uid, 'appData', FIREBASE_DOC_KEY)
+    const unsub = onSnapshot(
+      ref,
+      async (snap) => {
+        const data = snap.data() as { items?: StudyItem[] } | undefined
+        const next = normalizeItems(data?.items)
+        if (next.length > 0) {
+          setItems(next)
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+        } else {
+          const cached = loadItems()
+          const seed = cached.length > 0 ? cached : SAMPLE_ITEMS
+          setItems(seed)
+          await setDoc(
+            ref,
+            { items: seed, updatedAt: serverTimestamp() },
+            { merge: true },
+          )
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(seed))
+        }
+        setSyncError('')
+        setSyncLoading(false)
+      },
+      (err) => {
+        const cached = loadItems()
+        setItems(cached.length > 0 ? cached : SAMPLE_ITEMS)
+        setSyncError(err.message || '클라우드 동기화에 실패했습니다.')
+        setSyncLoading(false)
+      },
+    )
+    return () => unsub()
+  }, [authUser])
+
+  const persist = async (next: StudyItem[]) => {
     setItems(next)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    if (!authUser || !db) return
+    try {
+      await setDoc(
+        doc(db, 'users', authUser.uid, 'appData', FIREBASE_DOC_KEY),
+        { items: next, updatedAt: serverTimestamp() },
+        { merge: true },
+      )
+      setSyncError('')
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : '클라우드 저장 중 오류가 발생했습니다.')
+    }
   }
 
   const listShowOptions = useMemo(() => {
@@ -381,6 +464,14 @@ function App() {
     }),
     [items],
   )
+
+  const boardColumnCounts = useMemo(() => {
+    const c = { new: 0, learning: 0, mastered: 0 }
+    for (const item of items) {
+      c[item.status]++
+    }
+    return c
+  }, [items])
 
   const dashboardRecent = useMemo(() => {
     return [...items]
@@ -471,6 +562,17 @@ function App() {
     }
     return map
   }, [items, weekDays])
+
+  useEffect(() => {
+    if (!isAccountMenuOpen) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false)
+      }
+    }
+    window.addEventListener('mousedown', onPointerDown)
+    return () => window.removeEventListener('mousedown', onPointerDown)
+  }, [isAccountMenuOpen])
 
   useEffect(() => {
     if (activeDeck === 'all') return
@@ -817,6 +919,104 @@ function App() {
     nextCard()
   }
 
+  const loginWithGoogle = async () => {
+    if (!auth || !firebaseReady) return
+    setAuthError('')
+    try {
+      await signInWithPopup(auth, googleProviderRef.current)
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : '구글 로그인에 실패했습니다.')
+    }
+  }
+
+  const logout = async () => {
+    if (!auth) return
+    try {
+      await signOut(auth)
+      setItems([])
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : '로그아웃에 실패했습니다.')
+    }
+  }
+
+  const forceSyncNow = async () => {
+    if (!authUser || !db) return
+    setSyncLoading(true)
+    setSettingsMsg('')
+    try {
+      await setDoc(
+        doc(db, 'users', authUser.uid, 'appData', FIREBASE_DOC_KEY),
+        { items, updatedAt: serverTimestamp() },
+        { merge: true },
+      )
+      setSettingsMsg('클라우드 동기화를 완료했습니다.')
+      setSyncError('')
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : '동기화에 실패했습니다.')
+    } finally {
+      setSyncLoading(false)
+    }
+  }
+
+  const exportItemsJson = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      count: items.length,
+      items,
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `midani-study-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setSettingsMsg('백업 파일을 내보냈습니다.')
+  }
+
+  const importItemsJson = async (file: File | null) => {
+    if (!file) return
+    setSettingsMsg('')
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text) as { items?: unknown } | StudyItem[]
+      const rawItems = Array.isArray(parsed) ? parsed : parsed.items
+      const next = normalizeItems(rawItems)
+      if (next.length === 0) {
+        setSettingsMsg('불러온 데이터에 카드가 없습니다.')
+        return
+      }
+      await persist(next)
+      setSettingsMsg(`${next.length}개 카드를 불러왔습니다.`)
+    } catch {
+      setSettingsMsg('JSON 파일 형식이 올바르지 않습니다.')
+    }
+  }
+
+  if (!firebaseReady) {
+    return (
+      <div className="auth-gate">
+        <section className="auth-card">
+          <h2>Firebase 설정이 필요합니다</h2>
+          <p>
+            외부 접속 동기화를 위해 Firebase 프로젝트를 연결해 주세요. 루트에 `.env` 파일을 만들고
+            `.env.example` 키를 채운 뒤 다시 실행하면 됩니다.
+          </p>
+        </section>
+      </div>
+    )
+  }
+
+  if (authLoading) {
+    return (
+      <div className="auth-gate">
+        <section className="auth-card">
+          <h2>로그인 상태 확인 중…</h2>
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -841,22 +1041,84 @@ function App() {
             캘린더
           </button>
         </nav>
+        <div className="sidebar-account" ref={accountMenuRef}>
+          {!authUser ? (
+            <>
+              <button type="button" className="account-login-link" onClick={loginWithGoogle}>
+                Google 로그인
+              </button>
+              <p className="account-subtext">로그인하면 기기 간 동기화가 활성화됩니다.</p>
+              {authError && <p className="auth-error">{authError}</p>}
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="account-trigger"
+                onClick={() => setIsAccountMenuOpen((prev) => !prev)}
+              >
+                <span className="account-avatar">{(authUser.displayName || authUser.email || 'U')[0]}</span>
+                <span className="account-main">
+                  <strong>{authUser.displayName || 'Google 사용자'}</strong>
+                  <small>{authUser.email || '이메일 없음'}</small>
+                </span>
+                <span className="account-caret">{isAccountMenuOpen ? '▴' : '▾'}</span>
+              </button>
+              {isAccountMenuOpen && (
+                <div className="account-menu">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSettingsOpen(true)
+                      setSettingsMsg('')
+                      setIsAccountMenuOpen(false)
+                    }}
+                  >
+                    설정
+                  </button>
+                  <button type="button" onClick={logout}>
+                    로그아웃
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </aside>
 
       <main className="content">
         <header className="page-header">
           <div>
-            <h2>{page === 'list' ? '📋 전체 목록' : '학습 노트'}</h2>
+            <h2>
+              {page === 'list'
+                ? '📋 전체 목록'
+                : page === 'board'
+                  ? '📌 카드 보드'
+                  : '학습 노트'}
+            </h2>
             <p>
               {page === 'list'
                 ? '단어·구문·뜻을 한눈에 보고 복습해 보세요.'
-                : '프로토타입 기반 모달 + 카드 학습 흐름'}
+                : page === 'board'
+                  ? '상태별 칸에서 예문·복습·출처를 함께 보며 진행도를 관리해 보세요.'
+                  : '프로토타입 기반 모달 + 카드 학습 흐름'}
             </p>
           </div>
-          <button className="primary" onClick={() => openCreateModal()}>
-            {page === 'list' ? '+ 추가' : '단어 / 구문 추가'}
-          </button>
+          <div className="header-actions">
+            <span className="sync-chip">
+              {!authUser ? '로컬 모드' : syncLoading ? '동기화 중…' : '동기화 완료'}
+            </span>
+            {authUser && (
+              <span className="user-chip" title={authUser.email ?? ''}>
+                {authUser.displayName || authUser.email || 'Google 사용자'}
+              </span>
+            )}
+            <button className="primary" onClick={() => openCreateModal()}>
+              {page === 'list' || page === 'board' ? '+ 추가' : '단어 / 구문 추가'}
+            </button>
+          </div>
         </header>
+        {syncError && <p className="sync-error-banner">동기화 오류: {syncError}</p>}
 
         {page === 'dashboard' && (
           <>
@@ -1151,32 +1413,121 @@ function App() {
         )}
         {page === 'board' && (
           <section className="board">
-            {(['new', 'learning', 'mastered'] as Status[]).map((status) => (
-              <div className="column" key={status}>
-                <h3>{STATUS_LABEL[status]}</h3>
-                {items
-                  .filter((item) => item.status === status)
-                  .map((item) => (
-                    <article key={item.id} className="board-card">
-                      <button className="plain-trigger" onClick={() => openDetailModal(item.id)}>
-                        <strong>{item.phrase}</strong>
-                        <p>{item.translation}</p>
-                      </button>
-                      <div className="card-actions">
-                        {status !== 'new' && (
-                          <button onClick={() => updateStatus(item.id, 'new')}>새 단어</button>
-                        )}
-                        {status !== 'learning' && (
-                          <button onClick={() => updateStatus(item.id, 'learning')}>학습 중</button>
-                        )}
-                        {status !== 'mastered' && (
-                          <button onClick={() => updateStatus(item.id, 'mastered')}>완료</button>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-              </div>
-            ))}
+            {(['new', 'learning', 'mastered'] as Status[]).map((status) => {
+              const columnItems = items.filter((item) => item.status === status)
+              return (
+                <div className="column board-column" key={status}>
+                  <div className="board-column-head">
+                    <span className={`board-dot board-dot--${status}`} aria-hidden />
+                    <h3>{STATUS_LABEL[status]}</h3>
+                    <span className="board-count">{boardColumnCounts[status]}</span>
+                  </div>
+                  {columnItems.length === 0 ? (
+                    <p className="board-column-empty">이 칸에 카드가 없습니다.</p>
+                  ) : (
+                    columnItems.map((item) => {
+                      const koPrimary =
+                        splitTranslationParts(item.translation).primary || item.translation
+                      const exampleLine = item.example.trim()
+                        ? item.example.split('\n')[0]?.trim() ?? ''
+                        : ''
+                      return (
+                        <article key={item.id} className="board-card">
+                          <button
+                            type="button"
+                            className="board-card-main plain-trigger"
+                            onClick={() => openDetailModal(item.id)}
+                          >
+                            <div className="board-card-top">
+                              <strong className="board-phrase">{item.phrase}</strong>
+                              <span className="board-deck-pill" title={item.deck}>
+                                {item.deck || '기본 덱'}
+                              </span>
+                            </div>
+                            <p className="board-ko">{koPrimary}</p>
+                            {item.tags.length > 0 && (
+                              <div className="board-tags" aria-label="태그">
+                                {item.tags.map((tag) => (
+                                  <span key={tag} className="board-tag">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {exampleLine && (
+                              <p className="board-example">
+                                <span className="board-example-label">예문</span>
+                                <span className="board-example-text">"{exampleLine}"</span>
+                              </p>
+                            )}
+                            <div className="board-meta-row">
+                              <span className="board-source">
+                                <span className="board-source-icon" aria-hidden>
+                                  🎬
+                                </span>
+                                {(item.show ?? '').trim() || '작품 미입력'}
+                                {item.episode ? (
+                                  <small className="board-ep">{item.episode}</small>
+                                ) : null}
+                              </span>
+                              <span
+                                className="board-stars"
+                                aria-label={`중요도·난이도 ${item.difficulty}단계`}
+                              >
+                                {[1, 2, 3].map((n) => (
+                                  <span
+                                    key={n}
+                                    className={n <= item.difficulty ? 'star on' : 'star off'}
+                                  >
+                                    ★
+                                  </span>
+                                ))}
+                              </span>
+                            </div>
+                            <dl className="board-srs">
+                              <div>
+                                <dt>복습</dt>
+                                <dd>{item.reviewCount}회</dd>
+                              </div>
+                              <div>
+                                <dt>마지막</dt>
+                                <dd>{dateText(item.lastReviewedAt)}</dd>
+                              </div>
+                              <div>
+                                <dt>일정</dt>
+                                <dd>{item.scheduledDate ? item.scheduledDate : '—'}</dd>
+                              </div>
+                            </dl>
+                            {item.notes.trim() ? (
+                              <p className="board-notes" title={item.notes}>
+                                {item.notes}
+                              </p>
+                            ) : null}
+                          </button>
+                          <div className="card-actions board-card-actions">
+                            {status !== 'new' && (
+                              <button type="button" onClick={() => updateStatus(item.id, 'new')}>
+                                ← 새 단어
+                              </button>
+                            )}
+                            {status !== 'learning' && (
+                              <button type="button" onClick={() => updateStatus(item.id, 'learning')}>
+                                학습
+                              </button>
+                            )}
+                            {status !== 'mastered' && (
+                              <button type="button" onClick={() => updateStatus(item.id, 'mastered')}>
+                                완료 →
+                              </button>
+                            )}
+                          </div>
+                        </article>
+                      )
+                    })
+                  )}
+                </div>
+              )
+            })}
           </section>
         )}
 
@@ -1541,6 +1892,65 @@ function App() {
           </section>
         )}
       </main>
+
+      {isSettingsOpen && (
+        <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
+          <section className="modal settings-modal" onClick={(event) => event.stopPropagation()}>
+            <header>
+              <h3>계정 및 동기화 설정</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSettingsOpen(false)
+                  setSettingsMsg('')
+                }}
+              >
+                ✕
+              </button>
+            </header>
+            <div className="settings-block">
+              <small>계정</small>
+              <strong>{authUser?.displayName || 'Google 사용자'}</strong>
+              <p>{authUser?.email || '이메일 없음'}</p>
+            </div>
+            <div className="settings-actions">
+              <button type="button" className="secondary" onClick={forceSyncNow} disabled={!authUser}>
+                지금 동기화
+              </button>
+              <button type="button" className="secondary" onClick={exportItemsJson}>
+                데이터 내보내기
+              </button>
+              <button type="button" className="secondary" onClick={() => importFileRef.current?.click()}>
+                데이터 가져오기
+              </button>
+              <input
+                ref={importFileRef}
+                type="file"
+                accept="application/json"
+                className="settings-hidden-file"
+                onChange={(event) => {
+                  importItemsJson(event.target.files?.[0] ?? null)
+                  event.currentTarget.value = ''
+                }}
+              />
+            </div>
+            {settingsMsg && <p className="settings-msg">{settingsMsg}</p>}
+            {syncError && <p className="settings-error">{syncError}</p>}
+            <footer>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setIsSettingsOpen(false)
+                  setSettingsMsg('')
+                }}
+              >
+                닫기
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
 
       {isAddOpen && (
         <div className="modal-overlay" onClick={closeAddModal}>
