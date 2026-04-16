@@ -45,6 +45,13 @@ VITE_FIREBASE_APP_ID=...
 npm run build
 ```
 
+## Mobile UX (Phase 1)
+
+- 모바일 화면에서 좌측 사이드 메뉴를 하단 탭 네비로 전환
+- 안전영역(`safe-area`)을 고려한 하단 패딩 처리
+- 카드/덱/헤더 영역을 세로 스크롤 중심 레이아웃으로 최적화
+- 앱 패키징 준비 문서는 `mobile-app/README.md` 참고
+
 ## GitHub 연결
 
 아래는 로컬에서 한 번만 실행하면 됩니다.

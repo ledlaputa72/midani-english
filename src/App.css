@@ -2109,3 +2109,199 @@ button.danger {
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 768px) {
+  .content {
+    padding: 14px 12px calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .sidebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    height: auto;
+    overflow: visible;
+    border-right: none;
+    border-top: 1px solid #2d2d42;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: rgba(18, 19, 33, 0.96);
+    backdrop-filter: blur(10px);
+    z-index: 90;
+  }
+
+  .sidebar .logo,
+  .sidebar-account {
+    display: none;
+  }
+
+  .sidebar nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .sidebar nav button {
+    min-height: 58px;
+    border-radius: 10px;
+    padding: 6px 4px;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.2;
+    word-break: keep-all;
+  }
+
+  .page-header {
+    align-items: start;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .page-header h2 {
+    font-size: 28px;
+  }
+
+  .page-header p {
+    font-size: 12px;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .header-actions .primary {
+    margin-left: auto;
+  }
+
+  .sync-chip,
+  .user-chip {
+    font-size: 10px;
+    padding: 5px 8px;
+  }
+
+  .stats-grid article {
+    padding: 11px;
+  }
+
+  .dash-welcome h3 {
+    font-size: 26px;
+  }
+
+  .week-cell {
+    min-height: 110px;
+  }
+
+  .deck-explorer-head {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .deck-explorer-actions {
+    width: 100%;
+  }
+
+  .deck-explorer-actions button {
+    flex: 1;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1200px) {
+  .app {
+    grid-template-columns: 96px 1fr;
+    align-items: start;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    align-self: start;
+    padding: 12px 8px;
+    gap: 10px;
+  }
+
+  .logo p {
+    display: none;
+  }
+
+  .logo h1 {
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .sidebar nav {
+    gap: 6px;
+  }
+
+  .sidebar nav button {
+    min-height: 54px;
+    padding: 8px 6px;
+    font-size: 11px;
+    text-align: center;
+    line-height: 1.25;
+  }
+
+  .sidebar-account {
+    padding-top: 8px;
+  }
+
+  .account-subtext,
+  .account-main small {
+    display: none;
+  }
+
+  .account-main strong {
+    font-size: 11px;
+  }
+
+  .content {
+    padding: 18px 16px;
+  }
+
+  .page-header {
+    align-items: start;
+    gap: 10px;
+  }
+
+  .page-header h2 {
+    font-size: 34px;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .board,
+  .calendar-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dash-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .week-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .deck-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .carousel-wrap {
+    grid-template-columns: 36px 1fr 36px;
+  }
+
+  .card-stack {
+    height: 292px;
+  }
+
+  .flashcard h3 {
+    font-size: 36px;
+  }
+}
