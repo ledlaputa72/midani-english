@@ -2,6 +2,7 @@
   display: grid;
   grid-template-columns: 230px 1fr;
   min-height: 100vh;
+  align-items: start;
 }
 
 .sidebar {
@@ -15,6 +16,7 @@
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  align-self: start;
 }
 
 .logo h1 {
@@ -1995,6 +1997,7 @@ button.danger {
 @media (max-width: 1000px) {
   .app {
     grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .sidebar {
