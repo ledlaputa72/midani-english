@@ -55,6 +55,14 @@ const STATUS_LABEL: Record<Status, string> = {
   mastered: '완료',
 }
 
+const NAV_ITEMS: Array<{ id: Page; label: string }> = [
+  { id: 'dashboard', label: '대시보드' },
+  { id: 'list', label: '리스트' },
+  { id: 'board', label: '보드' },
+  { id: 'cards', label: '플래시카드' },
+  { id: 'calendar', label: '캘린더' },
+]
+
 const EMPTY_FORM: FormState = {
   phrase: '',
   translation: '',
@@ -1182,21 +1190,15 @@ function App() {
           <p>미드/애니 영어 학습</p>
         </div>
         <nav>
-          <button className={page === 'dashboard' ? 'active' : ''} onClick={() => setPage('dashboard')}>
-            대시보드
-          </button>
-          <button className={page === 'list' ? 'active' : ''} onClick={() => setPage('list')}>
-            리스트
-          </button>
-          <button className={page === 'board' ? 'active' : ''} onClick={() => setPage('board')}>
-            보드
-          </button>
-          <button className={page === 'cards' ? 'active' : ''} onClick={() => setPage('cards')}>
-            플래시카드
-          </button>
-          <button className={page === 'calendar' ? 'active' : ''} onClick={() => setPage('calendar')}>
-            캘린더
-          </button>
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              className={page === item.id ? 'active' : ''}
+              onClick={() => setPage(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
         </nav>
         <div className="sidebar-account" ref={accountMenuRef}>
           {!authUser ? (
@@ -2112,6 +2114,18 @@ function App() {
           </section>
         )}
       </main>
+
+      <nav className="mobile-bottom-nav" aria-label="모바일 주 메뉴">
+        {NAV_ITEMS.map((item) => (
+          <button
+            key={`mobile-${item.id}`}
+            className={page === item.id ? 'active' : ''}
+            onClick={() => setPage(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
 
       {isSettingsOpen && (
         <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
