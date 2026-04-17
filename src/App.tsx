@@ -452,11 +452,402 @@ const PHRASE_USAGE_OVERRIDES: Record<
   string,
   { meaningKo: string; altMeaningsKo?: string[]; exampleEn: string; exampleKo: string; itemType?: ItemType }
 > = {
+  // ── A ──────────────────────────────────────────────────────────────
+  'add insult to injury': {
+    meaningKo: '설상가상으로 더 나쁘게 만들다.',
+    altMeaningsKo: ['엎친 데 덮친 격이다.'],
+    exampleEn: "A: He didn't even apologize.\nB: And then he blamed me — talk about adding insult to injury.",
+    exampleKo: 'A: 그는 사과조차 하지 않았어.\nB: 게다가 나를 탓하기까지 했어 — 정말 엎친 데 덮친 격이지.',
+    itemType: 'idiom',
+  },
+  'at the drop of a hat': {
+    meaningKo: '즉시, 망설임 없이.',
+    altMeaningsKo: ['언제든 바로'],
+    exampleEn: "A: Can you come help me move?\nB: Of course — I'd do it at the drop of a hat.",
+    exampleKo: 'A: 이사 도와줄 수 있어?\nB: 물론이지 — 언제든 바로 달려갈게.',
+    itemType: 'idiom',
+  },
+  // ── B ──────────────────────────────────────────────────────────────
+  'back to square one': {
+    meaningKo: '처음으로 돌아가다.',
+    altMeaningsKo: ['원점으로 돌아가다.'],
+    exampleEn: "A: The plan failed completely.\nB: I know. We're back to square one.",
+    exampleKo: 'A: 계획이 완전히 실패했어.\nB: 맞아. 원점으로 돌아간 거야.',
+    itemType: 'idiom',
+  },
+  'beat around the bush': {
+    meaningKo: '핵심을 피하고 빙빙 돌려 말하다.',
+    altMeaningsKo: ['돌려서 말하다.', '핵심을 회피하다.'],
+    exampleEn: "A: Just tell me what's wrong.\nB: Stop beating around the bush and be direct.",
+    exampleKo: 'A: 뭐가 문제인지 그냥 말해줘.\nB: 빙빙 돌리지 말고 직접적으로 말해.',
+    itemType: 'idiom',
+  },
+  'bite the bullet': {
+    meaningKo: '이를 악물고 참다, 힘든 상황을 감수하다.',
+    altMeaningsKo: ['어려움을 견디다.'],
+    exampleEn: "A: The dentist appointment is going to hurt.\nB: I know, but I'll just have to bite the bullet.",
+    exampleKo: 'A: 치과 예약이 아플 거야.\nB: 알아, 그냥 이를 악물고 견뎌야지.',
+    itemType: 'idiom',
+  },
+  'bite the dust': {
+    meaningKo: '실패하다, 쓰러지다.',
+    altMeaningsKo: ['망하다.', '죽다.'],
+    exampleEn: "A: Did the startup survive?\nB: No, it bit the dust after just six months.",
+    exampleKo: 'A: 그 스타트업 살아남았어?\nB: 아니, 6개월 만에 망했어.',
+    itemType: 'idiom',
+  },
+  'born yesterday': {
+    meaningKo: '세상 물정 모르는, 순진하게 속다.',
+    altMeaningsKo: ['그렇게 쉽게 속지 않아.', '나 바보 아니야.'],
+    exampleEn: "A: He thought I'd believe that story?\nB: Does he think I was born yesterday?",
+    exampleKo: 'A: 그가 내가 그 얘기를 믿을 거라 생각했대?\nB: 나를 뭘로 보는 거야, 내가 그렇게 순진한 줄 알아?',
+    itemType: 'idiom',
+  },
+  "i wasn't born yesterday": {
+    meaningKo: '나 그렇게 순진하지 않아. 나 호락호락하지 않아.',
+    altMeaningsKo: ['그런 걸로 못 속여.', '나 바보 아니거든.'],
+    exampleEn: "A: I think this plan is fair.\nB: I wasn't born yesterday. Let's double-check the details.",
+    exampleKo: 'A: 이 계획은 공정한 것 같아.\nB: 나 호락호락하지 않아. 세부 사항을 다시 확인해 보자.',
+    itemType: 'idiom',
+  },
+  'break the ice': {
+    meaningKo: '어색한 분위기를 깨다.',
+    altMeaningsKo: ['첫 대화를 시작하다.'],
+    exampleEn: "A: The room was so quiet at the party.\nB: Yeah, someone needed to break the ice.",
+    exampleKo: 'A: 파티에서 방이 너무 조용했어.\nB: 맞아, 누군가 어색한 분위기를 깨야 했어.',
+    itemType: 'idiom',
+  },
+  'burn bridges': {
+    meaningKo: '관계를 완전히 끊다, 돌아올 수 없게 만들다.',
+    altMeaningsKo: ['퇴로를 차단하다.'],
+    exampleEn: "A: Should I quit without notice?\nB: Don't burn bridges — give proper notice.",
+    exampleKo: 'A: 예고 없이 그냥 그만둘까?\nB: 관계를 끊지 마 — 제대로 예고를 해.',
+    itemType: 'idiom',
+  },
+  // ── C ──────────────────────────────────────────────────────────────
+  'call it a day': {
+    meaningKo: '오늘은 여기서 끝내다, 일을 마치다.',
+    altMeaningsKo: ['그만하다.', '마무리하다.'],
+    exampleEn: "A: We've been working for eight hours.\nB: Let's call it a day and get some rest.",
+    exampleKo: 'A: 8시간이나 일했어.\nB: 오늘은 여기서 끝내고 쉬자.',
+    itemType: 'idiom',
+  },
+  'cold feet': {
+    meaningKo: '(막판에) 겁이 나서 포기하고 싶은 마음.',
+    altMeaningsKo: ['긴장해서 망설이다.'],
+    exampleEn: "A: Are you still going through with the wedding?\nB: I'm getting cold feet, honestly.",
+    exampleKo: 'A: 결혼 그대로 진행하는 거야?\nB: 솔직히 겁이 나서 망설여져.',
+    itemType: 'idiom',
+  },
+  'cold shoulder': {
+    meaningKo: '냉대하다, 무시하다.',
+    altMeaningsKo: ['쌀쌀맞게 대하다.'],
+    exampleEn: "A: Why isn't she talking to you?\nB: She's been giving me the cold shoulder all week.",
+    exampleKo: 'A: 왜 그녀가 너한테 말 안 해?\nB: 일주일 내내 나를 냉대하고 있어.',
+    itemType: 'idiom',
+  },
+  'cost an arm and a leg': {
+    meaningKo: '엄청나게 비싸다.',
+    altMeaningsKo: ['큰돈이 들다.'],
+    exampleEn: "A: Did you buy the new phone?\nB: No, it costs an arm and a leg.",
+    exampleKo: 'A: 새 폰 샀어?\nB: 아니, 너무 비싸.',
+    itemType: 'idiom',
+  },
   'cut it out': {
     meaningKo: '그만해.',
     altMeaningsKo: ['집어치워.', '그만 좀 해.'],
     exampleEn: 'A: Why are you making fun of him?\nB: Okay, okay. Cut it out. I got it.',
     exampleKo: 'A: 왜 그를 놀리는 거야?\nB: 알았어, 알았어. 그만할게.',
+    itemType: 'idiom',
+  },
+  // ── D ──────────────────────────────────────────────────────────────
+  'down to earth': {
+    meaningKo: '현실적이고 소탈한, 꾸밈없는.',
+    altMeaningsKo: ['겸손하고 현실적인.'],
+    exampleEn: "A: Is the new manager approachable?\nB: Very — she's really down to earth.",
+    exampleKo: 'A: 새 매니저는 다가가기 쉬워?\nB: 응 — 정말 소탈하고 현실적이야.',
+    itemType: 'idiom',
+  },
+  'drop the ball': {
+    meaningKo: '실수하다, 책임을 다하지 못하다.',
+    altMeaningsKo: ['중요한 것을 놓치다.'],
+    exampleEn: "A: Who forgot to send the report?\nB: I dropped the ball on that. I'm sorry.",
+    exampleKo: 'A: 누가 보고서 보내는 거 잊었어?\nB: 내가 실수했어. 미안해.',
+    itemType: 'idiom',
+  },
+  // ── E ──────────────────────────────────────────────────────────────
+  'easier said than done': {
+    meaningKo: '말하기는 쉽지만 실제로 하기는 어렵다.',
+    altMeaningsKo: ['말이야 쉽지.'],
+    exampleEn: "A: Just forget about it and move on.\nB: Easier said than done.",
+    exampleKo: 'A: 그냥 잊고 앞으로 나아가.\nB: 말이야 쉽지.',
+    itemType: 'idiom',
+  },
+  // ── F ──────────────────────────────────────────────────────────────
+  'face the music': {
+    meaningKo: '결과에 책임지다, 현실을 직면하다.',
+    altMeaningsKo: ['책임을 지다.'],
+    exampleEn: "A: You made a mistake. What now?\nB: I have to face the music and apologize.",
+    exampleKo: 'A: 네가 실수했어. 이제 어쩔 거야?\nB: 현실을 직면하고 사과해야지.',
+    itemType: 'idiom',
+  },
+  'from scratch': {
+    meaningKo: '처음부터, 아무것도 없이 시작하다.',
+    altMeaningsKo: ['맨 처음부터 시작하다.'],
+    exampleEn: "A: Did you use a recipe?\nB: No, I made the whole dish from scratch.",
+    exampleKo: 'A: 레시피 사용했어?\nB: 아니, 처음부터 직접 만들었어.',
+    itemType: 'idiom',
+  },
+  // ── G ──────────────────────────────────────────────────────────────
+  'get out of hand': {
+    meaningKo: '통제를 벗어나다, 걷잡을 수 없게 되다.',
+    altMeaningsKo: ['감당이 안 되다.'],
+    exampleEn: "A: The argument got really intense.\nB: Yeah, it totally got out of hand.",
+    exampleKo: 'A: 말다툼이 정말 심해졌어.\nB: 맞아, 완전히 걷잡을 수 없게 됐어.',
+    itemType: 'idiom',
+  },
+  'get the hang of': {
+    meaningKo: '요령을 익히다, 감을 잡다.',
+    altMeaningsKo: ['익숙해지다.'],
+    exampleEn: "A: Is the new software confusing?\nB: A little, but I'm starting to get the hang of it.",
+    exampleKo: 'A: 새 소프트웨어 헷갈려?\nB: 조금, 근데 이제 감을 잡아가고 있어.',
+    itemType: 'idiom',
+  },
+  'give the cold shoulder': {
+    meaningKo: '냉대하다, 무시하다.',
+    altMeaningsKo: ['쌀쌀맞게 굴다.'],
+    exampleEn: "A: She didn't say a word to me.\nB: She's really giving you the cold shoulder.",
+    exampleKo: 'A: 그녀가 나한테 한마디도 안 했어.\nB: 정말 너를 냉대하고 있네.',
+    itemType: 'idiom',
+  },
+  // ── H ──────────────────────────────────────────────────────────────
+  'hit the nail on the head': {
+    meaningKo: '정확히 핵심을 짚다.',
+    altMeaningsKo: ['딱 맞는 말을 하다.'],
+    exampleEn: "A: I think the problem is a lack of communication.\nB: You hit the nail on the head.",
+    exampleKo: 'A: 문제가 소통 부족인 것 같아.\nB: 정확히 핵심을 짚었어.',
+    itemType: 'idiom',
+  },
+  'hit the sack': {
+    meaningKo: '자다, 잠자리에 들다.',
+    altMeaningsKo: ['자러 가다.'],
+    exampleEn: "A: It's already midnight.\nB: I know, I'm going to hit the sack soon.",
+    exampleKo: 'A: 벌써 자정이야.\nB: 알아, 곧 자러 갈 거야.',
+    itemType: 'idiom',
+  },
+  'hold your horses': {
+    meaningKo: '잠깐 기다려, 서두르지 마.',
+    altMeaningsKo: ['진정해.', '천천히 해.'],
+    exampleEn: "A: Let's just sign the contract now!\nB: Hold your horses — read the fine print first.",
+    exampleKo: 'A: 지금 바로 계약서에 서명하자!\nB: 잠깐만 — 먼저 세부 조항을 읽어봐.',
+    itemType: 'idiom',
+  },
+  // ── I ──────────────────────────────────────────────────────────────
+  'in a nutshell': {
+    meaningKo: '간단히 말하자면, 요약하면.',
+    altMeaningsKo: ['한마디로.'],
+    exampleEn: "A: Can you explain the situation?\nB: In a nutshell, we ran out of budget.",
+    exampleKo: 'A: 상황을 설명해 줄 수 있어?\nB: 간단히 말하자면, 예산이 바닥났어.',
+    itemType: 'idiom',
+  },
+  'in the same boat': {
+    meaningKo: '같은 처지에 있다, 같은 상황이다.',
+    altMeaningsKo: ['같은 배를 타고 있다.'],
+    exampleEn: "A: I'm stressed about the deadline too.\nB: We're all in the same boat.",
+    exampleKo: 'A: 나도 마감 때문에 스트레스받아.\nB: 우리 모두 같은 처지야.',
+    itemType: 'idiom',
+  },
+  // ── J ──────────────────────────────────────────────────────────────
+  'jump the gun': {
+    meaningKo: '너무 성급하게 행동하다.',
+    altMeaningsKo: ['섣불리 행동하다.'],
+    exampleEn: "A: Did you already send the announcement?\nB: Maybe I jumped the gun — we didn't confirm yet.",
+    exampleKo: 'A: 벌써 공지 보냈어?\nB: 성급했나 봐 — 아직 확인이 안 됐는데.',
+    itemType: 'idiom',
+  },
+  // ── K ──────────────────────────────────────────────────────────────
+  'kick the bucket': {
+    meaningKo: '죽다.',
+    altMeaningsKo: ['세상을 떠나다.'],
+    exampleEn: "A: Whatever happened to that old car?\nB: It finally kicked the bucket last winter.",
+    exampleKo: 'A: 그 낡은 차 어떻게 됐어?\nB: 지난 겨울에 드디어 수명이 다했어.',
+    itemType: 'idiom',
+  },
+  // ── L ──────────────────────────────────────────────────────────────
+  'let the cat out of the bag': {
+    meaningKo: '비밀을 누설하다.',
+    altMeaningsKo: ['비밀을 털어놓다.'],
+    exampleEn: "A: Does she know about the surprise party?\nB: Tom let the cat out of the bag by accident.",
+    exampleKo: 'A: 그녀가 깜짝 파티에 대해 알아?\nB: Tom이 실수로 비밀을 누설했어.',
+    itemType: 'idiom',
+  },
+  'long story short': {
+    meaningKo: '간단히 말하자면, 결론을 말하자면.',
+    altMeaningsKo: ['요약하자면.'],
+    exampleEn: "A: What happened at the meeting?\nB: Long story short, the project got canceled.",
+    exampleKo: 'A: 회의에서 무슨 일이 있었어?\nB: 간단히 말하자면, 프로젝트가 취소됐어.',
+    itemType: 'idiom',
+  },
+  // ── M ──────────────────────────────────────────────────────────────
+  'miss the boat': {
+    meaningKo: '기회를 놓치다.',
+    altMeaningsKo: ['때를 놓치다.'],
+    exampleEn: "A: Did you apply for that scholarship?\nB: No, I missed the boat — the deadline was yesterday.",
+    exampleKo: 'A: 그 장학금 신청했어?\nB: 아니, 기회를 놓쳤어 — 마감이 어제였거든.',
+    itemType: 'idiom',
+  },
+  // ── N ──────────────────────────────────────────────────────────────
+  'nip it in the bud': {
+    meaningKo: '초기에 싹을 자르다, 문제가 커지기 전에 해결하다.',
+    altMeaningsKo: ['미리 막다.'],
+    exampleEn: "A: The rumor is starting to spread.\nB: We need to nip it in the bud before it gets worse.",
+    exampleKo: 'A: 소문이 퍼지기 시작했어.\nB: 더 나빠지기 전에 초기에 잘라야 해.',
+    itemType: 'idiom',
+  },
+  // ── O ──────────────────────────────────────────────────────────────
+  'on the fence': {
+    meaningKo: '어느 쪽도 결정하지 못한, 망설이는.',
+    altMeaningsKo: ['중립적인.', '결정을 못 하는.'],
+    exampleEn: "A: Are you going to take the job offer?\nB: I'm still on the fence about it.",
+    exampleKo: 'A: 그 일자리 제안 받아들일 거야?\nB: 아직 결정을 못 하고 있어.',
+    itemType: 'idiom',
+  },
+  'on the same page': {
+    meaningKo: '같은 생각이다, 서로 이해하고 있다.',
+    altMeaningsKo: ['의견이 일치하다.'],
+    exampleEn: "A: Do we all agree on the plan?\nB: Let's make sure everyone is on the same page.",
+    exampleKo: 'A: 계획에 모두 동의해?\nB: 모두가 같은 생각인지 확인하자.',
+    itemType: 'idiom',
+  },
+  'once in a blue moon': {
+    meaningKo: '아주 가끔, 드물게.',
+    altMeaningsKo: ['매우 드물게.'],
+    exampleEn: "A: Do you ever eat fast food?\nB: Once in a blue moon, maybe.",
+    exampleKo: 'A: 패스트푸드 먹어?\nB: 아주 가끔은 먹지.',
+    itemType: 'idiom',
+  },
+  'out of the blue': {
+    meaningKo: '갑자기, 예고 없이.',
+    altMeaningsKo: ['뜬금없이.'],
+    exampleEn: "A: He called me out of the blue after years.\nB: Wow, that must have been a surprise.",
+    exampleKo: 'A: 그가 몇 년 만에 갑자기 전화했어.\nB: 와, 많이 놀랐겠다.',
+    itemType: 'idiom',
+  },
+  // ── P ──────────────────────────────────────────────────────────────
+  'pass the buck': {
+    meaningKo: '책임을 남에게 떠넘기다.',
+    altMeaningsKo: ['책임 회피하다.'],
+    exampleEn: "A: Who's responsible for this error?\nB: Everyone keeps passing the buck to someone else.",
+    exampleKo: 'A: 이 실수는 누구 책임이야?\nB: 다들 계속 남에게 책임을 떠넘기고 있어.',
+    itemType: 'idiom',
+  },
+  'piece of cake': {
+    meaningKo: '아주 쉬운 일.',
+    altMeaningsKo: ['식은 죽 먹기.'],
+    exampleEn: "A: Was the exam hard?\nB: Not at all — it was a piece of cake.",
+    exampleKo: 'A: 시험 어려웠어?\nB: 전혀 — 식은 죽 먹기였어.',
+    itemType: 'idiom',
+  },
+  'pull someone leg': {
+    meaningKo: '놀리다, 농담으로 속이다.',
+    altMeaningsKo: ['장난치다.'],
+    exampleEn: "A: Did you really win the lottery?\nB: Ha, I'm just pulling your leg.",
+    exampleKo: 'A: 진짜 복권에 당첨됐어?\nB: 하, 그냥 놀리는 거야.',
+    itemType: 'idiom',
+  },
+  "pulling your leg": {
+    meaningKo: '놀리다, 농담으로 속이다.',
+    altMeaningsKo: ['장난치는 것이다.'],
+    exampleEn: "A: Are you serious right now?\nB: Relax, I'm just pulling your leg.",
+    exampleKo: 'A: 지금 진지한 거야?\nB: 진정해, 그냥 놀리는 거야.',
+    itemType: 'idiom',
+  },
+  // ── R ──────────────────────────────────────────────────────────────
+  'rain check': {
+    meaningKo: '다음 기회로 미루다.',
+    altMeaningsKo: ['나중에 하기로 하다.'],
+    exampleEn: "A: Want to grab lunch today?\nB: I can't right now — can I take a rain check?",
+    exampleKo: 'A: 오늘 점심 먹을래?\nB: 지금은 안 되는데 — 다음에 하면 안 될까?',
+    itemType: 'idiom',
+  },
+  'read between the lines': {
+    meaningKo: '행간을 읽다, 숨겨진 의미를 파악하다.',
+    altMeaningsKo: ['말 속에 숨은 뜻을 읽다.'],
+    exampleEn: "A: He said everything was fine, but...\nB: You have to read between the lines with him.",
+    exampleKo: 'A: 그는 다 괜찮다고 했는데...\nB: 그 사람 말 속의 의미를 읽어야 해.',
+    itemType: 'idiom',
+  },
+  'rock the boat': {
+    meaningKo: '(현재 상태를) 흔들다, 문제를 일으키다.',
+    altMeaningsKo: ['분란을 일으키다.'],
+    exampleEn: "A: Should I bring up the salary issue?\nB: Be careful — nobody wants to rock the boat.",
+    exampleKo: 'A: 급여 문제를 꺼내야 할까?\nB: 조심해 — 아무도 분란을 일으키고 싶어 하지 않아.',
+    itemType: 'idiom',
+  },
+  // ── S ──────────────────────────────────────────────────────────────
+  'see eye to eye': {
+    meaningKo: '의견이 일치하다, 생각이 같다.',
+    altMeaningsKo: ['동의하다.'],
+    exampleEn: "A: Do you two agree on the plan?\nB: Not really — we never seem to see eye to eye.",
+    exampleKo: 'A: 둘이 계획에 동의해?\nB: 별로 — 우린 항상 의견이 엇갈려.',
+    itemType: 'idiom',
+  },
+  'silver lining': {
+    meaningKo: '불행 중 다행, 나쁜 상황에서 찾는 긍정적인 면.',
+    altMeaningsKo: ['위기 속의 기회.'],
+    exampleEn: "A: Losing that job was hard.\nB: True, but the silver lining is you found a better one.",
+    exampleKo: 'A: 그 직장을 잃은 건 힘들었어.\nB: 맞아, 하지만 불행 중 다행으로 더 좋은 곳을 찾았잖아.',
+    itemType: 'idiom',
+  },
+  'spill the beans': {
+    meaningKo: '비밀을 누설하다.',
+    altMeaningsKo: ['털어놓다.'],
+    exampleEn: "A: Who told her about the plan?\nB: Jake spilled the beans by accident.",
+    exampleKo: 'A: 누가 그녀에게 계획을 말했어?\nB: Jake가 실수로 비밀을 누설했어.',
+    itemType: 'idiom',
+  },
+  // ── T ──────────────────────────────────────────────────────────────
+  'that ship has sailed': {
+    meaningKo: '이미 때가 지났다, 기회를 놓쳤다.',
+    altMeaningsKo: ['기회가 이미 지나갔다.'],
+    exampleEn: "A: Maybe we can still fix things with them.\nB: I'm afraid that ship has sailed.",
+    exampleKo: 'A: 아직 그들과 관계를 고칠 수 있을 것 같아.\nB: 유감이지만 이미 때가 지난 것 같아.',
+    itemType: 'idiom',
+  },
+  'throw in the towel': {
+    meaningKo: '포기하다, 항복하다.',
+    altMeaningsKo: ['손을 들다.'],
+    exampleEn: "A: The project keeps failing.\nB: I don't want to throw in the towel just yet.",
+    exampleKo: 'A: 프로젝트가 계속 실패하고 있어.\nB: 아직 포기하고 싶지 않아.',
+    itemType: 'idiom',
+  },
+  'tip of the iceberg': {
+    meaningKo: '빙산의 일각, 문제의 일부만 보이는 것.',
+    altMeaningsKo: ['드러난 것은 일부일 뿐이다.'],
+    exampleEn: "A: There are so many hidden problems here.\nB: What we know is just the tip of the iceberg.",
+    exampleKo: 'A: 여기에 숨겨진 문제가 너무 많아.\nB: 우리가 아는 건 빙산의 일각에 불과해.',
+    itemType: 'idiom',
+  },
+  'under the weather': {
+    meaningKo: '몸이 안 좋다, 컨디션이 나쁘다.',
+    altMeaningsKo: ['몸이 좋지 않은.'],
+    exampleEn: "A: You look pale today.\nB: Yeah, I'm feeling a little under the weather.",
+    exampleKo: 'A: 오늘 안색이 안 좋아 보여.\nB: 응, 몸이 좀 안 좋아.',
+    itemType: 'idiom',
+  },
+  // ── U / W ──────────────────────────────────────────────────────────
+  'up in the air': {
+    meaningKo: '아직 결정되지 않은, 불확실한.',
+    altMeaningsKo: ['미정인.'],
+    exampleEn: "A: Is the trip still happening?\nB: It's still up in the air — we haven't confirmed yet.",
+    exampleKo: 'A: 여행 아직 진행돼?\nB: 아직 미정이야 — 아직 확인이 안 됐어.',
+    itemType: 'idiom',
+  },
+  'writing on the wall': {
+    meaningKo: '(나쁜 일이 올 것이라는) 조짐, 전조.',
+    altMeaningsKo: ['불길한 징조.'],
+    exampleEn: "A: Did you see the layoffs coming?\nB: The writing was on the wall for months.",
+    exampleKo: 'A: 해고 사태가 올 것을 예상했어?\nB: 몇 달 전부터 조짐이 보였어.',
     itemType: 'idiom',
   },
 }
@@ -1765,6 +2156,12 @@ function App() {
     }
     if (!geminiResult) {
       resolvedItemType = inferItemTypeAuto(phrase, definitionHint)
+      // 이디엄으로 판별됐으나 override도 없고 Gemini도 실패한 경우
+      // 사전 직역 대신 의미 확인 안내 메시지로 대체
+      if (resolvedItemType === 'idiom' && !phraseOverride && koMeaning) {
+        koMeaning = `"${phrase}"의 관용적 의미를 확인해 주세요.\n\n참고: 이 구문은 이디엄으로 직역과 다른 의미를 가질 수 있습니다.`
+        altMeanings = []
+      }
     }
 
     if (!koMeaning) {
