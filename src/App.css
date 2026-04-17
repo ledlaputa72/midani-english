@@ -466,6 +466,18 @@ button.danger {
   font-size: 12px;
 }
 
+.due-type-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.due-type-buttons button {
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
 .dash-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -674,11 +686,17 @@ button.danger {
 }
 
 .list-phrase-main {
-  display: block;
   font-size: 15px;
   font-weight: 700;
   color: #f0f1fa;
   line-height: 1.3;
+}
+
+.list-phrase-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .item-type-pill {
@@ -688,7 +706,7 @@ button.danger {
   padding: 2px 8px;
   font-size: 10px;
   font-weight: 700;
-  margin-top: 5px;
+  margin-top: 0;
   width: fit-content;
 }
 
@@ -1030,15 +1048,18 @@ button.danger {
 }
 
 .board-card--vocabulary {
-  border-color: #385aa0;
+  border-color: #3d567a;
+  background: linear-gradient(165deg, #202531 0%, #1c222d 100%);
 }
 
 .board-card--expression {
-  border-color: #684ab8;
+  border-color: #5b4f77;
+  background: linear-gradient(165deg, #24222f 0%, #201f2a 100%);
 }
 
 .board-card--idiom {
-  border-color: #b36b29;
+  border-color: #4a6550;
+  background: linear-gradient(165deg, #222a26 0%, #1f2622 100%);
 }
 
 .board-card[draggable='true'] {
@@ -1059,6 +1080,13 @@ button.danger {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 6px;
+}
+
+.board-title-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
 }
 
 .board-phrase {
@@ -1484,27 +1512,27 @@ button.danger {
 }
 
 .flashcard--vocabulary .flashcard-face {
-  background: linear-gradient(160deg, #1b2844, #223769);
+  background: linear-gradient(160deg, #1f2430, #222b3b);
 }
 
 .flashcard--vocabulary .flashcard-back {
-  background: linear-gradient(160deg, #183156, #204678);
+  background: linear-gradient(160deg, #1d2a3d, #233245);
 }
 
 .flashcard--expression .flashcard-face {
-  background: linear-gradient(160deg, #1f1f36, #28185a);
+  background: linear-gradient(160deg, #252330, #2a2637);
 }
 
 .flashcard--expression .flashcard-back {
-  background: linear-gradient(160deg, #2b1863, #2c1b6f);
+  background: linear-gradient(160deg, #28233a, #302747);
 }
 
 .flashcard--idiom .flashcard-face {
-  background: linear-gradient(160deg, #3b2410, #4c2913);
+  background: linear-gradient(160deg, #232a24, #273027);
 }
 
 .flashcard--idiom .flashcard-back {
-  background: linear-gradient(160deg, #52290f, #6a3310);
+  background: linear-gradient(160deg, #273129, #2f3b31);
 }
 
 .flashcard-face span {
@@ -1514,6 +1542,18 @@ button.danger {
 .flashcard-face h3 {
   margin: 14px 0;
   font-size: 44px;
+}
+
+.flashcard-title-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.flashcard-title-line h3 {
+  margin: 14px 0;
 }
 
 .flashcard-face p {
@@ -2057,7 +2097,7 @@ button.danger {
 
 .af-input-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 8px;
   align-items: center;
 }

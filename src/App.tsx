@@ -941,6 +941,11 @@ function App() {
       learning: items.filter((item) => item.status === 'learning').length,
       mastered: items.filter((item) => item.status === 'mastered').length,
       shows: new Set(items.map((item) => item.show).filter(Boolean)).size,
+      vocabulary: items.filter((item) => (item.itemType ?? inferItemType(item.phrase)) === 'vocabulary').length,
+      phraseLike: items.filter((item) => {
+        const type = item.itemType ?? inferItemType(item.phrase)
+        return type === 'expression' || type === 'idiom'
+      }).length,
     }),
     [items],
   )
@@ -970,6 +975,18 @@ function App() {
         return bScore - aScore
       })
       .slice(0, 6)
+  }, [items])
+
+  const dashboardStudyByType = useMemo(() => {
+    const candidates = items.filter((item) => item.status !== 'mastered')
+    return {
+      vocabulary: candidates.filter((item) => (item.itemType ?? inferItemType(item.phrase)) === 'vocabulary')
+        .length,
+      expression: candidates.filter((item) => (item.itemType ?? inferItemType(item.phrase)) === 'expression')
+        .length,
+      idiom: candidates.filter((item) => (item.itemType ?? inferItemType(item.phrase)) === 'idiom').length,
+      total: candidates.length,
+    }
   }, [items])
 
   const deckNames = useMemo(() => {
@@ -1952,7 +1969,9 @@ function App() {
               <article>
                 <small>전체 등록</small>
                 <strong className="c-accent">{stats.total}</strong>
-                <span>단어 · 구문</span>
+                <span>
+                  단어 {stats.vocabulary} · 구문 {stats.phraseLike}
+                </span>
               </article>
               <article>
                 <small>학습 중</small>
@@ -1974,11 +1993,49 @@ function App() {
             {dashboardDue.length > 0 && (
               <section className="due-banner">
                 <div>
-                  <h4>🔔 오늘의 복습</h4>
-                  <p>복습할 단어가 {dashboardDue.length}개 있어요!</p>
+                  <h4>🔔 오늘의 학습</h4>
+                  <p>학습할 카드가 {dashboardStudyByType.total}개 있어요!</p>
+                  <div className="due-type-buttons">
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setItemTypeFilter('vocabulary')
+                        setPage('cards')
+                      }}
+                    >
+                      Vocabulary ({dashboardStudyByType.vocabulary})
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setItemTypeFilter('expression')
+                        setPage('cards')
+                      }}
+                    >
+                      Expression ({dashboardStudyByType.expression})
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setItemTypeFilter('idiom')
+                        setPage('cards')
+                      }}
+                    >
+                      Idiom ({dashboardStudyByType.idiom})
+                    </button>
+                  </div>
                 </div>
-                <button className="primary" onClick={() => setPage('cards')}>
-                  지금 복습하기 →
+                <button
+                  className="primary"
+                  onClick={() => {
+                    setItemTypeFilter('all')
+                    setPage('cards')
+                  }}
+                >
+                  지금 학습하기 →
                 </button>
               </section>
             )}
@@ -2149,10 +2206,12 @@ function App() {
                     return (
                       <tr key={item.id} className="study-row" onClick={() => openDetailModal(item.id)}>
                         <td className="col-phrase">
-                          <strong className="list-phrase-main">{item.phrase}</strong>
-                          <span className={`item-type-pill item-type-${itemType}`}>
-                            {ITEM_TYPE_LABEL[itemType]}
-                          </span>
+                          <div className="list-phrase-line">
+                            <strong className="list-phrase-main">{item.phrase}</strong>
+                            <span className={`item-type-pill item-type-${itemType}`}>
+                              {ITEM_TYPE_LABEL[itemType]}
+                            </span>
+                          </div>
                           {exampleLine && <div className="list-phrase-example">"{exampleLine}"</div>}
                           {phraseWords.length >= 2 && (
                             <div
@@ -2320,14 +2379,16 @@ function App() {
                             onClick={() => openDetailModal(item.id)}
                           >
                             <div className="board-card-top">
-                              <strong className="board-phrase">{item.phrase}</strong>
+                              <div className="board-title-line">
+                                <strong className="board-phrase">{item.phrase}</strong>
+                                <span className={`item-type-pill item-type-${itemType}`}>
+                                  {ITEM_TYPE_LABEL[itemType]}
+                                </span>
+                              </div>
                               <span className="board-deck-pill" title={item.deck}>
                                 {item.deck || '기본 덱'}
                               </span>
                             </div>
-                            <span className={`item-type-pill item-type-${itemType}`}>
-                              {ITEM_TYPE_LABEL[itemType]}
-                            </span>
                             <p className="board-ko">{koPrimary}</p>
                             {item.tags.length > 0 && (
                               <div className="board-tags" aria-label="태그">
@@ -2494,10 +2555,12 @@ function App() {
                           <div className="flashcard-inner">
                             <div className="flashcard-face flashcard-front">
                               <span>{isCenter ? '클릭해서 뜻 확인' : stackCard.deck}</span>
-                              <small className={`item-type-pill item-type-${itemType}`}>
-                                {ITEM_TYPE_LABEL[itemType]}
-                              </small>
-                              <h3>{stackCard.phrase}</h3>
+                              <div className="flashcard-title-line">
+                                <h3>{stackCard.phrase}</h3>
+                                <small className={`item-type-pill item-type-${itemType}`}>
+                                  {ITEM_TYPE_LABEL[itemType]}
+                                </small>
+                              </div>
                               {stackCard.example && (
                                 <p
                                   className={`flashcard-example ${isExampleRevealed ? 'is-revealed' : ''}`}
@@ -3273,6 +3336,10 @@ function App() {
               <label>
                 영어 단어 / 구문 *
                 <div className="af-input-row">
+                  <input
+                    value={form.phrase}
+                    onChange={(event) => setForm((prev) => ({ ...prev, phrase: event.target.value }))}
+                  />
                   <select
                     className="ai-provider-inline"
                     value={formAiProvider}
@@ -3281,10 +3348,6 @@ function App() {
                     <option value="default">기본</option>
                     <option value="gemini">Gemini</option>
                   </select>
-                  <input
-                    value={form.phrase}
-                    onChange={(event) => setForm((prev) => ({ ...prev, phrase: event.target.value }))}
-                  />
                   <button
                     type="button"
                     className="secondary af-btn-inline"
