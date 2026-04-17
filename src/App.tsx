@@ -4136,6 +4136,26 @@ function App() {
                 </dl>
               </section>
 
+              {detailPhraseWords.length >= 2 && (
+                <section className="det-sec det-sec--phrase-words" aria-labelledby="det-words-intro">
+                  <p id="det-words-intro" className="det-phrase-words-intro">
+                    추가 정보는 포함된 단어 — 클릭하면 새 카드로 추가합니다
+                  </p>
+                  <div className="det-phrase-words-btns">
+                    {detailPhraseWords.map((word, index) => (
+                      <button
+                        key={`${index}-${word}`}
+                        type="button"
+                        className="det-phrase-word-btn"
+                        onClick={() => openCreateModalWithPhrase(word, detailItem)}
+                      >
+                        {word}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+
               <section className="det-sec det-sec--example" aria-labelledby="det-example-heading">
                 <h4 id="det-example-heading" className="det-sec-title">
                   예문
@@ -4183,24 +4203,6 @@ function App() {
                   </button>
                 </div>
               </section>
-
-              {detailPhraseWords.length >= 2 && (
-                <div className="det-phrase-words">
-                  <p className="det-phrase-words-label">포함된 단어 — 클릭하면 새 카드로 추가합니다</p>
-                  <div className="det-phrase-words-btns">
-                    {detailPhraseWords.map((word, index) => (
-                      <button
-                        key={`${index}-${word}`}
-                        type="button"
-                        className="det-phrase-word-btn"
-                        onClick={() => openCreateModalWithPhrase(word, detailItem)}
-                      >
-                        {word}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
             <footer className="card-detail-footer">
               <button type="button" className="secondary" onClick={() => openEditModal(detailItem)}>

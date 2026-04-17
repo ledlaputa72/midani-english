@@ -2211,13 +2211,15 @@ button.danger {
   gap: 22px;
   padding-right: 4px;
   margin-right: -4px;
+  padding-bottom: 20px;
 }
 
 .card-detail-footer {
   flex-shrink: 0;
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid #34344e;
+  margin-top: 28px;
+  padding-top: 22px;
+  padding-bottom: 4px;
+  border-top: 1px solid #3d3d5c;
 }
 
 .det-sec {
@@ -2235,6 +2237,21 @@ button.danger {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #8b90b5;
+}
+
+.det-phrase-words-intro {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+  color: #a5abc8;
+}
+
+.det-sec--phrase-words {
+  margin: 0;
+  padding-top: 20px;
+  border-top: 1px solid #3a3a55;
 }
 
 .det-phrase-line {
@@ -2336,18 +2353,6 @@ button.danger {
   color: #bfc1d8;
   padding: 10px 11px;
   margin-bottom: 10px;
-}
-
-.det-phrase-words {
-  margin-top: 0;
-  padding-top: 18px;
-  border-top: 1px solid #3a3a55;
-}
-
-.det-phrase-words-label {
-  margin: 0 0 8px;
-  font-size: 12px;
-  color: #9ca0be;
 }
 
 .det-phrase-words-btns {
