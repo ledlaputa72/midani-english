@@ -1375,6 +1375,14 @@ button.danger {
   color: #afb1c5;
 }
 
+.flashcard-secondary-meaning {
+  margin-top: -4px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #aeb2d3;
+  text-align: center;
+}
+
 .flashcard-example {
   filter: blur(7px);
   opacity: 0.5;

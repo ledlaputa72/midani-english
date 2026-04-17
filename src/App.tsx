@@ -731,11 +731,20 @@ function App() {
     setIsAddOpen(true)
   }
 
-  const openCreateModalWithPhrase = (phrase: string, deckPreset?: string) => {
-    const deck = (deckPreset ?? EMPTY_FORM.deck).trim() || EMPTY_FORM.deck
+  const openCreateModalWithPhrase = (phrase: string, sourceItem?: StudyItem) => {
+    const deck = (sourceItem?.deck ?? EMPTY_FORM.deck).trim() || EMPTY_FORM.deck
     resetOcrState()
     setEditingId(null)
-    setForm({ ...EMPTY_FORM, phrase: phrase.trim(), deck })
+    setForm({
+      ...EMPTY_FORM,
+      phrase: phrase.trim(),
+      show: sourceItem?.show ?? '',
+      episode: sourceItem?.episode ?? '',
+      tags: sourceItem ? sourceItem.tags.join(', ') : '',
+      difficulty: sourceItem?.difficulty ?? EMPTY_FORM.difficulty,
+      notes: sourceItem?.notes ?? '',
+      deck,
+    })
     setInputTab('text')
     setIsDetailOpen(false)
     setIsAddOpen(true)
@@ -1491,7 +1500,7 @@ function App() {
                                   key={`${item.id}-${index}-${word}`}
                                   type="button"
                                   className="list-phrase-word"
-                                  onClick={() => openCreateModalWithPhrase(word, item.deck)}
+                                  onClick={() => openCreateModalWithPhrase(word, item)}
                                 >
                                   {word}
                                 </button>
@@ -1761,7 +1770,20 @@ function App() {
                             </div>
                             <div className="flashcard-face flashcard-back">
                               <span>뜻</span>
-                              <h3>{stackCard.translation}</h3>
+                              {(() => {
+                                const translationParts = splitTranslationParts(stackCard.translation)
+                                const primaryMeaning = translationParts.primary || stackCard.translation
+                                return (
+                                  <>
+                                    <h3>{primaryMeaning}</h3>
+                                    {translationParts.secondary.length > 0 && (
+                                      <p className="flashcard-secondary-meaning">
+                                        {translationParts.secondary.join(' · ')}
+                                      </p>
+                                    )}
+                                  </>
+                                )
+                              })()}
                               {stackCard.notes && <p>{stackCard.notes}</p>}
                             </div>
                           </div>
@@ -2477,7 +2499,7 @@ function App() {
                       key={`${index}-${word}`}
                       type="button"
                       className="det-phrase-word-btn"
-                      onClick={() => openCreateModalWithPhrase(word, detailItem.deck)}
+                      onClick={() => openCreateModalWithPhrase(word, detailItem)}
                     >
                       {word}
                     </button>
