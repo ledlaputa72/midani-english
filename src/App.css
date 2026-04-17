@@ -2057,9 +2057,17 @@ button.danger {
 
 .af-input-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: auto 1fr auto;
   gap: 8px;
   align-items: center;
+}
+
+.ai-provider-inline {
+  width: 90px;
+  min-width: 90px;
+  height: 40px;
+  padding: 0 8px;
+  font-size: 12px;
 }
 
 .af-btn {
