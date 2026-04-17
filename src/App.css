@@ -2248,8 +2248,14 @@ button.danger {
   color: #a5abc8;
 }
 
-.det-sec--phrase-words {
+.det-sec--context-bottom {
   margin: 0;
+  padding-top: 22px;
+  border-top: 1px solid #3a3a55;
+}
+
+.det-phrase-words-inner {
+  margin-top: 20px;
   padding-top: 20px;
   border-top: 1px solid #3a3a55;
 }
