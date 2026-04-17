@@ -17,14 +17,13 @@ export default async function handler(req, res) {
     generationConfig: { temperature: 0.3 },
   })
 
-  // 시도할 모델 목록 (현재 Google AI Studio에서 지원하는 모델)
+  // 시도할 모델 목록 (Google AI Studio 현재 지원 모델 기준)
   const models = [
-    'gemini-2.0-flash',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-preview-05-20',
+    'gemini-2.5-pro',
     'gemini-2.0-flash-lite',
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-pro',
-    'gemini-1.5-pro-latest',
+    'gemini-2.0-flash-exp',
   ]
 
   const errors = []

@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   }
 
   // 실제 generateContent 테스트
-  const testModels = ['gemini-2.0-flash', 'gemini-1.5-flash']
+  const testModels = ['gemini-2.5-flash', 'gemini-2.0-flash-lite']
   for (const model of testModels) {
     try {
       const r = await fetch(
