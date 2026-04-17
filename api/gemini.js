@@ -12,61 +12,57 @@ export default async function handler(req, res) {
   const { prompt } = req.body ?? {}
   if (!prompt) return res.status(400).json({ error: 'prompt required' })
 
-  // AIzaSy... 형식 → ?key= 파라미터 방식
-  // AQ. 등 신규 형식 → Authorization: Bearer 방식도 함께 시도
-  const isLegacyKey = apiKey.startsWith('AIza')
-
-  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-001', 'gemini-1.5-flash', 'gemini-1.5-flash-latest']
-  const versions = ['v1beta', 'v1']
-
   const body = JSON.stringify({
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.3 },
   })
 
-  let lastError = 'unknown'
+  // 시도할 모델 목록 (현재 Google AI Studio에서 지원하는 모델)
+  const models = [
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro',
+    'gemini-1.5-pro-latest',
+  ]
 
-  for (const version of versions) {
-    for (const model of models) {
-      // 각 모델별로 key 파라미터 방식 / Bearer 방식 순서로 시도
-      const authModes = isLegacyKey
-        ? ['key-param']               // AIzaSy: key 파라미터만
-        : ['bearer', 'key-param']     // 신규 키: Bearer 먼저, fallback으로 key 파라미터
+  const errors = []
 
-      for (const authMode of authModes) {
-        try {
-          const baseUrl = `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent`
-          const url = authMode === 'key-param' ? `${baseUrl}?key=${apiKey}` : baseUrl
-          const headers = { 'Content-Type': 'application/json' }
-          if (authMode === 'bearer') headers['Authorization'] = `Bearer ${apiKey}`
+  for (const model of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      })
 
-          const r = await fetch(url, { method: 'POST', headers, body })
-
-          if (!r.ok) {
-            const errText = await r.text().catch(() => '')
-            lastError = `${version}/${model}(${authMode}) http-${r.status}: ${errText.slice(0, 60)}`
-            console.error(`[gemini] ${lastError}`)
-            continue
-          }
-
-          const data = await r.json()
-          const text = (data.candidates?.[0]?.content?.parts ?? [])
-            .map((p) => p.text ?? '').join('')
-
-          if (!text) {
-            lastError = `${version}/${model}(${authMode}) empty-response`
-            continue
-          }
-
-          console.log(`[gemini] ✓ success: ${version}/${model}(${authMode})`)
-          return res.status(200).json({ text })
-        } catch (err) {
-          lastError = `${version}/${model}(${authMode}) exception: ${err instanceof Error ? err.message.slice(0, 40) : 'err'}`
-          console.error(`[gemini] ${lastError}`)
-        }
+      if (!r.ok) {
+        const errText = await r.text().catch(() => '')
+        const msg = `${model} http-${r.status}: ${errText.slice(0, 120)}`
+        errors.push(msg)
+        console.error(`[gemini] ${msg}`)
+        continue
       }
+
+      const data = await r.json()
+      const text = (data.candidates?.[0]?.content?.parts ?? [])
+        .map((p) => p.text ?? '').join('')
+
+      if (!text) {
+        errors.push(`${model} empty-response`)
+        continue
+      }
+
+      console.log(`[gemini] ✓ success: ${model}`)
+      return res.status(200).json({ text })
+    } catch (err) {
+      const msg = `${model} exception: ${err instanceof Error ? err.message.slice(0, 60) : 'err'}`
+      errors.push(msg)
+      console.error(`[gemini] ${msg}`)
     }
   }
 
-  return res.status(500).json({ error: lastError })
+  return res.status(500).json({ error: errors.join(' | ') })
 }
