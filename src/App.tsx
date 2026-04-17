@@ -505,25 +505,31 @@ async function generateMeaningAndExampleWithGemini(
     '- meaningKo should be concise and practical for learners.',
   ].join('\n')
 
-  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash']
+  const modelsToTry = [
+    'gemini-2.5-flash-preview-04-17',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-latest',
+  ]
+  const apiBase = `https://generativelanguage.googleapis.com/v1beta/models`
+  const apiKey = encodeURIComponent(GEMINI_API_KEY)
   let lastError = ''
   for (const model of modelsToTry) {
     try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
-        GEMINI_API_KEY,
-      )}`,
+      `${apiBase}/${model}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, responseMimeType: 'application/json' },
+          generationConfig: { temperature: 0.3 },
         }),
       },
     )
     if (!res.ok) {
-      lastError = `http-${res.status}`
+      lastError = `http-${res.status}(${model})`
       continue
     }
     const data = (await res.json()) as {
