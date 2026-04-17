@@ -4,7 +4,6 @@ import type { DragEvent as ReactDragEvent, FormEvent, PointerEvent as ReactPoint
 import type { User } from 'firebase/auth'
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { auth, db, firebaseReady } from './firebase'
 import './App.css'
 
@@ -894,48 +893,44 @@ async function generateMeaningAndExampleWithGemini(
     '- Return ONLY the JSON object, no markdown, no explanation.',
   ].join('\n')
 
-  const modelsToTry = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash']
-  let lastError = ''
-
-  for (const modelName of modelsToTry) {
-    try {
-      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        generationConfig: { temperature: 0.3 },
-      })
-      const result = await model.generateContent(prompt)
-      const rawText = result.response.text()
-      const jsonText = extractFirstJsonObject(rawText)
-      if (!jsonText) {
-        lastError = 'invalid-json'
-        continue
-      }
-      const parsed = JSON.parse(jsonText) as Partial<GeminiAutofillResult>
-      const meaningKo = normalizeKoreanMeaningLine(String(parsed.meaningKo ?? ''))
-      const altMeaningsKo = Array.isArray(parsed.altMeaningsKo)
-        ? parsed.altMeaningsKo
-            .map((line) => normalizeKoreanMeaningLine(String(line)))
-            .filter(Boolean)
-            .slice(0, 2)
-        : []
-      const exampleEn = toSentenceCase(String(parsed.exampleEn ?? '').trim())
-      const exampleKo = normalizeKoreanMeaningLine(String(parsed.exampleKo ?? ''))
-      const definitionHint = String(parsed.definitionHint ?? '').trim()
-      const parsedItemType =
-        parsed.itemType === 'vocabulary' || parsed.itemType === 'expression' || parsed.itemType === 'idiom'
-          ? parsed.itemType
-          : undefined
-      if (!meaningKo || !exampleEn) {
-        lastError = 'empty-fields'
-        continue
-      }
-      return { result: { meaningKo, altMeaningsKo, exampleEn, exampleKo, definitionHint, itemType: parsedItemType } }
-    } catch (err) {
-      lastError = err instanceof Error ? err.message.slice(0, 40) : 'sdk-error'
+  try {
+    // Vercel 서버리스 함수를 통해 호출 (CORS/보안 문제 해결)
+    const res = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    })
+    if (!res.ok) {
+      const errData = (await res.json().catch(() => ({}))) as { error?: string }
+      return { result: null, error: errData.error ?? `http-${res.status}` }
     }
+    const data = (await res.json()) as { text?: string; error?: string }
+    if (data.error) return { result: null, error: data.error }
+
+    const rawText = data.text ?? ''
+    const jsonText = extractFirstJsonObject(rawText)
+    if (!jsonText) return { result: null, error: 'invalid-json' }
+
+    const parsed = JSON.parse(jsonText) as Partial<GeminiAutofillResult>
+    const meaningKo = normalizeKoreanMeaningLine(String(parsed.meaningKo ?? ''))
+    const altMeaningsKo = Array.isArray(parsed.altMeaningsKo)
+      ? parsed.altMeaningsKo
+          .map((line) => normalizeKoreanMeaningLine(String(line)))
+          .filter(Boolean)
+          .slice(0, 2)
+      : []
+    const exampleEn = toSentenceCase(String(parsed.exampleEn ?? '').trim())
+    const exampleKo = normalizeKoreanMeaningLine(String(parsed.exampleKo ?? ''))
+    const definitionHint = String(parsed.definitionHint ?? '').trim()
+    const parsedItemType =
+      parsed.itemType === 'vocabulary' || parsed.itemType === 'expression' || parsed.itemType === 'idiom'
+        ? parsed.itemType
+        : undefined
+    if (!meaningKo || !exampleEn) return { result: null, error: 'empty-fields' }
+    return { result: { meaningKo, altMeaningsKo, exampleEn, exampleKo, definitionHint, itemType: parsedItemType } }
+  } catch (err) {
+    return { result: null, error: err instanceof Error ? err.message.slice(0, 60) : 'fetch-failed' }
   }
-  return { result: null, error: lastError || 'unknown' }
 }
 
 /**
