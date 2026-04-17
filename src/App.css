@@ -166,6 +166,75 @@
   gap: 8px;
 }
 
+.settings-tab-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.settings-tab-row button.active {
+  border-color: #7458ec;
+  background: #2a2157;
+}
+
+.profile-settings-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.profile-editor-form {
+  border: 1px solid #343754;
+  background: #1d2036;
+  border-radius: 10px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.profile-editor-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.profile-list {
+  display: grid;
+  gap: 8px;
+}
+
+.profile-list-item {
+  border: 1px solid #343754;
+  background: #1d2036;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.profile-list-item p {
+  margin: 4px 0;
+  color: #b4b9d8;
+  font-size: 12px;
+}
+
+.profile-list-item small {
+  color: #9196b7;
+}
+
+.profile-list-actions {
+  display: flex;
+  gap: 6px;
+  align-items: start;
+}
+
+.profile-list-empty {
+  margin: 0;
+  color: #9ca0be;
+  font-size: 12px;
+}
+
 .settings-hidden-file {
   display: none;
 }
@@ -610,6 +679,21 @@ button.danger {
   font-weight: 700;
   color: #f0f1fa;
   line-height: 1.3;
+}
+
+.profile-pill {
+  display: inline-flex;
+  margin-top: 5px;
+  border: 1px solid #6d58d8;
+  border-radius: 999px;
+  background: rgba(116, 88, 236, 0.2);
+  color: #dad4ff;
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+.board-profile-pill {
+  margin-top: -2px;
 }
 
 .list-phrase-example {
@@ -1375,6 +1459,11 @@ button.danger {
   color: #afb1c5;
 }
 
+.flashcard-profile {
+  color: #b8addf;
+  font-size: 11px;
+}
+
 .flashcard-secondary-meaning {
   margin-top: -4px;
   font-size: 14px;
@@ -1912,7 +2001,7 @@ button.danger {
 
 .af-input-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 8px;
   align-items: center;
 }
@@ -1942,6 +2031,27 @@ button.danger {
 .modal-form textarea {
   min-height: 70px;
   resize: vertical;
+}
+
+.profile-bind-row {
+  border: 1px solid #353858;
+  border-radius: 10px;
+  background: #20233a;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.profile-bind-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-bind-hint {
+  margin: 0;
+  color: #a5acd0;
+  font-size: 12px;
 }
 
 .translation-box {

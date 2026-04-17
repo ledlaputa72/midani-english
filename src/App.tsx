@@ -30,6 +30,20 @@ type StudyItem = {
   createdAt: string
   lastReviewedAt?: string
   scheduledDate?: string
+  profileId?: string | null
+}
+
+type CardInfoProfile = {
+  id: string
+  name: string
+  show: string
+  episode: string
+  tags: string[]
+  difficulty: 1 | 2 | 3
+  notes: string
+  deck: string
+  createdAt: string
+  updatedAt: string
 }
 
 type FormState = {
@@ -42,6 +56,7 @@ type FormState = {
   difficulty: 1 | 2 | 3
   notes: string
   deck: string
+  profileId: string
 }
 
 const STORAGE_KEY = 'midani.study.items.v2'
@@ -74,6 +89,7 @@ const EMPTY_FORM: FormState = {
   difficulty: 2,
   notes: '',
   deck: '기본 덱',
+  profileId: '',
 }
 
 const SAMPLE_ITEMS: StudyItem[] = [
@@ -129,17 +145,67 @@ function normalizeItems(source: StudyItem[] | unknown): StudyItem[] {
   if (!Array.isArray(source)) return []
   return source.map((item) => ({
     ...(item as StudyItem),
+    show: (item as StudyItem).show ?? '',
+    episode: (item as StudyItem).episode ?? '',
+    notes: (item as StudyItem).notes ?? '',
+    tags: Array.isArray((item as StudyItem).tags)
+      ? (item as StudyItem).tags
+      : String((item as StudyItem).tags ?? '')
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
     deck: (item as StudyItem).deck?.trim() || '기본 덱',
+    difficulty:
+      (item as StudyItem).difficulty === 1 ||
+      (item as StudyItem).difficulty === 2 ||
+      (item as StudyItem).difficulty === 3
+        ? (item as StudyItem).difficulty
+        : 2,
+    profileId: typeof (item as StudyItem).profileId === 'string' ? (item as StudyItem).profileId : null,
   }))
 }
 
-function loadItems(): StudyItem[] {
+function normalizeProfiles(source: CardInfoProfile[] | unknown): CardInfoProfile[] {
+  if (!Array.isArray(source)) return []
+  return source
+    .map((item) => {
+      const raw = item as Partial<CardInfoProfile>
+      const now = new Date().toISOString().slice(0, 10)
+      return {
+        id: typeof raw.id === 'string' ? raw.id : crypto.randomUUID(),
+        name: (raw.name ?? '').trim(),
+        show: (raw.show ?? '').trim(),
+        episode: (raw.episode ?? '').trim(),
+        tags: Array.isArray(raw.tags)
+          ? raw.tags.map((tag) => String(tag).trim()).filter(Boolean)
+          : String(raw.tags ?? '')
+              .split(',')
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+        difficulty: raw.difficulty === 1 || raw.difficulty === 2 || raw.difficulty === 3 ? raw.difficulty : 2,
+        notes: (raw.notes ?? '').trim(),
+        deck: (raw.deck ?? '').trim() || '기본 덱',
+        createdAt: (raw.createdAt ?? '').trim() || now,
+        updatedAt: (raw.updatedAt ?? '').trim() || now,
+      }
+    })
+    .filter((p) => p.name.length > 0)
+}
+
+function loadLocalData(): { items: StudyItem[]; profiles: CardInfoProfile[] } {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    return normalizeItems(JSON.parse(raw))
+    if (!raw) return { items: [], profiles: [] }
+    const parsed = JSON.parse(raw) as { items?: unknown; profiles?: unknown } | unknown[]
+    if (Array.isArray(parsed)) {
+      return { items: normalizeItems(parsed), profiles: [] }
+    }
+    return {
+      items: normalizeItems(parsed?.items),
+      profiles: normalizeProfiles(parsed?.profiles),
+    }
   } catch {
-    return []
+    return { items: [], profiles: [] }
   }
 }
 
@@ -186,6 +252,7 @@ function toFormState(item: StudyItem): FormState {
     difficulty: item.difficulty,
     notes: item.notes,
     deck: item.deck || '기본 덱',
+    profileId: item.profileId ?? '',
   }
 }
 
@@ -242,15 +309,26 @@ function deterministicPick<T>(items: T[], seed: string): T {
   return items[acc % items.length]
 }
 
+function normalizeForContains(text: string): string {
+  return text.toLowerCase().replace(/[^\w\s'-]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function includesPhrase(haystack: string, phrase: string): boolean {
+  const h = normalizeForContains(haystack)
+  const p = normalizeForContains(phrase)
+  if (!h || !p) return false
+  return h.includes(p)
+}
+
 function buildPhraseFallbackExample(phrase: string, definitionHint?: string): string {
   const cleanPhrase = phrase.trim()
   const cleanDef = (definitionHint ?? '').trim()
-  const hintClause = cleanDef ? ` It usually means "${cleanDef}".` : ''
+  const hintClause = cleanDef ? ` (It means: ${cleanDef})` : ''
   const templates = [
-    `In today's meeting, one teammate said "${cleanPhrase}" to describe the situation.${hintClause}`,
-    `You can hear "${cleanPhrase}" in drama scenes when people react quickly.${hintClause}`,
-    `I used "${cleanPhrase}" while chatting with a friend, and it sounded natural.${hintClause}`,
-    `The subtitle used "${cleanPhrase}", so I wrote it down for speaking practice.${hintClause}`,
+    `A: The points have been allocated.\nB: ${cleanPhrase}${hintClause}`,
+    `A: I think this plan is fair.\nB: ${cleanPhrase}. Let's double-check the details.${hintClause}`,
+    `A: Why are you upset right now?\nB: ${cleanPhrase}. That's how it felt to me.${hintClause}`,
+    `A: Did the team agree on the decision?\nB: Yes, and ${cleanPhrase}.${hintClause}`,
   ]
   return deterministicPick(templates, cleanPhrase)
 }
@@ -271,6 +349,7 @@ function buildWordFallbackExample(word: string, definitionHint?: string): string
 function isLikelyAutoGeneratedExample(text: string): boolean {
   const normalized = text.trim().toLowerCase()
   return (
+    normalized.startsWith('a: ') ||
     normalized.startsWith('people often say "') ||
     normalized.includes('you can hear "') ||
     normalized.includes('i heard "') ||
@@ -299,6 +378,7 @@ function normalizeKoreanMeaningLine(text: string): string {
 function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [items, setItems] = useState<StudyItem[]>([])
+  const [profiles, setProfiles] = useState<CardInfoProfile[]>([])
   const [authUser, setAuthUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [syncLoading, setSyncLoading] = useState(false)
@@ -306,7 +386,27 @@ function App() {
   const [syncError, setSyncError] = useState('')
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<'account' | 'profiles'>('account')
   const [settingsMsg, setSettingsMsg] = useState('')
+  const [profileEditor, setProfileEditor] = useState<{
+    id: string | null
+    name: string
+    show: string
+    episode: string
+    tags: string
+    difficulty: 1 | 2 | 3
+    notes: string
+    deck: string
+  }>({
+    id: null,
+    name: '',
+    show: '',
+    episode: '',
+    tags: '',
+    difficulty: 2,
+    notes: '',
+    deck: '기본 덱',
+  })
   const [boardDragOverStatus, setBoardDragOverStatus] = useState<Status | null>(null)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | Status>('all')
@@ -432,6 +532,40 @@ function App() {
     return addDays(today, diff)
   })
 
+  const profileMap = useMemo(() => {
+    const map = new Map<string, CardInfoProfile>()
+    for (const profile of profiles) map.set(profile.id, profile)
+    return map
+  }, [profiles])
+
+  const applyProfileToItem = useCallback(
+    (item: StudyItem): StudyItem => {
+      if (!item.profileId) return item
+      const profile = profileMap.get(item.profileId)
+      if (!profile) return { ...item, profileId: null }
+      return {
+        ...item,
+        show: profile.show,
+        episode: profile.episode,
+        tags: [...profile.tags],
+        difficulty: profile.difficulty,
+        notes: profile.notes,
+        deck: profile.deck || '기본 덱',
+      }
+    },
+    [profileMap],
+  )
+
+  const writeLocalData = useCallback((nextItems: StudyItem[], nextProfiles: CardInfoProfile[]) => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        items: nextItems,
+        profiles: nextProfiles,
+      }),
+    )
+  }, [])
+
   useEffect(() => {
     if (!firebaseReady || !auth) {
       setAuthLoading(false)
@@ -447,7 +581,9 @@ function App() {
 
   useEffect(() => {
     if (!authUser || !db) {
-      setItems([])
+      const cached = loadLocalData()
+      setItems(cached.items)
+      setProfiles(cached.profiles)
       setIsAccountMenuOpen(false)
       return
     }
@@ -456,49 +592,117 @@ function App() {
     const unsub = onSnapshot(
       ref,
       async (snap) => {
-        const data = snap.data() as { items?: StudyItem[] } | undefined
+        const data = snap.data() as { items?: StudyItem[]; profiles?: CardInfoProfile[] } | undefined
         const next = normalizeItems(data?.items)
+        const nextProfiles = normalizeProfiles(data?.profiles)
+        const merged = next.map((item) => applyProfileToItem(item))
         if (next.length > 0) {
-          setItems(next)
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+          setItems(merged)
+          setProfiles(nextProfiles)
+          writeLocalData(merged, nextProfiles)
         } else {
-          const cached = loadItems()
-          const seed = cached.length > 0 ? cached : SAMPLE_ITEMS
-          setItems(seed)
+          const cached = loadLocalData()
+          const seed = cached.items.length > 0 ? cached.items : SAMPLE_ITEMS
+          const seedProfiles = nextProfiles.length > 0 ? nextProfiles : cached.profiles
+          const seedProfileMap = new Map(seedProfiles.map((profile) => [profile.id, profile]))
+          const hydratedSeed = seed.map((item) => {
+            if (!item.profileId) return item
+            const profile = seedProfileMap.get(item.profileId)
+            if (!profile) return { ...item, profileId: null }
+            return {
+              ...item,
+              show: profile.show,
+              episode: profile.episode,
+              tags: [...profile.tags],
+              difficulty: profile.difficulty,
+              notes: profile.notes,
+              deck: profile.deck,
+            }
+          })
+          setItems(hydratedSeed)
+          setProfiles(seedProfiles)
           await setDoc(
             ref,
-            { items: seed, updatedAt: serverTimestamp() },
+            { items: hydratedSeed, profiles: seedProfiles, updatedAt: serverTimestamp() },
             { merge: true },
           )
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(seed))
+          writeLocalData(hydratedSeed, seedProfiles)
         }
         setSyncError('')
         setSyncLoading(false)
       },
       (err) => {
-        const cached = loadItems()
-        setItems(cached.length > 0 ? cached : SAMPLE_ITEMS)
+        const cached = loadLocalData()
+        setItems(cached.items.length > 0 ? cached.items : SAMPLE_ITEMS)
+        setProfiles(cached.profiles)
         setSyncError(err.message || '클라우드 동기화에 실패했습니다.')
         setSyncLoading(false)
       },
     )
     return () => unsub()
-  }, [authUser])
+  }, [authUser, applyProfileToItem, writeLocalData])
 
-  const persist = async (next: StudyItem[]) => {
-    setItems(next)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  const persistAll = async (nextItems: StudyItem[], nextProfiles: CardInfoProfile[]) => {
+    setItems(nextItems)
+    setProfiles(nextProfiles)
+    writeLocalData(nextItems, nextProfiles)
     if (!authUser || !db) return
     try {
       await setDoc(
         doc(db, 'users', authUser.uid, 'appData', FIREBASE_DOC_KEY),
-        { items: next, updatedAt: serverTimestamp() },
+        { items: nextItems, profiles: nextProfiles, updatedAt: serverTimestamp() },
         { merge: true },
       )
       setSyncError('')
     } catch (error) {
       setSyncError(error instanceof Error ? error.message : '클라우드 저장 중 오류가 발생했습니다.')
     }
+  }
+
+  const persist = async (nextItems: StudyItem[]) => persistAll(nextItems, profiles)
+
+  const upsertProfile = async (
+    profileInput: Omit<CardInfoProfile, 'id' | 'createdAt' | 'updatedAt'> & { id?: string | null },
+  ) => {
+    const now = new Date().toISOString().slice(0, 10)
+    let updatedProfile: CardInfoProfile
+    const existing = profileInput.id ? profiles.find((p) => p.id === profileInput.id) ?? null : null
+    if (existing) {
+      updatedProfile = { ...existing, ...profileInput, id: existing.id, updatedAt: now }
+    } else {
+      updatedProfile = { ...profileInput, id: crypto.randomUUID(), createdAt: now, updatedAt: now }
+    }
+    const nextProfiles = existing
+      ? profiles.map((p) => (p.id === existing.id ? updatedProfile : p))
+      : [updatedProfile, ...profiles]
+    const nextItems = items.map((item) =>
+      item.profileId === updatedProfile.id
+        ? {
+            ...item,
+            show: updatedProfile.show,
+            episode: updatedProfile.episode,
+            tags: [...updatedProfile.tags],
+            difficulty: updatedProfile.difficulty,
+            notes: updatedProfile.notes,
+            deck: updatedProfile.deck,
+          }
+        : item,
+    )
+    await persistAll(nextItems, nextProfiles)
+    return updatedProfile
+  }
+
+  const deleteProfile = async (profileId: string) => {
+    const nextProfiles = profiles.filter((profile) => profile.id !== profileId)
+    const nextItems = items.map((item) =>
+      item.profileId === profileId
+        ? {
+            ...item,
+            profileId: null,
+          }
+        : item,
+    )
+    await persistAll(nextItems, nextProfiles)
   }
 
   const listShowOptions = useMemo(() => {
@@ -599,10 +803,77 @@ function App() {
   const currentCard = cardItems[cardIndex] ?? null
   const detailItem = detailId ? items.find((item) => item.id === detailId) ?? null : null
   const detailTranslation = splitTranslationParts(detailItem?.translation ?? '')
+  const detailProfile = detailItem?.profileId ? profileMap.get(detailItem.profileId) ?? null : null
   const detailPhraseWords = useMemo(
     () => splitPhraseWords(detailItem?.phrase ?? ''),
     [detailItem?.phrase],
   )
+  const selectedFormProfile = form.profileId ? profileMap.get(form.profileId) ?? null : null
+  const isFormUsingProfile = Boolean(selectedFormProfile)
+  const profileUsageCounts = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const item of items) {
+      if (!item.profileId) continue
+      map[item.profileId] = (map[item.profileId] ?? 0) + 1
+    }
+    return map
+  }, [items])
+
+  const showKeywords = useMemo(() => {
+    const set = new Set<string>()
+    for (const item of items) {
+      const value = item.show.trim()
+      if (value) set.add(value)
+    }
+    for (const profile of profiles) {
+      const value = profile.show.trim()
+      if (value) set.add(value)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [items, profiles])
+
+  const episodeKeywords = useMemo(() => {
+    const set = new Set<string>()
+    for (const item of items) {
+      const value = item.episode.trim()
+      if (value) set.add(value)
+    }
+    for (const profile of profiles) {
+      const value = profile.episode.trim()
+      if (value) set.add(value)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [items, profiles])
+
+  const deckKeywords = useMemo(() => {
+    const set = new Set<string>()
+    for (const item of items) {
+      const value = item.deck.trim()
+      if (value) set.add(value)
+    }
+    for (const profile of profiles) {
+      const value = profile.deck.trim()
+      if (value) set.add(value)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [items, profiles])
+
+  const tagKeywords = useMemo(() => {
+    const set = new Set<string>()
+    for (const item of items) {
+      for (const tag of item.tags) {
+        const value = tag.trim()
+        if (value) set.add(value)
+      }
+    }
+    for (const profile of profiles) {
+      for (const tag of profile.tags) {
+        const value = tag.trim()
+        if (value) set.add(value)
+      }
+    }
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [items, profiles])
 
   const calendarDays = useMemo(() => {
     const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1)
@@ -726,7 +997,7 @@ function App() {
   const openCreateModal = (deckPreset?: string) => {
     resetOcrState()
     setEditingId(null)
-    setForm({ ...EMPTY_FORM, deck: deckPreset || EMPTY_FORM.deck })
+    setForm({ ...EMPTY_FORM, deck: deckPreset || EMPTY_FORM.deck, profileId: '' })
     setInputTab('text')
     setIsAddOpen(true)
   }
@@ -744,6 +1015,7 @@ function App() {
       difficulty: sourceItem?.difficulty ?? EMPTY_FORM.difficulty,
       notes: sourceItem?.notes ?? '',
       deck,
+      profileId: sourceItem?.profileId ?? '',
     })
     setInputTab('text')
     setIsDetailOpen(false)
@@ -767,6 +1039,104 @@ function App() {
   const closeAddModal = () => {
     resetOcrState()
     setIsAddOpen(false)
+  }
+
+  const onFormProfileChange = (profileId: string) => {
+    if (!profileId) {
+      setForm((prev) => ({ ...prev, profileId: '' }))
+      return
+    }
+    const profile = profileMap.get(profileId)
+    if (!profile) return
+    setForm((prev) => ({
+      ...prev,
+      profileId,
+      show: profile.show,
+      episode: profile.episode,
+      tags: profile.tags.join(', '),
+      difficulty: profile.difficulty,
+      notes: profile.notes,
+      deck: profile.deck,
+    }))
+  }
+
+  const saveProfileFromCurrentForm = async () => {
+    const name = window.prompt('프로파일 이름을 입력하세요')
+    if (!name || !name.trim()) return
+    const nextProfile = await upsertProfile({
+      name: name.trim(),
+      show: form.show.trim(),
+      episode: form.episode.trim(),
+      tags: form.tags
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      difficulty: form.difficulty,
+      notes: form.notes.trim(),
+      deck: form.deck.trim() || '기본 덱',
+    })
+    setForm((prev) => ({ ...prev, profileId: nextProfile.id }))
+    setSettingsMsg(`프로파일 "${nextProfile.name}" 저장 완료`)
+  }
+
+  const startEditProfile = (profile: CardInfoProfile) => {
+    setSettingsTab('profiles')
+    setProfileEditor({
+      id: profile.id,
+      name: profile.name,
+      show: profile.show,
+      episode: profile.episode,
+      tags: profile.tags.join(', '),
+      difficulty: profile.difficulty,
+      notes: profile.notes,
+      deck: profile.deck,
+    })
+  }
+
+  const resetProfileEditor = () => {
+    setProfileEditor({
+      id: null,
+      name: '',
+      show: '',
+      episode: '',
+      tags: '',
+      difficulty: 2,
+      notes: '',
+      deck: '기본 덱',
+    })
+  }
+
+  const submitProfileEditor = async (event: FormEvent) => {
+    event.preventDefault()
+    const trimmedName = profileEditor.name.trim()
+    if (!trimmedName) {
+      setSettingsMsg('프로파일 이름을 입력해 주세요.')
+      return
+    }
+    const saved = await upsertProfile({
+      id: profileEditor.id,
+      name: trimmedName,
+      show: profileEditor.show.trim(),
+      episode: profileEditor.episode.trim(),
+      tags: profileEditor.tags
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      difficulty: profileEditor.difficulty,
+      notes: profileEditor.notes.trim(),
+      deck: profileEditor.deck.trim() || '기본 덱',
+    })
+    setSettingsMsg(`프로파일 "${saved.name}" 저장 완료`)
+    setProfileEditor({
+      id: saved.id,
+      name: saved.name,
+      show: saved.show,
+      episode: saved.episode,
+      tags: saved.tags.join(', '),
+      difficulty: saved.difficulty,
+      notes: saved.notes,
+      deck: saved.deck,
+    })
   }
 
   const updateStatus = (id: string, status: Status) => {
@@ -848,19 +1218,24 @@ function App() {
     event.preventDefault()
     if (!form.phrase.trim() || !form.translation.trim()) return
 
+    const selectedProfileId = form.profileId.trim()
+    const selectedProfile = selectedProfileId ? profileMap.get(selectedProfileId) ?? null : null
     const payload = {
       phrase: form.phrase.trim(),
       translation: form.translation.trim(),
       example: form.example.trim(),
-      show: form.show.trim(),
-      episode: form.episode.trim(),
-      tags: form.tags
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-      difficulty: form.difficulty,
-      notes: form.notes.trim(),
-      deck: form.deck.trim() || '기본 덱',
+      show: selectedProfile ? selectedProfile.show : form.show.trim(),
+      episode: selectedProfile ? selectedProfile.episode : form.episode.trim(),
+      tags: selectedProfile
+        ? [...selectedProfile.tags]
+        : form.tags
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+      difficulty: selectedProfile ? selectedProfile.difficulty : form.difficulty,
+      notes: selectedProfile ? selectedProfile.notes : form.notes.trim(),
+      deck: selectedProfile ? selectedProfile.deck : form.deck.trim() || '기본 덱',
+      profileId: selectedProfile ? selectedProfile.id : null,
     }
 
     if (editingId) {
@@ -890,7 +1265,7 @@ function App() {
     resetOcrState()
   }
 
-  const autoFillFromEnglish = async () => {
+  const autoFillFromEnglish = async (forceUpdate = false) => {
     const phrase = form.phrase.trim()
     if (!phrase || isAutoFilling) return
 
@@ -949,10 +1324,11 @@ function App() {
             }
           }
         }
-        const matchedExample =
-          examples.find((line) => line.toLowerCase().includes(phrase.toLowerCase())) ||
-          examples[0] ||
-          ''
+        const matchedExample = phrase.includes(' ')
+          ? examples.find((line) => includesPhrase(line, phrase)) || ''
+          : examples.find((line) => line.toLowerCase().includes(phrase.toLowerCase())) ||
+            examples[0] ||
+            ''
         if (matchedExample) enExample = toSentenceCase(matchedExample)
         if (definitions[0]) definitionHint = definitions[0]
         if (enExample) break
@@ -968,6 +1344,9 @@ function App() {
       enExample = phrase.includes(' ')
         ? buildPhraseFallbackExample(phrase, definitionHint)
         : buildWordFallbackExample(phrase, definitionHint)
+    }
+    if (phrase.includes(' ') && !includesPhrase(enExample, phrase)) {
+      enExample = buildPhraseFallbackExample(phrase, definitionHint)
     }
 
     try {
@@ -994,12 +1373,18 @@ function App() {
 
     setForm((prev) => ({
       ...prev,
-      translation: prev.translation.trim() ? prev.translation : translationText,
+      translation: forceUpdate || !prev.translation.trim() ? translationText : prev.translation,
       example:
-        !prev.example.trim() || isLikelyAutoGeneratedExample(prev.example) ? exampleText : prev.example,
+        forceUpdate || !prev.example.trim() || isLikelyAutoGeneratedExample(prev.example)
+          ? exampleText
+          : prev.example,
     }))
 
-    setAutoFillMsg('뜻/예문 자동 채우기를 완료했습니다.')
+    setAutoFillMsg(
+      forceUpdate
+        ? '뜻/예문을 최신 자동 생성 내용으로 업데이트했습니다.'
+        : '뜻/예문 자동 채우기를 완료했습니다.',
+    )
     setIsAutoFilling(false)
   }
 
@@ -1121,7 +1506,7 @@ function App() {
     try {
       await setDoc(
         doc(db, 'users', authUser.uid, 'appData', FIREBASE_DOC_KEY),
-        { items, updatedAt: serverTimestamp() },
+        { items, profiles, updatedAt: serverTimestamp() },
         { merge: true },
       )
       setSettingsMsg('클라우드 동기화를 완료했습니다.')
@@ -1138,6 +1523,7 @@ function App() {
       exportedAt: new Date().toISOString(),
       count: items.length,
       items,
+      profiles,
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -1154,15 +1540,31 @@ function App() {
     setSettingsMsg('')
     try {
       const text = await file.text()
-      const parsed = JSON.parse(text) as { items?: unknown } | StudyItem[]
+      const parsed = JSON.parse(text) as { items?: unknown; profiles?: unknown } | StudyItem[]
       const rawItems = Array.isArray(parsed) ? parsed : parsed.items
+      const rawProfiles = Array.isArray(parsed) ? [] : parsed.profiles
       const next = normalizeItems(rawItems)
+      const nextProfiles = normalizeProfiles(rawProfiles)
+      const hydratedNext = next.map((item) => {
+        if (!item.profileId) return item
+        const profile = nextProfiles.find((p) => p.id === item.profileId)
+        if (!profile) return { ...item, profileId: null }
+        return {
+          ...item,
+          show: profile.show,
+          episode: profile.episode,
+          tags: [...profile.tags],
+          difficulty: profile.difficulty,
+          notes: profile.notes,
+          deck: profile.deck,
+        }
+      })
       if (next.length === 0) {
         setSettingsMsg('불러온 데이터에 카드가 없습니다.')
         return
       }
-      await persist(next)
-      setSettingsMsg(`${next.length}개 카드를 불러왔습니다.`)
+      await persistAll(hydratedNext, nextProfiles)
+      setSettingsMsg(`${hydratedNext.length}개 카드를 불러왔습니다.`)
     } catch {
       setSettingsMsg('JSON 파일 형식이 올바르지 않습니다.')
     }
@@ -1239,6 +1641,8 @@ function App() {
                     type="button"
                     onClick={() => {
                       setIsSettingsOpen(true)
+                      setSettingsTab('account')
+                      resetProfileEditor()
                       setSettingsMsg('')
                       setIsAccountMenuOpen(false)
                     }}
@@ -1482,6 +1886,7 @@ function App() {
                   {filteredItems.map((item) => {
                     const koPrimary = splitTranslationParts(item.translation).primary || item.translation
                     const phraseWords = splitPhraseWords(item.phrase)
+                    const linkedProfile = item.profileId ? profileMap.get(item.profileId) ?? null : null
                     const exampleLine = item.example.trim()
                       ? item.example.split('\n')[0]?.trim() ?? ''
                       : ''
@@ -1489,6 +1894,7 @@ function App() {
                       <tr key={item.id} className="study-row" onClick={() => openDetailModal(item.id)}>
                         <td className="col-phrase">
                           <strong className="list-phrase-main">{item.phrase}</strong>
+                          {linkedProfile && <span className="profile-pill">프로파일: {linkedProfile.name}</span>}
                           {exampleLine && <div className="list-phrase-example">"{exampleLine}"</div>}
                           {phraseWords.length >= 2 && (
                             <div
@@ -1603,6 +2009,7 @@ function App() {
                     columnItems.map((item) => {
                       const koPrimary =
                         splitTranslationParts(item.translation).primary || item.translation
+                      const linkedProfile = item.profileId ? profileMap.get(item.profileId) ?? null : null
                       const exampleLine = item.example.trim()
                         ? item.example.split('\n')[0]?.trim() ?? ''
                         : ''
@@ -1625,6 +2032,9 @@ function App() {
                                 {item.deck || '기본 덱'}
                               </span>
                             </div>
+                            {linkedProfile && (
+                              <div className="profile-pill board-profile-pill">프로파일: {linkedProfile.name}</div>
+                            )}
                             <p className="board-ko">{koPrimary}</p>
                             {item.tags.length > 0 && (
                               <div className="board-tags" aria-label="태그">
@@ -1736,6 +2146,7 @@ function App() {
                       const stackCard = cardItems[idx]
                       if (!stackCard) return null
                       const isCenter = offset === 0
+                      const linkedProfile = stackCard.profileId ? profileMap.get(stackCard.profileId) ?? null : null
                       const isExampleRevealed = !isCenter || cardTimerProgress <= 0.5
                       const card = (
                         <button
@@ -1759,6 +2170,7 @@ function App() {
                           <div className="flashcard-inner">
                             <div className="flashcard-face flashcard-front">
                               <span>{isCenter ? '클릭해서 뜻 확인' : stackCard.deck}</span>
+                              {linkedProfile && <small className="flashcard-profile">프로파일: {linkedProfile.name}</small>}
                               <h3>{stackCard.phrase}</h3>
                               {stackCard.example && (
                                 <p
@@ -1770,6 +2182,7 @@ function App() {
                             </div>
                             <div className="flashcard-face flashcard-back">
                               <span>뜻</span>
+                              {linkedProfile && <small className="flashcard-profile">프로파일: {linkedProfile.name}</small>}
                               {(() => {
                                 const translationParts = splitTranslationParts(stackCard.translation)
                                 const primaryMeaning = translationParts.primary || stackCard.translation
@@ -2169,32 +2582,201 @@ function App() {
                 ✕
               </button>
             </header>
-            <div className="settings-block">
-              <small>계정</small>
-              <strong>{authUser?.displayName || 'Google 사용자'}</strong>
-              <p>{authUser?.email || '이메일 없음'}</p>
+            <div className="settings-tab-row">
+              <button
+                type="button"
+                className={settingsTab === 'account' ? 'active' : ''}
+                onClick={() => setSettingsTab('account')}
+              >
+                계정/동기화
+              </button>
+              <button
+                type="button"
+                className={settingsTab === 'profiles' ? 'active' : ''}
+                onClick={() => setSettingsTab('profiles')}
+              >
+                카드 정보 프로파일
+              </button>
             </div>
-            <div className="settings-actions">
-              <button type="button" className="secondary" onClick={forceSyncNow} disabled={!authUser}>
-                지금 동기화
-              </button>
-              <button type="button" className="secondary" onClick={exportItemsJson}>
-                데이터 내보내기
-              </button>
-              <button type="button" className="secondary" onClick={() => importFileRef.current?.click()}>
-                데이터 가져오기
-              </button>
-              <input
-                ref={importFileRef}
-                type="file"
-                accept="application/json"
-                className="settings-hidden-file"
-                onChange={(event) => {
-                  importItemsJson(event.target.files?.[0] ?? null)
-                  event.currentTarget.value = ''
-                }}
-              />
-            </div>
+            {settingsTab === 'account' ? (
+              <>
+                <div className="settings-block">
+                  <small>계정</small>
+                  <strong>{authUser?.displayName || 'Google 사용자'}</strong>
+                  <p>{authUser?.email || '이메일 없음'}</p>
+                </div>
+                <div className="settings-actions">
+                  <button type="button" className="secondary" onClick={forceSyncNow} disabled={!authUser}>
+                    지금 동기화
+                  </button>
+                  <button type="button" className="secondary" onClick={exportItemsJson}>
+                    데이터 내보내기
+                  </button>
+                  <button type="button" className="secondary" onClick={() => importFileRef.current?.click()}>
+                    데이터 가져오기
+                  </button>
+                  <input
+                    ref={importFileRef}
+                    type="file"
+                    accept="application/json"
+                    className="settings-hidden-file"
+                    onChange={(event) => {
+                      importItemsJson(event.target.files?.[0] ?? null)
+                      event.currentTarget.value = ''
+                    }}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="profile-settings-panel">
+                <form className="profile-editor-form" onSubmit={submitProfileEditor}>
+                  <label>
+                    프로파일 이름 *
+                    <input
+                      value={profileEditor.name}
+                      onChange={(event) =>
+                        setProfileEditor((prev) => ({
+                          ...prev,
+                          name: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <div className="row2">
+                    <label>
+                      드라마 / 작품명
+                      <input
+                        list="show-keywords"
+                        value={profileEditor.show}
+                        onChange={(event) =>
+                          setProfileEditor((prev) => ({
+                            ...prev,
+                            show: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      에피소드
+                      <input
+                        list="episode-keywords"
+                        value={profileEditor.episode}
+                        onChange={(event) =>
+                          setProfileEditor((prev) => ({
+                            ...prev,
+                            episode: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="row2">
+                    <label>
+                      태그 (쉼표 구분)
+                      <input
+                        list="tag-keywords"
+                        value={profileEditor.tags}
+                        onChange={(event) =>
+                          setProfileEditor((prev) => ({
+                            ...prev,
+                            tags: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      덱(그룹)
+                      <input
+                        list="deck-keywords"
+                        value={profileEditor.deck}
+                        onChange={(event) =>
+                          setProfileEditor((prev) => ({
+                            ...prev,
+                            deck: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="row2">
+                    <label>
+                      난이도
+                      <select
+                        value={profileEditor.difficulty}
+                        onChange={(event) =>
+                          setProfileEditor((prev) => ({
+                            ...prev,
+                            difficulty: Number(event.target.value) as 1 | 2 | 3,
+                          }))
+                        }
+                      >
+                        <option value={1}>★ 쉬움</option>
+                        <option value={2}>★★ 보통</option>
+                        <option value={3}>★★★ 어려움</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label>
+                    메모
+                    <textarea
+                      value={profileEditor.notes}
+                      onChange={(event) =>
+                        setProfileEditor((prev) => ({
+                          ...prev,
+                          notes: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <div className="profile-editor-actions">
+                    <button type="submit" className="secondary">
+                      {profileEditor.id ? '프로파일 업데이트' : '새 프로파일 저장'}
+                    </button>
+                    <button type="button" className="secondary" onClick={resetProfileEditor}>
+                      새로 작성
+                    </button>
+                  </div>
+                </form>
+                <div className="profile-list">
+                  {profiles.length === 0 ? (
+                    <p className="profile-list-empty">저장된 프로파일이 없습니다.</p>
+                  ) : (
+                    profiles.map((profile) => (
+                      <div key={profile.id} className="profile-list-item">
+                        <div>
+                          <strong>{profile.name}</strong>
+                          <p>
+                            {profile.show || '작품 미입력'} · {profile.episode || '에피소드 미입력'} ·{' '}
+                            {profile.deck}
+                          </p>
+                          <small>연결 카드 {profileUsageCounts[profile.id] ?? 0}개</small>
+                        </div>
+                        <div className="profile-list-actions">
+                          <button type="button" className="secondary" onClick={() => startEditProfile(profile)}>
+                            수정
+                          </button>
+                          <button
+                            type="button"
+                            className="danger"
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  `"${profile.name}" 프로파일을 삭제할까요? 연결 카드들은 프로파일 연결만 해제됩니다.`,
+                                )
+                              ) {
+                                void deleteProfile(profile.id)
+                              }
+                            }}
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
             {settingsMsg && <p className="settings-msg">{settingsMsg}</p>}
             {syncError && <p className="settings-error">{syncError}</p>}
             <footer>
@@ -2350,9 +2932,24 @@ function App() {
                     value={form.phrase}
                     onChange={(event) => setForm((prev) => ({ ...prev, phrase: event.target.value }))}
                   />
-                  <button type="button" className="secondary af-btn-inline" onClick={autoFillFromEnglish} disabled={isAutoFilling}>
+                  <button
+                    type="button"
+                    className="secondary af-btn-inline"
+                    onClick={() => autoFillFromEnglish(false)}
+                    disabled={isAutoFilling}
+                  >
                     {isAutoFilling ? '생성 중...' : '자동 생성'}
                   </button>
+                  {editingId && (
+                    <button
+                      type="button"
+                      className="secondary af-btn-inline"
+                      onClick={() => autoFillFromEnglish(true)}
+                      disabled={isAutoFilling}
+                    >
+                      {isAutoFilling ? '업데이트 중...' : '내용 업데이트'}
+                    </button>
+                  )}
                 </div>
                 {autoFillMsg && <small className="af-msg">{autoFillMsg}</small>}
               </label>
@@ -2373,19 +2970,58 @@ function App() {
                   onChange={(event) => setForm((prev) => ({ ...prev, example: event.target.value }))}
                 />
               </label>
+              <div className="profile-bind-row">
+                <label>
+                  카드 정보 프로파일
+                  <select value={form.profileId} onChange={(event) => onFormProfileChange(event.target.value)}>
+                    <option value="">직접 입력 (프로파일 미사용)</option>
+                    {profiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="profile-bind-actions">
+                  <button type="button" className="secondary" onClick={saveProfileFromCurrentForm}>
+                    현재 입력으로 프로파일 저장
+                  </button>
+                  {isFormUsingProfile && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setForm((prev) => ({ ...prev, profileId: '' }))
+                      }}
+                    >
+                      프로파일 해제
+                    </button>
+                  )}
+                </div>
+                {selectedFormProfile && (
+                  <p className="profile-bind-hint">
+                    "{selectedFormProfile.name}" 프로파일을 사용하는 중입니다. 메타 정보는 프로파일 변경 시
+                    연결된 카드에 일괄 반영됩니다.
+                  </p>
+                )}
+              </div>
               <div className="row2">
                 <label>
                   드라마 / 작품명
                   <input
+                    list="show-keywords"
                     value={form.show}
                     onChange={(event) => setForm((prev) => ({ ...prev, show: event.target.value }))}
+                    disabled={isFormUsingProfile}
                   />
                 </label>
                 <label>
                   에피소드
                   <input
+                    list="episode-keywords"
                     value={form.episode}
                     onChange={(event) => setForm((prev) => ({ ...prev, episode: event.target.value }))}
+                    disabled={isFormUsingProfile}
                   />
                 </label>
               </div>
@@ -2393,16 +3029,20 @@ function App() {
                 <label>
                   태그 (쉼표 구분)
                   <input
+                    list="tag-keywords"
                     value={form.tags}
                     onChange={(event) => setForm((prev) => ({ ...prev, tags: event.target.value }))}
+                    disabled={isFormUsingProfile}
                   />
                 </label>
                 <label>
                   덱(그룹)
                   <input
+                    list="deck-keywords"
                     value={form.deck}
                     onChange={(event) => setForm((prev) => ({ ...prev, deck: event.target.value }))}
                     placeholder="예: 일상 회화, 비즈니스, 시험"
+                    disabled={isFormUsingProfile}
                   />
                 </label>
               </div>
@@ -2417,6 +3057,7 @@ function App() {
                         difficulty: Number(event.target.value) as 1 | 2 | 3,
                       }))
                     }
+                    disabled={isFormUsingProfile}
                   >
                     <option value={1}>★ 쉬움</option>
                     <option value={2}>★★ 보통</option>
@@ -2429,6 +3070,7 @@ function App() {
                 <textarea
                   value={form.notes}
                   onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
+                  disabled={isFormUsingProfile}
                 />
               </label>
               <footer>
@@ -2440,6 +3082,26 @@ function App() {
                 </button>
               </footer>
             </form>
+            <datalist id="show-keywords">
+              {showKeywords.map((keyword) => (
+                <option key={`show-${keyword}`} value={keyword} />
+              ))}
+            </datalist>
+            <datalist id="episode-keywords">
+              {episodeKeywords.map((keyword) => (
+                <option key={`episode-${keyword}`} value={keyword} />
+              ))}
+            </datalist>
+            <datalist id="deck-keywords">
+              {deckKeywords.map((keyword) => (
+                <option key={`deck-${keyword}`} value={keyword} />
+              ))}
+            </datalist>
+            <datalist id="tag-keywords">
+              {tagKeywords.map((keyword) => (
+                <option key={`tag-${keyword}`} value={keyword} />
+              ))}
+            </datalist>
           </section>
         </div>
       )}
@@ -2466,6 +3128,7 @@ function App() {
               <span>{detailItem.show || '작품 미입력'}</span>
               <span>{detailItem.deck}</span>
               <span>{'★'.repeat(detailItem.difficulty)}</span>
+              {detailProfile && <span>프로파일: {detailProfile.name}</span>}
               {detailItem.tags.map((tag) => (
                 <span key={tag}>{tag}</span>
               ))}
