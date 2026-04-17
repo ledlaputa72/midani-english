@@ -692,16 +692,22 @@ button.danger {
   width: fit-content;
 }
 
-.item-type-word {
+.item-type-vocabulary {
   border: 1px solid #4b6ba8;
   background: rgba(56, 95, 160, 0.22);
   color: #c8dcff;
 }
 
-.item-type-phrase {
+.item-type-expression {
   border: 1px solid #7a59d5;
   background: rgba(111, 75, 188, 0.24);
   color: #e2d4ff;
+}
+
+.item-type-idiom {
+  border: 1px solid #d8893e;
+  background: rgba(214, 126, 34, 0.22);
+  color: #ffe0bc;
 }
 
 .item-type-filter-row {
@@ -1023,12 +1029,16 @@ button.danger {
   flex-direction: column;
 }
 
-.board-card--word {
+.board-card--vocabulary {
   border-color: #385aa0;
 }
 
-.board-card--phrase {
+.board-card--expression {
   border-color: #684ab8;
+}
+
+.board-card--idiom {
+  border-color: #b36b29;
 }
 
 .board-card[draggable='true'] {
@@ -1473,12 +1483,28 @@ button.danger {
   background: linear-gradient(160deg, #2b1863, #2c1b6f);
 }
 
-.flashcard--word .flashcard-face {
+.flashcard--vocabulary .flashcard-face {
   background: linear-gradient(160deg, #1b2844, #223769);
 }
 
-.flashcard--word .flashcard-back {
+.flashcard--vocabulary .flashcard-back {
   background: linear-gradient(160deg, #183156, #204678);
+}
+
+.flashcard--expression .flashcard-face {
+  background: linear-gradient(160deg, #1f1f36, #28185a);
+}
+
+.flashcard--expression .flashcard-back {
+  background: linear-gradient(160deg, #2b1863, #2c1b6f);
+}
+
+.flashcard--idiom .flashcard-face {
+  background: linear-gradient(160deg, #3b2410, #4c2913);
+}
+
+.flashcard--idiom .flashcard-back {
+  background: linear-gradient(160deg, #52290f, #6a3310);
 }
 
 .flashcard-face span {

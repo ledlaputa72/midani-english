@@ -8,7 +8,7 @@ import { auth, db, firebaseReady } from './firebase'
 import './App.css'
 
 type Status = 'new' | 'learning' | 'mastered'
-type ItemType = 'word' | 'phrase'
+type ItemType = 'vocabulary' | 'expression' | 'idiom'
 type Page = 'dashboard' | 'list' | 'board' | 'cards' | 'calendar'
 type InputTab = 'text' | 'ocr'
 type ListSort = 'latest' | 'oldest' | 'phrase'
@@ -64,6 +64,12 @@ type FormState = {
 
 const STORAGE_KEY = 'midani.study.items.v2'
 const FIREBASE_DOC_KEY = 'studyItems'
+const GEMINI_API_KEY =
+  (
+    import.meta as ImportMeta & {
+      env?: Record<string, string | undefined>
+    }
+  ).env?.VITE_GEMINI_API_KEY?.trim() || ''
 
 /** 플래시카드 자동 넘김 간격 (롤링 배너, ms) */
 const CARD_AUTO_ADVANCE_MS = 8000
@@ -75,8 +81,9 @@ const STATUS_LABEL: Record<Status, string> = {
 }
 
 const ITEM_TYPE_LABEL: Record<ItemType, string> = {
-  word: '단어',
-  phrase: '구문',
+  vocabulary: 'Vocabulary',
+  expression: 'Expression',
+  idiom: 'Idiom',
 }
 
 const NAV_ITEMS: Array<{ id: Page; label: string }> = [
@@ -98,7 +105,7 @@ const EMPTY_FORM: FormState = {
   notes: '',
   deck: '기본 덱',
   profileId: '',
-  itemType: 'word',
+  itemType: 'vocabulary',
 }
 
 const SAMPLE_ITEMS: StudyItem[] = [
@@ -171,10 +178,13 @@ function normalizeItems(source: StudyItem[] | unknown): StudyItem[] {
         ? (item as StudyItem).difficulty
         : 2,
     profileId: typeof (item as StudyItem).profileId === 'string' ? (item as StudyItem).profileId : null,
-    itemType:
-      (item as StudyItem).itemType === 'word' || (item as StudyItem).itemType === 'phrase'
-        ? (item as StudyItem).itemType
-        : inferItemType((item as StudyItem).phrase ?? ''),
+    itemType: (() => {
+      const rawType = (item as StudyItem).itemType
+      if (rawType === 'vocabulary' || rawType === 'expression' || rawType === 'idiom') return rawType
+      if (rawType === 'word') return 'vocabulary'
+      if (rawType === 'phrase') return 'expression'
+      return inferItemType((item as StudyItem).phrase ?? '')
+    })(),
   }))
 }
 
@@ -271,7 +281,7 @@ function toFormState(item: StudyItem): FormState {
 }
 
 function inferItemType(phrase: string): ItemType {
-  return /\s/.test(phrase.trim()) ? 'phrase' : 'word'
+  return /\s/.test(phrase.trim()) ? 'expression' : 'vocabulary'
 }
 
 function splitTranslationParts(text: string): { primary: string; secondary: string[] } {
@@ -408,6 +418,97 @@ function pickWordMeaningCandidate(candidates: string[]): string {
     })
     .sort((a, b) => b.score - a.score || a.clean.length - b.clean.length)
   return scored[0]?.clean ?? candidates[0]
+}
+
+type GeminiAutofillResult = {
+  meaningKo: string
+  altMeaningsKo: string[]
+  exampleEn: string
+  exampleKo?: string
+  definitionHint?: string
+}
+
+function extractFirstJsonObject(text: string): string | null {
+  const fenced = text.match(/```json\s*([\s\S]*?)```/i)
+  if (fenced?.[1]) return fenced[1].trim()
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start === -1 || end === -1 || end <= start) return null
+  return text.slice(start, end + 1).trim()
+}
+
+async function translateEnglishToKorean(text: string): Promise<string> {
+  const clean = text.trim()
+  if (!clean) return ''
+  try {
+    const res = await fetch(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(clean)}&langpair=en|ko`,
+    )
+    if (!res.ok) return ''
+    const data = (await res.json()) as { responseData?: { translatedText?: string } }
+    return normalizeKoreanMeaningLine(data.responseData?.translatedText ?? '')
+  } catch {
+    return ''
+  }
+}
+
+async function generateMeaningAndExampleWithGemini(
+  phrase: string,
+  itemType: ItemType,
+): Promise<GeminiAutofillResult | null> {
+  if (!GEMINI_API_KEY) return null
+  const typeLabel =
+    itemType === 'vocabulary' ? 'vocabulary(word)' : itemType === 'idiom' ? 'idiom' : 'expression'
+  const prompt = [
+    'You are an English learning assistant for Korean learners.',
+    `Target text: "${phrase}"`,
+    `Item type: ${typeLabel}`,
+    'Return ONLY JSON with keys:',
+    '{ "meaningKo": string, "altMeaningsKo": string[], "definitionHint": string, "exampleEn": string, "exampleKo": string }',
+    'Rules:',
+    '- For expression/idiom, prioritize natural usage meaning (NOT literal translation).',
+    '- exampleEn must include the exact target text naturally.',
+    '- For expression/idiom, make exampleEn a 2-line dialogue using "A:" and "B:".',
+    '- meaningKo should be concise and practical for learners.',
+  ].join('\n')
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(
+        GEMINI_API_KEY,
+      )}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, responseMimeType: 'application/json' },
+        }),
+      },
+    )
+    if (!res.ok) return null
+    const data = (await res.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+    }
+    const rawText = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('\n') ?? ''
+    const jsonText = extractFirstJsonObject(rawText)
+    if (!jsonText) return null
+    const parsed = JSON.parse(jsonText) as Partial<GeminiAutofillResult>
+    const meaningKo = normalizeKoreanMeaningLine(String(parsed.meaningKo ?? ''))
+    const altMeaningsKo = Array.isArray(parsed.altMeaningsKo)
+      ? parsed.altMeaningsKo
+          .map((line) => normalizeKoreanMeaningLine(String(line)))
+          .filter(Boolean)
+          .slice(0, 2)
+      : []
+    const exampleEn = toSentenceCase(String(parsed.exampleEn ?? '').trim())
+    const exampleKo = normalizeKoreanMeaningLine(String(parsed.exampleKo ?? ''))
+    const definitionHint = String(parsed.definitionHint ?? '').trim()
+    if (!meaningKo || !exampleEn) return null
+    return { meaningKo, altMeaningsKo, exampleEn, exampleKo, definitionHint }
+  } catch {
+    return null
+  }
 }
 
 function App() {
@@ -1057,7 +1158,7 @@ function App() {
       notes: sourceItem?.notes ?? '',
       deck,
       profileId: sourceItem?.profileId ?? '',
-      itemType: 'word',
+      itemType: 'vocabulary',
     })
     setInputTab('text')
     setIsDetailOpen(false)
@@ -1321,6 +1422,7 @@ function App() {
     let koExample = ''
     let altMeanings: string[] = []
     let definitionHint = ''
+    let usedGemini = false
 
     try {
       const transRes = await fetch(
@@ -1338,7 +1440,7 @@ function App() {
           .map((line) => normalizeKoreanMeaningLine(line))
           .filter(Boolean)
         koMeaning =
-          inferredType === 'word' ? pickWordMeaningCandidate(allCandidates) : (allCandidates[0] ?? '')
+          inferredType === 'vocabulary' ? pickWordMeaningCandidate(allCandidates) : (allCandidates[0] ?? '')
         altMeanings = allCandidates
           .filter((line) => line !== koMeaning)
           .slice(0, 2)
@@ -1369,7 +1471,7 @@ function App() {
             }
           }
         }
-        const matchedExample = inferredType === 'phrase'
+        const matchedExample = inferredType !== 'vocabulary'
           ? examples.find((line) => includesPhrase(line, phrase)) || ''
           : examples.find((line) => line.toLowerCase().includes(phrase.toLowerCase())) ||
             examples[0] ||
@@ -1382,15 +1484,33 @@ function App() {
       // Ignore dictionary API failures and fallback below.
     }
 
+    if (inferredType !== 'vocabulary' && definitionHint) {
+      const meaningFromDefinition = await translateEnglishToKorean(definitionHint)
+      if (meaningFromDefinition) {
+        koMeaning = meaningFromDefinition
+        altMeanings = altMeanings.filter((line) => line !== koMeaning)
+      }
+    }
+
+    const geminiResult = await generateMeaningAndExampleWithGemini(phrase, inferredType)
+    if (geminiResult) {
+      koMeaning = geminiResult.meaningKo
+      altMeanings = geminiResult.altMeaningsKo
+      enExample = geminiResult.exampleEn
+      if (geminiResult.exampleKo) koExample = geminiResult.exampleKo
+      if (geminiResult.definitionHint) definitionHint = geminiResult.definitionHint
+      usedGemini = true
+    }
+
     if (!koMeaning) {
       koMeaning = `"${phrase}"의 의미를 확인해 주세요.`
     }
     if (!enExample) {
-      enExample = inferredType === 'phrase'
+      enExample = inferredType !== 'vocabulary'
         ? buildPhraseFallbackExample(phrase, definitionHint)
         : buildWordFallbackExample(phrase, definitionHint)
     }
-    if (inferredType === 'phrase' && !includesPhrase(enExample, phrase)) {
+    if (inferredType !== 'vocabulary' && !includesPhrase(enExample, phrase)) {
       enExample = buildPhraseFallbackExample(phrase, definitionHint)
     }
 
@@ -1428,7 +1548,9 @@ function App() {
     setAutoFillMsg(
       forceUpdate
         ? '뜻/예문을 최신 자동 생성 내용으로 업데이트했습니다.'
-        : '뜻/예문 자동 채우기를 완료했습니다.',
+        : usedGemini
+          ? '뜻/예문 자동 채우기 완료 (의미 중심 해석 적용).'
+          : '뜻/예문 자동 채우기를 완료했습니다.',
     )
     setIsAutoFilling(false)
   }
@@ -1895,9 +2017,10 @@ function App() {
                 value={itemTypeFilter}
                 onChange={(event) => setItemTypeFilter(event.target.value as 'all' | ItemType)}
               >
-                <option value="all">단어+구문</option>
-                <option value="word">단어</option>
-                <option value="phrase">구문</option>
+                <option value="all">Vocabulary+Expression+Idiom</option>
+                <option value="vocabulary">Vocabulary</option>
+                <option value="expression">Expression</option>
+                <option value="idiom">Idiom</option>
               </select>
               <select
                 className="list-filter-select"
@@ -2050,21 +2173,28 @@ function App() {
                 className={itemTypeFilter === 'all' ? 'active' : ''}
                 onClick={() => setItemTypeFilter('all')}
               >
-                단어+구문
+                Vocabulary+Expression+Idiom
               </button>
               <button
                 type="button"
-                className={itemTypeFilter === 'word' ? 'active' : ''}
-                onClick={() => setItemTypeFilter('word')}
+                className={itemTypeFilter === 'vocabulary' ? 'active' : ''}
+                onClick={() => setItemTypeFilter('vocabulary')}
               >
-                단어
+                Vocabulary
               </button>
               <button
                 type="button"
-                className={itemTypeFilter === 'phrase' ? 'active' : ''}
-                onClick={() => setItemTypeFilter('phrase')}
+                className={itemTypeFilter === 'expression' ? 'active' : ''}
+                onClick={() => setItemTypeFilter('expression')}
               >
-                구문
+                Expression
+              </button>
+              <button
+                type="button"
+                className={itemTypeFilter === 'idiom' ? 'active' : ''}
+                onClick={() => setItemTypeFilter('idiom')}
+              >
+                Idiom
               </button>
             </section>
             <section className="board">
@@ -2215,21 +2345,28 @@ function App() {
                 className={itemTypeFilter === 'all' ? 'active' : ''}
                 onClick={() => setItemTypeFilter('all')}
               >
-                단어+구문
+                Vocabulary+Expression+Idiom
               </button>
               <button
                 type="button"
-                className={itemTypeFilter === 'word' ? 'active' : ''}
-                onClick={() => setItemTypeFilter('word')}
+                className={itemTypeFilter === 'vocabulary' ? 'active' : ''}
+                onClick={() => setItemTypeFilter('vocabulary')}
               >
-                단어
+                Vocabulary
               </button>
               <button
                 type="button"
-                className={itemTypeFilter === 'phrase' ? 'active' : ''}
-                onClick={() => setItemTypeFilter('phrase')}
+                className={itemTypeFilter === 'expression' ? 'active' : ''}
+                onClick={() => setItemTypeFilter('expression')}
               >
-                구문
+                Expression
+              </button>
+              <button
+                type="button"
+                className={itemTypeFilter === 'idiom' ? 'active' : ''}
+                onClick={() => setItemTypeFilter('idiom')}
+              >
+                Idiom
               </button>
             </section>
             <p className="card-counter">
@@ -3073,8 +3210,9 @@ function App() {
                     }))
                   }
                 >
-                  <option value="word">단어</option>
-                  <option value="phrase">구문</option>
+                  <option value="vocabulary">Vocabulary</option>
+                  <option value="expression">Expression</option>
+                  <option value="idiom">Idiom</option>
                 </select>
               </label>
               <label>
