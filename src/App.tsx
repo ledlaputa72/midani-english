@@ -1541,6 +1541,7 @@ function App() {
 
   const currentCard = cardItems[cardIndex] ?? null
   const detailItem = detailId ? items.find((item) => item.id === detailId) ?? null : null
+  const detailProfile = detailItem?.profileId ? profileMap.get(detailItem.profileId) ?? null : null
   const detailTranslation = splitTranslationParts(detailItem?.translation ?? '')
   const detailPhraseWords = useMemo(
     () => splitPhraseWords(detailItem?.phrase ?? ''),
@@ -4069,73 +4070,143 @@ function App() {
 
       {isDetailOpen && detailItem && (
         <div className="modal-overlay" onClick={() => setIsDetailOpen(false)}>
-          <section className="modal detail" onClick={(event) => event.stopPropagation()}>
+          <section
+            className="modal detail card-detail-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
             <header>
               <h3>상세 보기</h3>
-              <button onClick={() => setIsDetailOpen(false)}>✕</button>
+              <button type="button" onClick={() => setIsDetailOpen(false)} aria-label="닫기">
+                ✕
+              </button>
             </header>
-            <h2>{detailItem.phrase}</h2>
-            <p className="det-trans">{detailTranslation.primary || detailItem.translation}</p>
-            {detailTranslation.secondary.length > 0 && (
-              <div className="det-trans-sub">
-                {detailTranslation.secondary.map((line) => (
-                  <div key={line}>- {line}</div>
-                ))}
-              </div>
-            )}
-            {detailItem.example && <div className="det-box">"{detailItem.example}"</div>}
-            <div className="chips">
-              <span>{ITEM_TYPE_LABEL[detailItem.itemType ?? inferItemType(detailItem.phrase)]}</span>
-              <span>{STATUS_LABEL[detailItem.status]}</span>
-              <span>{detailItem.show || '작품 미입력'}</span>
-              <span>{detailItem.deck}</span>
-              <span>{'★'.repeat(detailItem.difficulty)}</span>
-              {detailItem.tags.map((tag) => (
-                <span key={tag}>{tag}</span>
-              ))}
-            </div>
-            {detailItem.notes && <div className="det-box">{detailItem.notes}</div>}
-            <div className="meta-grid">
-              <div>
-                <strong>{detailItem.reviewCount}</strong>
-                <small>복습 횟수</small>
-              </div>
-              <div>
-                <strong>{dateText(detailItem.lastReviewedAt)}</strong>
-                <small>마지막 복습</small>
-              </div>
-              <div>
-                <strong>{dateText(detailItem.createdAt)}</strong>
-                <small>추가일</small>
-              </div>
-            </div>
-            <div className="status-actions">
-              <button onClick={() => updateStatus(detailItem.id, 'new')}>→ 새 단어</button>
-              <button onClick={() => updateStatus(detailItem.id, 'learning')}>→ 학습 중</button>
-              <button onClick={() => updateStatus(detailItem.id, 'mastered')}>→ 완료</button>
-            </div>
-            {detailPhraseWords.length >= 2 && (
-              <div className="det-phrase-words">
-                <p className="det-phrase-words-label">포함된 단어 — 클릭하면 새 카드로 추가합니다</p>
-                <div className="det-phrase-words-btns">
-                  {detailPhraseWords.map((word, index) => (
-                    <button
-                      key={`${index}-${word}`}
-                      type="button"
-                      className="det-phrase-word-btn"
-                      onClick={() => openCreateModalWithPhrase(word, detailItem)}
-                    >
-                      {word}
-                    </button>
+            <div className="card-detail-body">
+              <section className="det-sec det-sec--phrase" aria-labelledby="det-phrase-heading">
+                <div className="det-phrase-line">
+                  <h2 id="det-phrase-heading" className="det-phrase-title">
+                    {detailItem.phrase}
+                  </h2>
+                  <span
+                    className={`item-type-pill item-type-${detailItem.itemType ?? inferItemType(detailItem.phrase)}`}
+                  >
+                    {ITEM_TYPE_LABEL[detailItem.itemType ?? inferItemType(detailItem.phrase)]}
+                  </span>
+                </div>
+              </section>
+
+              <section className="det-sec det-sec--meaning" aria-labelledby="det-meaning-heading">
+                <h4 id="det-meaning-heading" className="det-sec-title">
+                  한글 뜻
+                </h4>
+                <p className="det-trans">{detailTranslation.primary || detailItem.translation}</p>
+                {detailTranslation.secondary.length > 0 && (
+                  <div className="det-trans-sub">
+                    {detailTranslation.secondary.map((line) => (
+                      <div key={line}>- {line}</div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="det-sec det-sec--context" aria-labelledby="det-context-heading">
+                <h4 id="det-context-heading" className="det-sec-title">
+                  추가 정보
+                </h4>
+                <dl className="det-dl">
+                  <dt>드라마 / 작품</dt>
+                  <dd>{detailItem.show.trim() || '—'}</dd>
+                  <dt>에피소드</dt>
+                  <dd>{detailItem.episode.trim() || '—'}</dd>
+                  <dt>덱</dt>
+                  <dd>{detailItem.deck.trim() || '—'}</dd>
+                  <dt>난이도</dt>
+                  <dd>{'★'.repeat(detailItem.difficulty) || '—'}</dd>
+                  <dt>카드 정보 프로파일</dt>
+                  <dd>
+                    {detailItem.profileId
+                      ? detailProfile?.name ?? '(삭제된 프로파일)'
+                      : '—'}
+                  </dd>
+                  {detailItem.notes.trim() ? (
+                    <>
+                      <dt>메모</dt>
+                      <dd className="det-dd-notes">{detailItem.notes}</dd>
+                    </>
+                  ) : null}
+                </dl>
+              </section>
+
+              <section className="det-sec det-sec--example" aria-labelledby="det-example-heading">
+                <h4 id="det-example-heading" className="det-sec-title">
+                  예문
+                </h4>
+                {detailItem.example.trim() ? (
+                  <div className="det-example-box">{detailItem.example}</div>
+                ) : (
+                  <p className="det-empty-line">등록된 예문이 없습니다.</p>
+                )}
+              </section>
+
+              <section className="det-sec det-sec--extra" aria-labelledby="det-extra-heading">
+                <h4 id="det-extra-heading" className="det-sec-title">
+                  기타 · 태그 · 학습 상태
+                </h4>
+                <div className="det-extra-chips chips">
+                  <span className="chip-status">{STATUS_LABEL[detailItem.status]}</span>
+                  {detailItem.tags.map((tag) => (
+                    <span key={tag}>{tag}</span>
                   ))}
                 </div>
-              </div>
-            )}
-            <footer>
-              <button className="secondary" onClick={() => openEditModal(detailItem)}>
+                <div className="meta-grid">
+                  <div>
+                    <strong>{detailItem.reviewCount}</strong>
+                    <small>복습 횟수</small>
+                  </div>
+                  <div>
+                    <strong>{dateText(detailItem.lastReviewedAt)}</strong>
+                    <small>마지막 복습</small>
+                  </div>
+                  <div>
+                    <strong>{dateText(detailItem.createdAt)}</strong>
+                    <small>추가일</small>
+                  </div>
+                </div>
+                <div className="status-actions">
+                  <button type="button" onClick={() => updateStatus(detailItem.id, 'new')}>
+                    → 새 단어
+                  </button>
+                  <button type="button" onClick={() => updateStatus(detailItem.id, 'learning')}>
+                    → 학습 중
+                  </button>
+                  <button type="button" onClick={() => updateStatus(detailItem.id, 'mastered')}>
+                    → 완료
+                  </button>
+                </div>
+              </section>
+
+              {detailPhraseWords.length >= 2 && (
+                <div className="det-phrase-words">
+                  <p className="det-phrase-words-label">포함된 단어 — 클릭하면 새 카드로 추가합니다</p>
+                  <div className="det-phrase-words-btns">
+                    {detailPhraseWords.map((word, index) => (
+                      <button
+                        key={`${index}-${word}`}
+                        type="button"
+                        className="det-phrase-word-btn"
+                        onClick={() => openCreateModalWithPhrase(word, detailItem)}
+                      >
+                        {word}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <footer className="card-detail-footer">
+              <button type="button" className="secondary" onClick={() => openEditModal(detailItem)}>
                 수정
               </button>
-              <button className="danger" onClick={() => removeItem(detailItem.id)}>
+              <button type="button" className="danger" onClick={() => removeItem(detailItem.id)}>
                 삭제
               </button>
             </footer>

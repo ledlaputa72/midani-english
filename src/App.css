@@ -2186,21 +2186,147 @@ button.danger {
   margin-top: 6px;
 }
 
-.detail h2 {
-  margin: 4px 0;
+.modal.detail.card-detail-modal {
+  width: min(720px, 100%);
+  max-height: min(92vh, 900px);
+  padding: 20px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.modal.detail.card-detail-modal > header {
+  flex-shrink: 0;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #34344e;
+}
+
+.card-detail-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+
+.card-detail-footer {
+  flex-shrink: 0;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #34344e;
+}
+
+.det-sec {
+  margin: 0;
+}
+
+.det-sec + .det-sec {
+  padding-top: 4px;
+}
+
+.det-sec-title {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8b90b5;
+}
+
+.det-phrase-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+
+.det-phrase-title {
+  margin: 0;
+  font-size: clamp(1.35rem, 4vw, 1.75rem);
+  font-weight: 700;
+  color: #f4f5ff;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
 }
 
 .det-trans {
   color: #d9daf0;
-  margin: 0 0 10px;
-  font-size: 28px;
+  margin: 0;
+  font-size: clamp(1.25rem, 3.5vw, 1.65rem);
+  line-height: 1.4;
+  font-weight: 600;
 }
 
 .det-trans-sub {
-  margin: -4px 0 10px;
+  margin: 10px 0 0;
   color: #aeb2cd;
   font-size: 15px;
+  line-height: 1.55;
+}
+
+.det-dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(108px, 34%) 1fr;
+  column-gap: 16px;
+  row-gap: 12px;
+  font-size: 14px;
+  align-items: start;
+}
+
+.det-dl dt {
+  margin: 0;
+  color: #8f95b8;
+  font-weight: 600;
   line-height: 1.45;
+}
+
+.det-dl dd {
+  margin: 0;
+  color: #e4e6f5;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.det-dd-notes {
+  white-space: pre-wrap;
+  color: #cfd1e6;
+  font-size: 13px;
+}
+
+.det-example-box {
+  border: 1px solid #45456a;
+  background: linear-gradient(165deg, #26263e 0%, #1f1f34 100%);
+  border-radius: 12px;
+  color: #d8daec;
+  padding: 16px 18px;
+  font-size: 15px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 4.5em;
+}
+
+.det-empty-line {
+  margin: 0;
+  color: #7c819f;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.det-extra-chips.chips {
+  margin-bottom: 14px;
+}
+
+.det-extra-chips .chip-status {
+  border-color: #5a5a82;
+  background: #2c2c45;
+  color: #c8cbf0;
+  font-weight: 600;
 }
 
 .det-box {
@@ -2213,8 +2339,8 @@ button.danger {
 }
 
 .det-phrase-words {
-  margin-top: 14px;
-  padding-top: 12px;
+  margin-top: 0;
+  padding-top: 18px;
   border-top: 1px solid #3a3a55;
 }
 
@@ -2274,6 +2400,38 @@ button.danger {
   gap: 7px;
   flex-wrap: wrap;
   margin-bottom: 10px;
+}
+
+/* 상세 모달 안에서는 통계 행을 좁은 화면에서도 3열 유지 (가독성) */
+.modal.detail.card-detail-modal .meta-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0 8px;
+}
+
+@media (max-width: 480px) {
+  .modal.detail.card-detail-modal .meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal.detail.card-detail-modal .det-dl {
+    grid-template-columns: 1fr;
+    row-gap: 6px;
+  }
+
+  .modal.detail.card-detail-modal .det-dl dt {
+    padding-top: 4px;
+    border-top: 1px solid #34344e;
+  }
+
+  .modal.detail.card-detail-modal .det-dl dt:first-of-type {
+    padding-top: 0;
+    border-top: none;
+  }
+
+  .modal.detail.card-detail-modal {
+    padding: 16px 14px 14px;
+  }
 }
 
 @media (max-width: 1000px) {
