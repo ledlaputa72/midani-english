@@ -9,6 +9,7 @@ import './App.css'
 
 type Status = 'new' | 'learning' | 'mastered'
 type ItemType = 'vocabulary' | 'expression' | 'idiom'
+type AiProvider = 'default' | 'gemini'
 type Page = 'dashboard' | 'list' | 'board' | 'cards' | 'calendar'
 type InputTab = 'text' | 'ocr'
 type ListSort = 'latest' | 'oldest' | 'phrase'
@@ -48,6 +49,10 @@ type CardInfoProfile = {
   updatedAt: string
 }
 
+type AppSettings = {
+  defaultAiProvider: AiProvider
+}
+
 type FormState = {
   phrase: string
   translation: string
@@ -73,6 +78,9 @@ const GEMINI_API_KEY =
 
 /** 플래시카드 자동 넘김 간격 (롤링 배너, ms) */
 const CARD_AUTO_ADVANCE_MS = 8000
+const DEFAULT_APP_SETTINGS: AppSettings = {
+  defaultAiProvider: 'default',
+}
 
 const STATUS_LABEL: Record<Status, string> = {
   new: '새 단어',
@@ -84,6 +92,11 @@ const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   vocabulary: 'Vocabulary',
   expression: 'Expression',
   idiom: 'Idiom',
+}
+
+const AI_PROVIDER_LABEL: Record<AiProvider, string> = {
+  default: '기본 엔진 (사전+번역)',
+  gemini: 'Gemini',
 }
 
 const NAV_ITEMS: Array<{ id: Page; label: string }> = [
@@ -215,20 +228,28 @@ function normalizeProfiles(source: CardInfoProfile[] | unknown): CardInfoProfile
     .filter((p) => p.name.length > 0)
 }
 
-function loadLocalData(): { items: StudyItem[]; profiles: CardInfoProfile[] } {
+function normalizeAppSettings(source: unknown): AppSettings {
+  const raw = (source ?? {}) as Partial<AppSettings>
+  return {
+    defaultAiProvider: raw.defaultAiProvider === 'gemini' ? 'gemini' : 'default',
+  }
+}
+
+function loadLocalData(): { items: StudyItem[]; profiles: CardInfoProfile[]; settings: AppSettings } {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { items: [], profiles: [] }
+    if (!raw) return { items: [], profiles: [], settings: DEFAULT_APP_SETTINGS }
     const parsed = JSON.parse(raw) as { items?: unknown; profiles?: unknown } | unknown[]
     if (Array.isArray(parsed)) {
-      return { items: normalizeItems(parsed), profiles: [] }
+      return { items: normalizeItems(parsed), profiles: [], settings: DEFAULT_APP_SETTINGS }
     }
     return {
       items: normalizeItems(parsed?.items),
       profiles: normalizeProfiles(parsed?.profiles),
+      settings: normalizeAppSettings((parsed as { settings?: unknown })?.settings),
     }
   } catch {
-    return { items: [], profiles: [] }
+    return { items: [], profiles: [], settings: DEFAULT_APP_SETTINGS }
   }
 }
 
@@ -515,6 +536,7 @@ function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [items, setItems] = useState<StudyItem[]>([])
   const [profiles, setProfiles] = useState<CardInfoProfile[]>([])
+  const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
   const [authUser, setAuthUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [syncLoading, setSyncLoading] = useState(false)
@@ -556,6 +578,7 @@ function App() {
   const [detailId, setDetailId] = useState<string | null>(null)
   const [inputTab, setInputTab] = useState<InputTab>('text')
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [formAiProvider, setFormAiProvider] = useState<AiProvider>(DEFAULT_APP_SETTINGS.defaultAiProvider)
   const [isAutoFilling, setIsAutoFilling] = useState(false)
   const [autoFillMsg, setAutoFillMsg] = useState('')
 
@@ -693,15 +716,19 @@ function App() {
     [profileMap],
   )
 
-  const writeLocalData = useCallback((nextItems: StudyItem[], nextProfiles: CardInfoProfile[]) => {
+  const writeLocalData = useCallback(
+    (nextItems: StudyItem[], nextProfiles: CardInfoProfile[], nextSettings: AppSettings) => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
         items: nextItems,
         profiles: nextProfiles,
+        settings: nextSettings,
       }),
     )
-  }, [])
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!firebaseReady || !auth) {
@@ -721,6 +748,7 @@ function App() {
       const cached = loadLocalData()
       setItems(cached.items)
       setProfiles(cached.profiles)
+      setAppSettings(cached.settings)
       setIsAccountMenuOpen(false)
       return
     }
@@ -729,18 +757,23 @@ function App() {
     const unsub = onSnapshot(
       ref,
       async (snap) => {
-        const data = snap.data() as { items?: StudyItem[]; profiles?: CardInfoProfile[] } | undefined
+        const data = snap.data() as
+          | { items?: StudyItem[]; profiles?: CardInfoProfile[]; settings?: AppSettings }
+          | undefined
         const next = normalizeItems(data?.items)
         const nextProfiles = normalizeProfiles(data?.profiles)
+        const nextSettings = normalizeAppSettings(data?.settings)
         const merged = next.map((item) => applyProfileToItem(item))
         if (next.length > 0) {
           setItems(merged)
           setProfiles(nextProfiles)
-          writeLocalData(merged, nextProfiles)
+          setAppSettings(nextSettings)
+          writeLocalData(merged, nextProfiles, nextSettings)
         } else {
           const cached = loadLocalData()
           const seed = cached.items.length > 0 ? cached.items : SAMPLE_ITEMS
           const seedProfiles = nextProfiles.length > 0 ? nextProfiles : cached.profiles
+          const seedSettings = nextSettings.defaultAiProvider ? nextSettings : cached.settings
           const seedProfileMap = new Map(seedProfiles.map((profile) => [profile.id, profile]))
           const hydratedSeed = seed.map((item) => {
             if (!item.profileId) return item
@@ -758,12 +791,13 @@ function App() {
           })
           setItems(hydratedSeed)
           setProfiles(seedProfiles)
+          setAppSettings(seedSettings)
           await setDoc(
             ref,
-            { items: hydratedSeed, profiles: seedProfiles, updatedAt: serverTimestamp() },
+            { items: hydratedSeed, profiles: seedProfiles, settings: seedSettings, updatedAt: serverTimestamp() },
             { merge: true },
           )
-          writeLocalData(hydratedSeed, seedProfiles)
+          writeLocalData(hydratedSeed, seedProfiles, seedSettings)
         }
         setSyncError('')
         setSyncLoading(false)
@@ -772,6 +806,7 @@ function App() {
         const cached = loadLocalData()
         setItems(cached.items.length > 0 ? cached.items : SAMPLE_ITEMS)
         setProfiles(cached.profiles)
+        setAppSettings(cached.settings)
         setSyncError(err.message || '클라우드 동기화에 실패했습니다.')
         setSyncLoading(false)
       },
@@ -779,15 +814,20 @@ function App() {
     return () => unsub()
   }, [authUser, applyProfileToItem, writeLocalData])
 
-  const persistAll = async (nextItems: StudyItem[], nextProfiles: CardInfoProfile[]) => {
+  const persistAll = async (
+    nextItems: StudyItem[],
+    nextProfiles: CardInfoProfile[],
+    nextSettings: AppSettings,
+  ) => {
     setItems(nextItems)
     setProfiles(nextProfiles)
-    writeLocalData(nextItems, nextProfiles)
+    setAppSettings(nextSettings)
+    writeLocalData(nextItems, nextProfiles, nextSettings)
     if (!authUser || !db) return
     try {
       await setDoc(
         doc(db, 'users', authUser.uid, 'appData', FIREBASE_DOC_KEY),
-        { items: nextItems, profiles: nextProfiles, updatedAt: serverTimestamp() },
+        { items: nextItems, profiles: nextProfiles, settings: nextSettings, updatedAt: serverTimestamp() },
         { merge: true },
       )
       setSyncError('')
@@ -796,7 +836,7 @@ function App() {
     }
   }
 
-  const persist = async (nextItems: StudyItem[]) => persistAll(nextItems, profiles)
+  const persist = async (nextItems: StudyItem[]) => persistAll(nextItems, profiles, appSettings)
 
   const upsertProfile = async (
     profileInput: Omit<CardInfoProfile, 'id' | 'createdAt' | 'updatedAt'> & { id?: string | null },
@@ -825,7 +865,7 @@ function App() {
           }
         : item,
     )
-    await persistAll(nextItems, nextProfiles)
+    await persistAll(nextItems, nextProfiles, appSettings)
     return updatedProfile
   }
 
@@ -839,7 +879,7 @@ function App() {
           }
         : item,
     )
-    await persistAll(nextItems, nextProfiles)
+    await persistAll(nextItems, nextProfiles, appSettings)
   }
 
   const listShowOptions = useMemo(() => {
@@ -1140,6 +1180,7 @@ function App() {
     resetOcrState()
     setEditingId(null)
     setForm({ ...EMPTY_FORM, deck: deckPreset || EMPTY_FORM.deck, profileId: '' })
+    setFormAiProvider(appSettings.defaultAiProvider)
     setInputTab('text')
     setIsAddOpen(true)
   }
@@ -1160,6 +1201,7 @@ function App() {
       profileId: sourceItem?.profileId ?? '',
       itemType: 'vocabulary',
     })
+    setFormAiProvider(appSettings.defaultAiProvider)
     setInputTab('text')
     setIsDetailOpen(false)
     setIsAddOpen(true)
@@ -1169,6 +1211,7 @@ function App() {
     resetOcrState()
     setEditingId(item.id)
     setForm(toFormState(item))
+    setFormAiProvider(appSettings.defaultAiProvider)
     setInputTab('text')
     setIsDetailOpen(false)
     setIsAddOpen(true)
@@ -1280,6 +1323,12 @@ function App() {
       notes: saved.notes,
       deck: saved.deck,
     })
+  }
+
+  const updateDefaultAiProvider = async (provider: AiProvider) => {
+    const nextSettings: AppSettings = { ...appSettings, defaultAiProvider: provider }
+    await persistAll(items, profiles, nextSettings)
+    setSettingsMsg(`기본 자동 생성 모델을 "${AI_PROVIDER_LABEL[provider]}"로 저장했습니다.`)
   }
 
   const updateStatus = (id: string, status: Status) => {
@@ -1409,7 +1458,7 @@ function App() {
     resetOcrState()
   }
 
-  const autoFillFromEnglish = async (forceUpdate = false) => {
+  const autoFillFromEnglish = async (forceUpdate = false, provider: AiProvider = formAiProvider) => {
     const phrase = form.phrase.trim()
     if (!phrase || isAutoFilling) return
     const inferredType = form.itemType || inferItemType(phrase)
@@ -1492,7 +1541,10 @@ function App() {
       }
     }
 
-    const geminiResult = await generateMeaningAndExampleWithGemini(phrase, inferredType)
+    const shouldUseGemini = provider === 'gemini' && Boolean(GEMINI_API_KEY)
+    const geminiResult = shouldUseGemini
+      ? await generateMeaningAndExampleWithGemini(phrase, inferredType)
+      : null
     if (geminiResult) {
       koMeaning = geminiResult.meaningKo
       altMeanings = geminiResult.altMeaningsKo
@@ -1545,12 +1597,16 @@ function App() {
           : prev.example,
     }))
 
+    const providerMsg =
+      provider === 'gemini' && !GEMINI_API_KEY
+        ? `${AI_PROVIDER_LABEL.default} 사용 (Gemini 키 없음)`
+        : usedGemini
+          ? `${AI_PROVIDER_LABEL.gemini} 사용`
+          : `${AI_PROVIDER_LABEL.default} 사용`
     setAutoFillMsg(
       forceUpdate
-        ? '뜻/예문을 최신 자동 생성 내용으로 업데이트했습니다.'
-        : usedGemini
-          ? '뜻/예문 자동 채우기 완료 (의미 중심 해석 적용).'
-          : '뜻/예문 자동 채우기를 완료했습니다.',
+        ? `뜻/예문을 최신 자동 생성 내용으로 업데이트했습니다. (${providerMsg})`
+        : `뜻/예문 자동 채우기 완료 (${providerMsg}).`,
     )
     setIsAutoFilling(false)
   }
@@ -1673,7 +1729,7 @@ function App() {
     try {
       await setDoc(
         doc(db, 'users', authUser.uid, 'appData', FIREBASE_DOC_KEY),
-        { items, profiles, updatedAt: serverTimestamp() },
+        { items, profiles, settings: appSettings, updatedAt: serverTimestamp() },
         { merge: true },
       )
       setSettingsMsg('클라우드 동기화를 완료했습니다.')
@@ -1691,6 +1747,7 @@ function App() {
       count: items.length,
       items,
       profiles,
+      settings: appSettings,
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -1707,11 +1764,13 @@ function App() {
     setSettingsMsg('')
     try {
       const text = await file.text()
-      const parsed = JSON.parse(text) as { items?: unknown; profiles?: unknown } | StudyItem[]
+      const parsed = JSON.parse(text) as { items?: unknown; profiles?: unknown; settings?: unknown } | StudyItem[]
       const rawItems = Array.isArray(parsed) ? parsed : parsed.items
       const rawProfiles = Array.isArray(parsed) ? [] : parsed.profiles
+      const rawSettings = Array.isArray(parsed) ? undefined : parsed.settings
       const next = normalizeItems(rawItems)
       const nextProfiles = normalizeProfiles(rawProfiles)
+      const nextSettings = normalizeAppSettings(rawSettings)
       const hydratedNext = next.map((item) => {
         if (!item.profileId) return item
         const profile = nextProfiles.find((p) => p.id === item.profileId)
@@ -1730,7 +1789,7 @@ function App() {
         setSettingsMsg('불러온 데이터에 카드가 없습니다.')
         return
       }
-      await persistAll(hydratedNext, nextProfiles)
+      await persistAll(hydratedNext, nextProfiles, nextSettings)
       setSettingsMsg(`${hydratedNext.length}개 카드를 불러왔습니다.`)
     } catch {
       setSettingsMsg('JSON 파일 형식이 올바르지 않습니다.')
@@ -2851,6 +2910,26 @@ function App() {
                   <strong>{authUser?.displayName || 'Google 사용자'}</strong>
                   <p>{authUser?.email || '이메일 없음'}</p>
                 </div>
+                <div className="settings-block">
+                  <small>자동 생성 기본 모델</small>
+                  <strong>{AI_PROVIDER_LABEL[appSettings.defaultAiProvider]}</strong>
+                  <div className="ai-provider-row">
+                    <select
+                      value={appSettings.defaultAiProvider}
+                      onChange={(event) => {
+                        void updateDefaultAiProvider(event.target.value as AiProvider)
+                      }}
+                    >
+                      <option value="default">{AI_PROVIDER_LABEL.default}</option>
+                      <option value="gemini">{AI_PROVIDER_LABEL.gemini}</option>
+                    </select>
+                    <small>
+                      {appSettings.defaultAiProvider === 'gemini' && !GEMINI_API_KEY
+                        ? 'Gemini 키가 없으면 기본 엔진으로 자동 전환됩니다.'
+                        : '카드 추가/수정에서 기본값으로 사용됩니다.'}
+                    </small>
+                  </div>
+                </div>
                 <div className="settings-actions">
                   <button type="button" className="secondary" onClick={forceSyncNow} disabled={!authUser}>
                     지금 동기화
@@ -3181,23 +3260,29 @@ function App() {
                   <button
                     type="button"
                     className="secondary af-btn-inline"
-                    onClick={() => autoFillFromEnglish(false)}
+                    onClick={() => autoFillFromEnglish(Boolean(editingId), formAiProvider)}
                     disabled={isAutoFilling}
                   >
-                    {isAutoFilling ? '생성 중...' : '자동 생성'}
+                    {isAutoFilling ? (editingId ? '업데이트 중...' : '생성 중...') : editingId ? '업데이트' : '자동 생성'}
                   </button>
-                  {editingId && (
-                    <button
-                      type="button"
-                      className="secondary af-btn-inline"
-                      onClick={() => autoFillFromEnglish(true)}
-                      disabled={isAutoFilling}
-                    >
-                      {isAutoFilling ? '업데이트 중...' : '내용 업데이트'}
-                    </button>
-                  )}
                 </div>
                 {autoFillMsg && <small className="af-msg">{autoFillMsg}</small>}
+              </label>
+              <label>
+                자동 생성 모델
+                <div className="ai-provider-row">
+                  <select
+                    value={formAiProvider}
+                    onChange={(event) => setFormAiProvider(event.target.value as AiProvider)}
+                  >
+                    <option value="default">{AI_PROVIDER_LABEL.default}</option>
+                    <option value="gemini">{AI_PROVIDER_LABEL.gemini}</option>
+                  </select>
+                  <small>
+                    현재: {AI_PROVIDER_LABEL[formAiProvider]}
+                    {formAiProvider === 'gemini' && !GEMINI_API_KEY ? ' (API 키 필요)' : ''}
+                  </small>
+                </div>
               </label>
               <label>
                 카드 유형

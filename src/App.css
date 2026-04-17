@@ -2084,6 +2084,16 @@ button.danger {
   font-size: 11px;
 }
 
+.ai-provider-row {
+  display: grid;
+  gap: 6px;
+}
+
+.ai-provider-row small {
+  color: #9ea4c6;
+  font-size: 11px;
+}
+
 .modal-form textarea {
   min-height: 70px;
   resize: vertical;
