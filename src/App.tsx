@@ -8,6 +8,7 @@ import { auth, db, firebaseReady } from './firebase'
 import './App.css'
 
 type Status = 'new' | 'learning' | 'mastered'
+type ItemType = 'word' | 'phrase'
 type Page = 'dashboard' | 'list' | 'board' | 'cards' | 'calendar'
 type InputTab = 'text' | 'ocr'
 type ListSort = 'latest' | 'oldest' | 'phrase'
@@ -31,6 +32,7 @@ type StudyItem = {
   lastReviewedAt?: string
   scheduledDate?: string
   profileId?: string | null
+  itemType?: ItemType
 }
 
 type CardInfoProfile = {
@@ -57,6 +59,7 @@ type FormState = {
   notes: string
   deck: string
   profileId: string
+  itemType: ItemType
 }
 
 const STORAGE_KEY = 'midani.study.items.v2'
@@ -69,6 +72,11 @@ const STATUS_LABEL: Record<Status, string> = {
   new: '새 단어',
   learning: '학습 중',
   mastered: '완료',
+}
+
+const ITEM_TYPE_LABEL: Record<ItemType, string> = {
+  word: '단어',
+  phrase: '구문',
 }
 
 const NAV_ITEMS: Array<{ id: Page; label: string }> = [
@@ -90,6 +98,7 @@ const EMPTY_FORM: FormState = {
   notes: '',
   deck: '기본 덱',
   profileId: '',
+  itemType: 'word',
 }
 
 const SAMPLE_ITEMS: StudyItem[] = [
@@ -162,6 +171,10 @@ function normalizeItems(source: StudyItem[] | unknown): StudyItem[] {
         ? (item as StudyItem).difficulty
         : 2,
     profileId: typeof (item as StudyItem).profileId === 'string' ? (item as StudyItem).profileId : null,
+    itemType:
+      (item as StudyItem).itemType === 'word' || (item as StudyItem).itemType === 'phrase'
+        ? (item as StudyItem).itemType
+        : inferItemType((item as StudyItem).phrase ?? ''),
   }))
 }
 
@@ -253,7 +266,12 @@ function toFormState(item: StudyItem): FormState {
     notes: item.notes,
     deck: item.deck || '기본 덱',
     profileId: item.profileId ?? '',
+    itemType: item.itemType ?? inferItemType(item.phrase),
   }
+}
+
+function inferItemType(phrase: string): ItemType {
+  return /\s/.test(phrase.trim()) ? 'phrase' : 'word'
 }
 
 function splitTranslationParts(text: string): { primary: string; secondary: string[] } {
@@ -375,6 +393,23 @@ function normalizeKoreanMeaningLine(text: string): string {
     .trim()
 }
 
+function pickWordMeaningCandidate(candidates: string[]): string {
+  if (candidates.length === 0) return ''
+  const scored = candidates
+    .map((line) => {
+      const clean = line.trim()
+      let score = 0
+      if (clean.length <= 20) score += 6
+      else if (clean.length <= 32) score += 3
+      if (!/[.!?]/.test(clean)) score += 3
+      if (!/[-→]/.test(clean)) score += 2
+      if (!/\s{2,}/.test(clean)) score += 1
+      return { clean, score }
+    })
+    .sort((a, b) => b.score - a.score || a.clean.length - b.clean.length)
+  return scored[0]?.clean ?? candidates[0]
+}
+
 function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [items, setItems] = useState<StudyItem[]>([])
@@ -410,6 +445,7 @@ function App() {
   const [boardDragOverStatus, setBoardDragOverStatus] = useState<Status | null>(null)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | Status>('all')
+  const [itemTypeFilter, setItemTypeFilter] = useState<'all' | ItemType>('all')
   const [listShowFilter, setListShowFilter] = useState<string>('all')
   const [listSort, setListSort] = useState<ListSort>('latest')
 
@@ -717,7 +753,9 @@ function App() {
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase()
     const rows = items.filter((item) => {
+      const itemType = item.itemType ?? inferItemType(item.phrase)
       if (statusFilter !== 'all' && item.status !== statusFilter) return false
+      if (itemTypeFilter !== 'all' && itemType !== itemTypeFilter) return false
       if (listShowFilter !== 'all') {
         if (listShowFilter === '__none__') {
           if (item.show?.trim()) return false
@@ -740,7 +778,7 @@ function App() {
       return a.phrase.localeCompare(b.phrase, 'en', { sensitivity: 'base' })
     })
     return sorted
-  }, [items, query, statusFilter, listShowFilter, listSort])
+  }, [items, query, statusFilter, itemTypeFilter, listShowFilter, listSort])
 
   const stats = useMemo(
     () => ({
@@ -755,10 +793,12 @@ function App() {
   const boardColumnCounts = useMemo(() => {
     const c = { new: 0, learning: 0, mastered: 0 }
     for (const item of items) {
+      const itemType = item.itemType ?? inferItemType(item.phrase)
+      if (itemTypeFilter !== 'all' && itemType !== itemTypeFilter) continue
       c[item.status]++
     }
     return c
-  }, [items])
+  }, [items, itemTypeFilter])
 
   const dashboardRecent = useMemo(() => {
     return [...items]
@@ -796,14 +836,15 @@ function App() {
     return items.filter((item) => {
       const passDeck = activeDeck === 'all' ? true : item.deck === activeDeck
       const passLearning = item.status !== 'mastered' || item.reviewCount < 3
-      return passDeck && passLearning
+      const itemType = item.itemType ?? inferItemType(item.phrase)
+      const passType = itemTypeFilter === 'all' ? true : itemType === itemTypeFilter
+      return passDeck && passLearning && passType
     })
-  }, [items, activeDeck])
+  }, [items, activeDeck, itemTypeFilter])
 
   const currentCard = cardItems[cardIndex] ?? null
   const detailItem = detailId ? items.find((item) => item.id === detailId) ?? null : null
   const detailTranslation = splitTranslationParts(detailItem?.translation ?? '')
-  const detailProfile = detailItem?.profileId ? profileMap.get(detailItem.profileId) ?? null : null
   const detailPhraseWords = useMemo(
     () => splitPhraseWords(detailItem?.phrase ?? ''),
     [detailItem?.phrase],
@@ -1016,6 +1057,7 @@ function App() {
       notes: sourceItem?.notes ?? '',
       deck,
       profileId: sourceItem?.profileId ?? '',
+      itemType: 'word',
     })
     setInputTab('text')
     setIsDetailOpen(false)
@@ -1236,6 +1278,7 @@ function App() {
       notes: selectedProfile ? selectedProfile.notes : form.notes.trim(),
       deck: selectedProfile ? selectedProfile.deck : form.deck.trim() || '기본 덱',
       profileId: selectedProfile ? selectedProfile.id : null,
+      itemType: form.itemType,
     }
 
     if (editingId) {
@@ -1268,6 +1311,7 @@ function App() {
   const autoFillFromEnglish = async (forceUpdate = false) => {
     const phrase = form.phrase.trim()
     if (!phrase || isAutoFilling) return
+    const inferredType = form.itemType || inferItemType(phrase)
 
     setIsAutoFilling(true)
     setAutoFillMsg('자동 생성 중...')
@@ -1293,7 +1337,8 @@ function App() {
         ]
           .map((line) => normalizeKoreanMeaningLine(line))
           .filter(Boolean)
-        koMeaning = allCandidates[0] ?? ''
+        koMeaning =
+          inferredType === 'word' ? pickWordMeaningCandidate(allCandidates) : (allCandidates[0] ?? '')
         altMeanings = allCandidates
           .filter((line) => line !== koMeaning)
           .slice(0, 2)
@@ -1324,7 +1369,7 @@ function App() {
             }
           }
         }
-        const matchedExample = phrase.includes(' ')
+        const matchedExample = inferredType === 'phrase'
           ? examples.find((line) => includesPhrase(line, phrase)) || ''
           : examples.find((line) => line.toLowerCase().includes(phrase.toLowerCase())) ||
             examples[0] ||
@@ -1341,11 +1386,11 @@ function App() {
       koMeaning = `"${phrase}"의 의미를 확인해 주세요.`
     }
     if (!enExample) {
-      enExample = phrase.includes(' ')
+      enExample = inferredType === 'phrase'
         ? buildPhraseFallbackExample(phrase, definitionHint)
         : buildWordFallbackExample(phrase, definitionHint)
     }
-    if (phrase.includes(' ') && !includesPhrase(enExample, phrase)) {
+    if (inferredType === 'phrase' && !includesPhrase(enExample, phrase)) {
       enExample = buildPhraseFallbackExample(phrase, definitionHint)
     }
 
@@ -1847,6 +1892,15 @@ function App() {
               </select>
               <select
                 className="list-filter-select"
+                value={itemTypeFilter}
+                onChange={(event) => setItemTypeFilter(event.target.value as 'all' | ItemType)}
+              >
+                <option value="all">단어+구문</option>
+                <option value="word">단어</option>
+                <option value="phrase">구문</option>
+              </select>
+              <select
+                className="list-filter-select"
                 value={listShowFilter}
                 onChange={(event) => setListShowFilter(event.target.value)}
               >
@@ -1886,7 +1940,7 @@ function App() {
                   {filteredItems.map((item) => {
                     const koPrimary = splitTranslationParts(item.translation).primary || item.translation
                     const phraseWords = splitPhraseWords(item.phrase)
-                    const linkedProfile = item.profileId ? profileMap.get(item.profileId) ?? null : null
+                    const itemType = item.itemType ?? inferItemType(item.phrase)
                     const exampleLine = item.example.trim()
                       ? item.example.split('\n')[0]?.trim() ?? ''
                       : ''
@@ -1894,7 +1948,9 @@ function App() {
                       <tr key={item.id} className="study-row" onClick={() => openDetailModal(item.id)}>
                         <td className="col-phrase">
                           <strong className="list-phrase-main">{item.phrase}</strong>
-                          {linkedProfile && <span className="profile-pill">프로파일: {linkedProfile.name}</span>}
+                          <span className={`item-type-pill item-type-${itemType}`}>
+                            {ITEM_TYPE_LABEL[itemType]}
+                          </span>
                           {exampleLine && <div className="list-phrase-example">"{exampleLine}"</div>}
                           {phraseWords.length >= 2 && (
                             <div
@@ -1987,9 +2043,37 @@ function App() {
           </>
         )}
         {page === 'board' && (
-          <section className="board">
-            {(['new', 'learning', 'mastered'] as Status[]).map((status) => {
-              const columnItems = items.filter((item) => item.status === status)
+          <>
+            <section className="item-type-filter-row">
+              <button
+                type="button"
+                className={itemTypeFilter === 'all' ? 'active' : ''}
+                onClick={() => setItemTypeFilter('all')}
+              >
+                단어+구문
+              </button>
+              <button
+                type="button"
+                className={itemTypeFilter === 'word' ? 'active' : ''}
+                onClick={() => setItemTypeFilter('word')}
+              >
+                단어
+              </button>
+              <button
+                type="button"
+                className={itemTypeFilter === 'phrase' ? 'active' : ''}
+                onClick={() => setItemTypeFilter('phrase')}
+              >
+                구문
+              </button>
+            </section>
+            <section className="board">
+              {(['new', 'learning', 'mastered'] as Status[]).map((status) => {
+              const columnItems = items.filter((item) => {
+                const itemType = item.itemType ?? inferItemType(item.phrase)
+                const passType = itemTypeFilter === 'all' ? true : itemType === itemTypeFilter
+                return item.status === status && passType
+              })
               return (
                 <div
                   className={`column board-column ${boardDragOverStatus === status ? 'is-drop-target' : ''}`}
@@ -2007,16 +2091,16 @@ function App() {
                     <p className="board-column-empty">이 칸에 카드가 없습니다.</p>
                   ) : (
                     columnItems.map((item) => {
+                      const itemType = item.itemType ?? inferItemType(item.phrase)
                       const koPrimary =
                         splitTranslationParts(item.translation).primary || item.translation
-                      const linkedProfile = item.profileId ? profileMap.get(item.profileId) ?? null : null
                       const exampleLine = item.example.trim()
                         ? item.example.split('\n')[0]?.trim() ?? ''
                         : ''
                       return (
                         <article
                           key={item.id}
-                          className="board-card"
+                          className={`board-card board-card--${itemType}`}
                           draggable
                           onDragStart={(event) => onBoardCardDragStart(event, item.id)}
                           onDragEnd={() => setBoardDragOverStatus(null)}
@@ -2032,9 +2116,9 @@ function App() {
                                 {item.deck || '기본 덱'}
                               </span>
                             </div>
-                            {linkedProfile && (
-                              <div className="profile-pill board-profile-pill">프로파일: {linkedProfile.name}</div>
-                            )}
+                            <span className={`item-type-pill item-type-${itemType}`}>
+                              {ITEM_TYPE_LABEL[itemType]}
+                            </span>
                             <p className="board-ko">{koPrimary}</p>
                             {item.tags.length > 0 && (
                               <div className="board-tags" aria-label="태그">
@@ -2118,12 +2202,36 @@ function App() {
                   )}
                 </div>
               )
-            })}
-          </section>
+              })}
+            </section>
+          </>
         )}
 
         {page === 'cards' && (
           <section className="cards-page">
+            <section className="item-type-filter-row">
+              <button
+                type="button"
+                className={itemTypeFilter === 'all' ? 'active' : ''}
+                onClick={() => setItemTypeFilter('all')}
+              >
+                단어+구문
+              </button>
+              <button
+                type="button"
+                className={itemTypeFilter === 'word' ? 'active' : ''}
+                onClick={() => setItemTypeFilter('word')}
+              >
+                단어
+              </button>
+              <button
+                type="button"
+                className={itemTypeFilter === 'phrase' ? 'active' : ''}
+                onClick={() => setItemTypeFilter('phrase')}
+              >
+                구문
+              </button>
+            </section>
             <p className="card-counter">
               {cardItems.length === 0
                 ? '카드 없음'
@@ -2146,12 +2254,12 @@ function App() {
                       const stackCard = cardItems[idx]
                       if (!stackCard) return null
                       const isCenter = offset === 0
-                      const linkedProfile = stackCard.profileId ? profileMap.get(stackCard.profileId) ?? null : null
+                      const itemType = stackCard.itemType ?? inferItemType(stackCard.phrase)
                       const isExampleRevealed = !isCenter || cardTimerProgress <= 0.5
                       const card = (
                         <button
                           type="button"
-                          className={`flashcard stack-pos-${offset} ${isCenter && cardFlipped ? 'flipped' : ''}`}
+                          className={`flashcard flashcard--${itemType} stack-pos-${offset} ${isCenter && cardFlipped ? 'flipped' : ''}`}
                           onClick={() => {
                             if (suppressCardClickRef.current) return
                             if (isCenter) {
@@ -2170,7 +2278,9 @@ function App() {
                           <div className="flashcard-inner">
                             <div className="flashcard-face flashcard-front">
                               <span>{isCenter ? '클릭해서 뜻 확인' : stackCard.deck}</span>
-                              {linkedProfile && <small className="flashcard-profile">프로파일: {linkedProfile.name}</small>}
+                              <small className={`item-type-pill item-type-${itemType}`}>
+                                {ITEM_TYPE_LABEL[itemType]}
+                              </small>
                               <h3>{stackCard.phrase}</h3>
                               {stackCard.example && (
                                 <p
@@ -2182,7 +2292,6 @@ function App() {
                             </div>
                             <div className="flashcard-face flashcard-back">
                               <span>뜻</span>
-                              {linkedProfile && <small className="flashcard-profile">프로파일: {linkedProfile.name}</small>}
                               {(() => {
                                 const translationParts = splitTranslationParts(stackCard.translation)
                                 const primaryMeaning = translationParts.primary || stackCard.translation
@@ -2954,6 +3063,21 @@ function App() {
                 {autoFillMsg && <small className="af-msg">{autoFillMsg}</small>}
               </label>
               <label>
+                카드 유형
+                <select
+                  value={form.itemType}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      itemType: event.target.value as ItemType,
+                    }))
+                  }
+                >
+                  <option value="word">단어</option>
+                  <option value="phrase">구문</option>
+                </select>
+              </label>
+              <label>
                 한국어 뜻 *
                 <textarea
                   className="translation-box"
@@ -3124,11 +3248,11 @@ function App() {
             )}
             {detailItem.example && <div className="det-box">"{detailItem.example}"</div>}
             <div className="chips">
+              <span>{ITEM_TYPE_LABEL[detailItem.itemType ?? inferItemType(detailItem.phrase)]}</span>
               <span>{STATUS_LABEL[detailItem.status]}</span>
               <span>{detailItem.show || '작품 미입력'}</span>
               <span>{detailItem.deck}</span>
               <span>{'★'.repeat(detailItem.difficulty)}</span>
-              {detailProfile && <span>프로파일: {detailProfile.name}</span>}
               {detailItem.tags.map((tag) => (
                 <span key={tag}>{tag}</span>
               ))}

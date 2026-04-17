@@ -599,7 +599,7 @@ button.danger {
 
 .list-toolbar {
   display: grid;
-  grid-template-columns: 1fr repeat(3, minmax(128px, 1fr));
+  grid-template-columns: 1fr repeat(4, minmax(120px, 1fr));
   gap: 10px;
   margin-bottom: 14px;
   align-items: center;
@@ -681,19 +681,38 @@ button.danger {
   line-height: 1.3;
 }
 
-.profile-pill {
+.item-type-pill {
   display: inline-flex;
-  margin-top: 5px;
-  border: 1px solid #6d58d8;
+  align-items: center;
   border-radius: 999px;
-  background: rgba(116, 88, 236, 0.2);
-  color: #dad4ff;
-  font-size: 10px;
   padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 5px;
+  width: fit-content;
 }
 
-.board-profile-pill {
-  margin-top: -2px;
+.item-type-word {
+  border: 1px solid #4b6ba8;
+  background: rgba(56, 95, 160, 0.22);
+  color: #c8dcff;
+}
+
+.item-type-phrase {
+  border: 1px solid #7a59d5;
+  background: rgba(111, 75, 188, 0.24);
+  color: #e2d4ff;
+}
+
+.item-type-filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.item-type-filter-row button.active {
+  border-color: #7458ec;
+  background: #2a2157;
 }
 
 .list-phrase-example {
@@ -1002,6 +1021,14 @@ button.danger {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.board-card--word {
+  border-color: #385aa0;
+}
+
+.board-card--phrase {
+  border-color: #684ab8;
 }
 
 .board-card[draggable='true'] {
@@ -1446,6 +1473,14 @@ button.danger {
   background: linear-gradient(160deg, #2b1863, #2c1b6f);
 }
 
+.flashcard--word .flashcard-face {
+  background: linear-gradient(160deg, #1b2844, #223769);
+}
+
+.flashcard--word .flashcard-back {
+  background: linear-gradient(160deg, #183156, #204678);
+}
+
 .flashcard-face span {
   color: #b9bcd7;
 }
@@ -1457,11 +1492,6 @@ button.danger {
 
 .flashcard-face p {
   color: #afb1c5;
-}
-
-.flashcard-profile {
-  color: #b8addf;
-  font-size: 11px;
 }
 
 .flashcard-secondary-meaning {
