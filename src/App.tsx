@@ -4,6 +4,7 @@ import type { DragEvent as ReactDragEvent, FormEvent, PointerEvent as ReactPoint
 import type { User } from 'firebase/auth'
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { auth, db, firebaseReady } from './firebase'
 import './App.css'
 
@@ -876,78 +877,62 @@ async function generateMeaningAndExampleWithGemini(
   itemType: ItemType,
 ): Promise<{ result: GeminiAutofillResult | null; error?: string }> {
   if (!GEMINI_API_KEY) return { result: null, error: 'missing-key' }
+
   const typeLabel =
     itemType === 'vocabulary' ? 'vocabulary(word)' : itemType === 'idiom' ? 'idiom' : 'expression'
   const prompt = [
     'You are an English learning assistant for Korean learners.',
     `Target text: "${phrase}"`,
     `Item type: ${typeLabel}`,
-    'Return ONLY JSON with keys:',
+    'Return ONLY a valid JSON object with these keys:',
     '{ "meaningKo": string, "altMeaningsKo": string[], "definitionHint": string, "exampleEn": string, "exampleKo": string, "itemType": "vocabulary"|"expression"|"idiom" }',
     'Rules:',
     '- For expression/idiom, prioritize natural usage meaning (NOT literal translation).',
     '- exampleEn must include the exact target text naturally.',
     '- For expression/idiom, make exampleEn a 2-line dialogue using "A:" and "B:".',
     '- meaningKo should be concise and practical for learners.',
+    '- Return ONLY the JSON object, no markdown, no explanation.',
   ].join('\n')
 
-  const modelsToTry = [
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
-  ]
-  const apiBase = `https://generativelanguage.googleapis.com/v1beta/models`
-  const apiKey = GEMINI_API_KEY
+  const modelsToTry = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash']
   let lastError = ''
-  for (const model of modelsToTry) {
+
+  for (const modelName of modelsToTry) {
     try {
-    const res = await fetch(
-      `${apiBase}/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3 },
-        }),
-      },
-    )
-    if (!res.ok) {
-      lastError = `http-${res.status}(${model})`
-      continue
-    }
-    const data = (await res.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
-    }
-    const rawText = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('\n') ?? ''
-    const jsonText = extractFirstJsonObject(rawText)
-    if (!jsonText) {
-      lastError = 'invalid-json'
-      continue
-    }
-    const parsed = JSON.parse(jsonText) as Partial<GeminiAutofillResult>
-    const meaningKo = normalizeKoreanMeaningLine(String(parsed.meaningKo ?? ''))
-    const altMeaningsKo = Array.isArray(parsed.altMeaningsKo)
-      ? parsed.altMeaningsKo
-          .map((line) => normalizeKoreanMeaningLine(String(line)))
-          .filter(Boolean)
-          .slice(0, 2)
-      : []
-    const exampleEn = toSentenceCase(String(parsed.exampleEn ?? '').trim())
-    const exampleKo = normalizeKoreanMeaningLine(String(parsed.exampleKo ?? ''))
-    const definitionHint = String(parsed.definitionHint ?? '').trim()
-    const parsedItemType =
-      parsed.itemType === 'vocabulary' || parsed.itemType === 'expression' || parsed.itemType === 'idiom'
-        ? parsed.itemType
-        : undefined
-    if (!meaningKo || !exampleEn) {
-      lastError = 'empty-fields'
-      continue
-    }
-    return { result: { meaningKo, altMeaningsKo, exampleEn, exampleKo, definitionHint, itemType: parsedItemType } }
-    } catch {
-      lastError = 'fetch-failed'
+      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: { temperature: 0.3 },
+      })
+      const result = await model.generateContent(prompt)
+      const rawText = result.response.text()
+      const jsonText = extractFirstJsonObject(rawText)
+      if (!jsonText) {
+        lastError = 'invalid-json'
+        continue
+      }
+      const parsed = JSON.parse(jsonText) as Partial<GeminiAutofillResult>
+      const meaningKo = normalizeKoreanMeaningLine(String(parsed.meaningKo ?? ''))
+      const altMeaningsKo = Array.isArray(parsed.altMeaningsKo)
+        ? parsed.altMeaningsKo
+            .map((line) => normalizeKoreanMeaningLine(String(line)))
+            .filter(Boolean)
+            .slice(0, 2)
+        : []
+      const exampleEn = toSentenceCase(String(parsed.exampleEn ?? '').trim())
+      const exampleKo = normalizeKoreanMeaningLine(String(parsed.exampleKo ?? ''))
+      const definitionHint = String(parsed.definitionHint ?? '').trim()
+      const parsedItemType =
+        parsed.itemType === 'vocabulary' || parsed.itemType === 'expression' || parsed.itemType === 'idiom'
+          ? parsed.itemType
+          : undefined
+      if (!meaningKo || !exampleEn) {
+        lastError = 'empty-fields'
+        continue
+      }
+      return { result: { meaningKo, altMeaningsKo, exampleEn, exampleKo, definitionHint, itemType: parsedItemType } }
+    } catch (err) {
+      lastError = err instanceof Error ? err.message.slice(0, 40) : 'sdk-error'
     }
   }
   return { result: null, error: lastError || 'unknown' }
