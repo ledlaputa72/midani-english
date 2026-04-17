@@ -369,15 +369,13 @@ function includesPhrase(haystack: string, phrase: string): boolean {
   return h.includes(p)
 }
 
-function buildPhraseFallbackExample(phrase: string, definitionHint?: string): string {
+function buildPhraseFallbackExample(phrase: string): string {
   const cleanPhrase = phrase.trim()
-  const cleanDef = (definitionHint ?? '').trim()
-  const hintClause = cleanDef ? ` (It means: ${cleanDef})` : ''
   const templates = [
-    `A: The points have been allocated.\nB: ${cleanPhrase}${hintClause}`,
-    `A: I think this plan is fair.\nB: ${cleanPhrase}. Let's double-check the details.${hintClause}`,
-    `A: Why are you upset right now?\nB: ${cleanPhrase}. That's how it felt to me.${hintClause}`,
-    `A: Did the team agree on the decision?\nB: Yes, and ${cleanPhrase}.${hintClause}`,
+    `A: The points have been allocated.\nB: ${cleanPhrase}`,
+    `A: I think this plan is fair.\nB: ${cleanPhrase}. Let's double-check the details.`,
+    `A: Why are you upset right now?\nB: ${cleanPhrase}. That's how it felt to me.`,
+    `A: Did the team agree on the decision?\nB: Yes, and ${cleanPhrase}.`,
   ]
   return deterministicPick(templates, cleanPhrase)
 }
@@ -450,6 +448,19 @@ type GeminiAutofillResult = {
   itemType?: ItemType
 }
 
+const PHRASE_USAGE_OVERRIDES: Record<
+  string,
+  { meaningKo: string; altMeaningsKo?: string[]; exampleEn: string; exampleKo: string; itemType?: ItemType }
+> = {
+  'cut it out': {
+    meaningKo: '그만해.',
+    altMeaningsKo: ['집어치워.', '그만 좀 해.'],
+    exampleEn: 'A: Why are you making fun of him?\nB: Okay, okay. Cut it out. I got it.',
+    exampleKo: 'A: 왜 그를 놀리는 거야?\nB: 알았어, 알았어. 그만할게.',
+    itemType: 'idiom',
+  },
+}
+
 function extractFirstJsonObject(text: string): string | null {
   const fenced = text.match(/```json\s*([\s\S]*?)```/i)
   if (fenced?.[1]) return fenced[1].trim()
@@ -477,8 +488,8 @@ async function translateEnglishToKorean(text: string): Promise<string> {
 async function generateMeaningAndExampleWithGemini(
   phrase: string,
   itemType: ItemType,
-): Promise<GeminiAutofillResult | null> {
-  if (!GEMINI_API_KEY) return null
+): Promise<{ result: GeminiAutofillResult | null; error?: string }> {
+  if (!GEMINI_API_KEY) return { result: null, error: 'missing-key' }
   const typeLabel =
     itemType === 'vocabulary' ? 'vocabulary(word)' : itemType === 'idiom' ? 'idiom' : 'expression'
   const prompt = [
@@ -494,9 +505,12 @@ async function generateMeaningAndExampleWithGemini(
     '- meaningKo should be concise and practical for learners.',
   ].join('\n')
 
-  try {
+  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash']
+  let lastError = ''
+  for (const model of modelsToTry) {
+    try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
         GEMINI_API_KEY,
       )}`,
       {
@@ -508,13 +522,19 @@ async function generateMeaningAndExampleWithGemini(
         }),
       },
     )
-    if (!res.ok) return null
+    if (!res.ok) {
+      lastError = `http-${res.status}`
+      continue
+    }
     const data = (await res.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
     }
     const rawText = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('\n') ?? ''
     const jsonText = extractFirstJsonObject(rawText)
-    if (!jsonText) return null
+    if (!jsonText) {
+      lastError = 'invalid-json'
+      continue
+    }
     const parsed = JSON.parse(jsonText) as Partial<GeminiAutofillResult>
     const meaningKo = normalizeKoreanMeaningLine(String(parsed.meaningKo ?? ''))
     const altMeaningsKo = Array.isArray(parsed.altMeaningsKo)
@@ -530,11 +550,16 @@ async function generateMeaningAndExampleWithGemini(
       parsed.itemType === 'vocabulary' || parsed.itemType === 'expression' || parsed.itemType === 'idiom'
         ? parsed.itemType
         : undefined
-    if (!meaningKo || !exampleEn) return null
-    return { meaningKo, altMeaningsKo, exampleEn, exampleKo, definitionHint, itemType: parsedItemType }
-  } catch {
-    return null
+    if (!meaningKo || !exampleEn) {
+      lastError = 'empty-fields'
+      continue
+    }
+    return { result: { meaningKo, altMeaningsKo, exampleEn, exampleKo, definitionHint, itemType: parsedItemType } }
+    } catch {
+      lastError = 'fetch-failed'
+    }
   }
+  return { result: null, error: lastError || 'unknown' }
 }
 
 function inferItemTypeAuto(phrase: string, definitionHint = ''): ItemType {
@@ -712,24 +737,6 @@ function App() {
     return map
   }, [profiles])
 
-  const applyProfileToItem = useCallback(
-    (item: StudyItem): StudyItem => {
-      if (!item.profileId) return item
-      const profile = profileMap.get(item.profileId)
-      if (!profile) return { ...item, profileId: null }
-      return {
-        ...item,
-        show: profile.show,
-        episode: profile.episode,
-        tags: [...profile.tags],
-        difficulty: profile.difficulty,
-        notes: profile.notes,
-        deck: profile.deck || '기본 덱',
-      }
-    },
-    [profileMap],
-  )
-
   const writeLocalData = useCallback(
     (nextItems: StudyItem[], nextProfiles: CardInfoProfile[], nextSettings: AppSettings) => {
     localStorage.setItem(
@@ -777,7 +784,21 @@ function App() {
         const next = normalizeItems(data?.items)
         const nextProfiles = normalizeProfiles(data?.profiles)
         const nextSettings = normalizeAppSettings(data?.settings)
-        const merged = next.map((item) => applyProfileToItem(item))
+        const nextProfileMap = new Map(nextProfiles.map((profile) => [profile.id, profile]))
+        const merged = next.map((item) => {
+          if (!item.profileId) return item
+          const profile = nextProfileMap.get(item.profileId)
+          if (!profile) return { ...item, profileId: null }
+          return {
+            ...item,
+            show: profile.show,
+            episode: profile.episode,
+            tags: [...profile.tags],
+            difficulty: profile.difficulty,
+            notes: profile.notes,
+            deck: profile.deck || '기본 덱',
+          }
+        })
         if (next.length > 0) {
           setItems(merged)
           setProfiles(nextProfiles)
@@ -826,7 +847,7 @@ function App() {
       },
     )
     return () => unsub()
-  }, [authUser, applyProfileToItem, writeLocalData])
+  }, [authUser, writeLocalData])
 
   const persistAll = async (
     nextItems: StudyItem[],
@@ -1129,6 +1150,13 @@ function App() {
     }
     return map
   }, [items, weekDays])
+
+  // appSettings가 Firebase에서 로드되면 formAiProvider도 동기화
+  useEffect(() => {
+    if (!isAddOpen) {
+      setFormAiProvider(appSettings.defaultAiProvider)
+    }
+  }, [appSettings.defaultAiProvider, isAddOpen])
 
   useEffect(() => {
     if (!isAccountMenuOpen) return
@@ -1493,6 +1521,7 @@ function App() {
     const phrase = form.phrase.trim()
     if (!phrase || isAutoFilling) return
     const inferredType = inferItemTypeAuto(phrase)
+    const phraseOverride = PHRASE_USAGE_OVERRIDES[normalizeForContains(phrase)]
 
     setIsAutoFilling(true)
     setAutoFillMsg('자동 생성 중...')
@@ -1530,7 +1559,8 @@ function App() {
     }
 
     try {
-      const lookupCandidates = [phrase, phrase.split(/\s+/)[0] ?? '']
+      const lookupCandidates =
+        inferredType === 'vocabulary' ? [phrase, phrase.split(/\s+/)[0] ?? ''] : [phrase]
       for (const candidate of lookupCandidates) {
         const keyword = candidate.replace(/[^a-zA-Z'-\s]/g, '').trim()
         if (!keyword) continue
@@ -1573,9 +1603,10 @@ function App() {
     }
 
     const shouldUseGemini = provider === 'gemini' && Boolean(GEMINI_API_KEY)
-    const geminiResult = shouldUseGemini
+    const geminiResponse = shouldUseGemini
       ? await generateMeaningAndExampleWithGemini(phrase, inferredType)
-      : null
+      : { result: null, error: provider === 'gemini' ? 'missing-key' : undefined }
+    const geminiResult = geminiResponse.result
     let resolvedItemType = inferredType
     if (geminiResult) {
       koMeaning = geminiResult.meaningKo
@@ -1586,6 +1617,13 @@ function App() {
       if (geminiResult.itemType) resolvedItemType = geminiResult.itemType
       usedGemini = true
     }
+    if (!geminiResult && phraseOverride && inferredType !== 'vocabulary') {
+      koMeaning = phraseOverride.meaningKo
+      altMeanings = phraseOverride.altMeaningsKo ?? []
+      enExample = phraseOverride.exampleEn
+      koExample = phraseOverride.exampleKo
+      if (phraseOverride.itemType) resolvedItemType = phraseOverride.itemType
+    }
     if (!geminiResult) {
       resolvedItemType = inferItemTypeAuto(phrase, definitionHint)
     }
@@ -1595,11 +1633,11 @@ function App() {
     }
     if (!enExample) {
       enExample = inferredType !== 'vocabulary'
-        ? buildPhraseFallbackExample(phrase, definitionHint)
+        ? buildPhraseFallbackExample(phrase)
         : buildWordFallbackExample(phrase, definitionHint)
     }
     if (inferredType !== 'vocabulary' && !includesPhrase(enExample, phrase)) {
-      enExample = buildPhraseFallbackExample(phrase, definitionHint)
+      enExample = buildPhraseFallbackExample(phrase)
     }
 
     try {
@@ -1639,7 +1677,9 @@ function App() {
         ? `${AI_PROVIDER_LABEL.default} 사용 (Gemini 키 없음)`
         : usedGemini
           ? `${AI_PROVIDER_LABEL.gemini} 사용`
-          : `${AI_PROVIDER_LABEL.default} 사용`
+          : provider === 'gemini'
+            ? `${AI_PROVIDER_LABEL.default} 사용 (Gemini 실패: ${geminiResponse.error ?? 'unknown'})`
+            : `${AI_PROVIDER_LABEL.default} 사용`
     setAutoFillMsg(
       forceUpdate
         ? `뜻/예문을 최신 자동 생성 내용으로 업데이트했습니다. (${providerMsg})`
