@@ -568,12 +568,145 @@ async function generateMeaningAndExampleWithGemini(
   return { result: null, error: lastError || 'unknown' }
 }
 
+/**
+ * 구문이 이디엄일 가능성이 높은 패턴 목록.
+ * 자주 쓰이는 영어 이디엄을 중심으로 구성.
+ */
+const IDIOM_PATTERNS: ReadonlyArray<RegExp> = [
+  // ── 대표 이디엄 직접 매칭 ──────────────────────────────────────────
+  /born yesterday/i,
+  /cold (feet|shoulder|turkey|snap)\b/i,
+  /rain check/i,
+  /raining cats/i,
+  /blue moon/i,
+  /over the moon/i,
+  /under the weather/i,
+  /piece of cake/i,
+  /beat around the bush/i,
+  /silver lining/i,
+  /throw in the towel/i,
+  /barking up the wrong tree/i,
+  /red.?handed/i,
+  /kill two birds/i,
+  /read between the lines/i,
+  /pull (someone'?s?|my|your|their|his|her|one'?s?) leg\b/i,
+  /burn (bridges|midnight oil|your boats?)/i,
+  /face the music/i,
+  /back to (the drawing board|square one)/i,
+  /cut (corners|the mustard)\b/i,
+  /cut it out\b/i,
+  /cut to the chase/i,
+  /miss(ed)? the boat/i,
+  /ship has sailed/i,
+  /pass the buck/i,
+  /on the fence/i,
+  /turn a blind eye/i,
+  /foot in (my|your|their|his|her|the|one'?s?) mouth/i,
+  /tie the knot/i,
+  /speak of the devil/i,
+  /drop the ball/i,
+  /jump the gun/i,
+  /get the hang of/i,
+  /roll with the punches/i,
+  /get the ball rolling/i,
+  /from scratch/i,
+  /down to earth/i,
+  /nip (it )?in the bud/i,
+  /icing on the cake/i,
+  /see eye to eye/i,
+  /on thin ice/i,
+  /out of the blue/i,
+  /call it a day/i,
+  /hit it off\b/i,
+  /hit the ground running/i,
+  /out of hand/i,
+  /make ends meet/i,
+  /elephant in the room/i,
+  /throw (someone )?under the bus/i,
+  /nick of time/i,
+  /grain of salt/i,
+  /can of worms/i,
+  /dime a dozen/i,
+  /in a nutshell/i,
+  /tip of the iceberg/i,
+  /pay through the nose/i,
+  /drop of a hat/i,
+  /hold (your|my|his|her|their) horses/i,
+  /easier said than done/i,
+  /actions speak louder/i,
+  /writing on the wall/i,
+  /up in the air/i,
+  /under (my|your|his|her|their|someone'?s?) thumb/i,
+  /wrap (my|your|their|his|her|one'?s?) (head|mind) around/i,
+  /on the same page/i,
+  /bite (my|your|his|her|their|one'?s?) tongue/i,
+  /cat got (your|my|their|his|her) tongue/i,
+  /bone to pick/i,
+  /off (my|your|his|her|their|one'?s?) chest/i,
+  /wash (my|your|his|her|their|one'?s?) hands of/i,
+  /fingers crossed/i,
+  /add insult to injury/i,
+  /last straw/i,
+  /turn the other cheek/i,
+  /on the bandwagon/i,
+  /rock the boat/i,
+  /own medicine/i,
+  /pick up the slack/i,
+  /get cold feet/i,
+  /rock bottom/i,
+  /raise the bar/i,
+  /steal (the show|(someone'?s?|my|your|their|his|her) thunder)/i,
+  /two cents/i,
+  /bite off more than/i,
+  /speak volumes/i,
+  /in the same boat/i,
+  /forest for the trees/i,
+  /under the gun/i,
+  /cup of tea/i,
+  /arm and a leg/i,
+  /long story short/i,
+  /horse'?s? mouth/i,
+  /ring(s)? a bell/i,
+  /low.?hanging fruit/i,
+  /bull by the horns/i,
+  /sleeping dogs (lie|lay)/i,
+  /spilled? milk/i,
+  /out of steam/i,
+  /benefit of the doubt/i,
+  /hit a nerve/i,
+  /under (my|your|his|her|their|one'?s?|someone'?s?) skin/i,
+  /sore thumb/i,
+  /devil'?s? advocate/i,
+  /let (your|my|his|her|their) hair down/i,
+  /get under (my|your|his|her|their|someone'?s?) skin/i,
+  /in the same boat/i,
+  /bite the hand that feeds/i,
+  /at bay/i,
+  /blood is thicker/i,
+  /judge a book by its cover/i,
+  // ── Verb + "the" 구조 (kick/bite/hit/spill + the + 명사) ──────────
+  /\b(kick|bite|spill|face|beat|steal|drop|throw|burn|pass) the\b/i,
+  /\bhit the (sack|road|hay|nail|ceiling|wall|spot|jackpot|books|gym)\b/i,
+  /\bbreak (the ice|a leg|new ground|the bank|the mold)\b/i,
+  /\blet the cat\b/i,
+  /\bcat out of the bag\b/i,
+]
+
+function isLikelyIdiom(lower: string): boolean {
+  return IDIOM_PATTERNS.some((pattern) => pattern.test(lower))
+}
+
 function inferItemTypeAuto(phrase: string, definitionHint = ''): ItemType {
   const trimmed = phrase.trim()
   if (!trimmed) return 'vocabulary'
   if (!/\s/.test(trimmed)) return 'vocabulary'
+  const lower = trimmed.toLowerCase()
   const hint = definitionHint.toLowerCase()
+  // 1순위: definitionHint 키워드
   if (/\b(idiom|idiomatic|figurative|slang|colloquial)\b/.test(hint)) return 'idiom'
+  // 2순위: 구문 자체가 이디엄 패턴에 매칭
+  if (isLikelyIdiom(lower)) return 'idiom'
+  // 그 외 다단어 구문 → expression
   return 'expression'
 }
 
