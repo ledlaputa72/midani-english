@@ -12,12 +12,23 @@ export default async function handler(req, res) {
   const { prompt } = req.body ?? {}
   if (!prompt) return res.status(400).json({ error: 'prompt required' })
 
-  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash']
+  // API 버전 × 모델명 조합으로 순서대로 시도
+  const attempts = [
+    { version: 'v1beta', model: 'gemini-2.0-flash' },
+    { version: 'v1beta', model: 'gemini-2.0-flash-001' },
+    { version: 'v1',     model: 'gemini-2.0-flash' },
+    { version: 'v1',     model: 'gemini-2.0-flash-001' },
+    { version: 'v1beta', model: 'gemini-1.5-flash' },
+    { version: 'v1',     model: 'gemini-1.5-flash' },
+    { version: 'v1beta', model: 'gemini-1.5-flash-latest' },
+    { version: 'v1beta', model: 'gemini-pro' },
+  ]
+
   let lastError = 'unknown'
 
-  for (const model of models) {
+  for (const { version, model } of attempts) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+      const url = `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${apiKey}`
       const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29,8 +40,8 @@ export default async function handler(req, res) {
 
       if (!r.ok) {
         const errBody = await r.text().catch(() => '')
-        lastError = `http-${r.status}(${model}): ${errBody.slice(0, 100)}`
-        console.error(`[gemini] ${model} failed ${r.status}:`, errBody.slice(0, 200))
+        lastError = `${version}/${model} → http-${r.status}: ${errBody.slice(0, 80)}`
+        console.error(`[gemini] ${version}/${model} failed ${r.status}:`, errBody.slice(0, 200))
         continue
       }
 
@@ -38,10 +49,17 @@ export default async function handler(req, res) {
       const text = (data.candidates?.[0]?.content?.parts ?? [])
         .map((p) => p.text ?? '')
         .join('')
-      return res.status(200).json({ text })
+
+      if (!text) {
+        lastError = `${version}/${model} → empty response`
+        continue
+      }
+
+      console.log(`[gemini] success with ${version}/${model}`)
+      return res.status(200).json({ text, model: `${version}/${model}` })
     } catch (err) {
-      lastError = `${model}: ${err instanceof Error ? err.message : 'error'}`
-      console.error(`[gemini] ${model} exception:`, err)
+      lastError = `${version}/${model} → ${err instanceof Error ? err.message.slice(0, 60) : 'error'}`
+      console.error(`[gemini] ${version}/${model} exception:`, err)
     }
   }
 
