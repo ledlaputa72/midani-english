@@ -69,12 +69,7 @@ type FormState = {
 
 const STORAGE_KEY = 'midani.study.items.v2'
 const FIREBASE_DOC_KEY = 'studyItems'
-const GEMINI_API_KEY =
-  (
-    import.meta as ImportMeta & {
-      env?: Record<string, string | undefined>
-    }
-  ).env?.VITE_GEMINI_API_KEY?.trim() || ''
+const GEMINI_API_KEY = (import.meta.env.VITE_GEMINI_API_KEY ?? '').trim()
 
 /** 플래시카드 자동 넘김 간격 (롤링 배너, ms) */
 const CARD_AUTO_ADVANCE_MS = 8000
@@ -897,14 +892,13 @@ async function generateMeaningAndExampleWithGemini(
   ].join('\n')
 
   const modelsToTry = [
-    'gemini-2.5-flash-preview-04-17',
     'gemini-2.0-flash',
     'gemini-2.0-flash-lite',
     'gemini-1.5-flash',
-    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro',
   ]
   const apiBase = `https://generativelanguage.googleapis.com/v1beta/models`
-  const apiKey = encodeURIComponent(GEMINI_API_KEY)
+  const apiKey = GEMINI_API_KEY
   let lastError = ''
   for (const model of modelsToTry) {
     try {
