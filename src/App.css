@@ -2332,6 +2332,21 @@ button.danger {
   white-space: pre-wrap;
   word-break: break-word;
   min-height: 4.5em;
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #45456a transparent;
+}
+
+.det-example-box::-webkit-scrollbar {
+  width: 6px;
+}
+.det-example-box::-webkit-scrollbar-track {
+  background: transparent;
+}
+.det-example-box::-webkit-scrollbar-thumb {
+  background: #45456a;
+  border-radius: 3px;
 }
 
 .det-empty-line {
