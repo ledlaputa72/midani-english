@@ -17,27 +17,32 @@ export default async function handler(req, res) {
     return res.status(200).json(result)
   }
 
-  // 모델 목록 조회 (key 파라미터 방식)
+  // 모델 목록 조회
   try {
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
     )
     const body = await r.text()
+    // 모델 이름만 추출
+    const names = [...body.matchAll(/"name":\s*"([^"]+)"/g)].map((m) => m[1])
     result.tests.push({
-      method: 'GET v1beta/models?key=',
+      method: 'GET v1beta/models',
       status: r.status,
-      preview: body.slice(0, 400),
+      modelNames: names.slice(0, 20),
     })
   } catch (e) {
-    result.tests.push({ method: 'GET v1beta/models?key=', error: String(e).slice(0, 100) })
+    result.tests.push({ method: 'GET v1beta/models', error: String(e).slice(0, 100) })
   }
 
-  // 실제 generateContent 테스트
-  const testModels = ['gemini-2.5-flash', 'gemini-2.0-flash-lite']
-  for (const model of testModels) {
+  // 실제 generateContent 테스트 (v1beta + v1 각각)
+  const testCombos = [
+    { version: 'v1beta', model: 'gemini-2.5-flash' },
+    { version: 'v1',     model: 'gemini-2.5-flash' },
+  ]
+  for (const { version, model } of testCombos) {
     try {
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -48,12 +53,12 @@ export default async function handler(req, res) {
       )
       const body = await r.text()
       result.tests.push({
-        method: `POST ${model}:generateContent`,
+        method: `POST ${version}/${model}`,
         status: r.status,
         preview: body.slice(0, 200),
       })
     } catch (e) {
-      result.tests.push({ method: `POST ${model}:generateContent`, error: String(e).slice(0, 100) })
+      result.tests.push({ method: `POST ${version}/${model}`, error: String(e).slice(0, 100) })
     }
   }
 
