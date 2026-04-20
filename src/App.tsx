@@ -24,7 +24,7 @@ type StudyItem = {
   show: string
   episode: string
   tags: string[]
-  difficulty: 1 | 2 | 3
+  difficulty: 1 | 2 | 3 | 4 | 5
   notes: string
   deck: string
   status: Status
@@ -42,7 +42,7 @@ type CardInfoProfile = {
   show: string
   episode: string
   tags: string[]
-  difficulty: 1 | 2 | 3
+  difficulty: 1 | 2 | 3 | 4 | 5
   notes: string
   deck: string
   createdAt: string
@@ -60,7 +60,7 @@ type FormState = {
   show: string
   episode: string
   tags: string
-  difficulty: 1 | 2 | 3
+  difficulty: 1 | 2 | 3 | 4 | 5
   notes: string
   deck: string
   profileId: string
@@ -180,9 +180,7 @@ function normalizeItems(source: StudyItem[] | unknown): StudyItem[] {
           .filter(Boolean),
     deck: (item as StudyItem).deck?.trim() || '기본 덱',
     difficulty:
-      (item as StudyItem).difficulty === 1 ||
-      (item as StudyItem).difficulty === 2 ||
-      (item as StudyItem).difficulty === 3
+      [1, 2, 3, 4, 5].includes((item as StudyItem).difficulty)
         ? (item as StudyItem).difficulty
         : 2,
     profileId: typeof (item as StudyItem).profileId === 'string' ? (item as StudyItem).profileId : null,
@@ -213,7 +211,7 @@ function normalizeProfiles(source: CardInfoProfile[] | unknown): CardInfoProfile
               .split(',')
               .map((tag) => tag.trim())
               .filter(Boolean),
-        difficulty: raw.difficulty === 1 || raw.difficulty === 2 || raw.difficulty === 3 ? raw.difficulty : 2,
+        difficulty: [1, 2, 3, 4, 5].includes(raw.difficulty) ? raw.difficulty : 3,
         notes: (raw.notes ?? '').trim(),
         deck: (raw.deck ?? '').trim() || '기본 덱',
         createdAt: (raw.createdAt ?? '').trim() || now,
@@ -1296,7 +1294,7 @@ function App() {
     show: string
     episode: string
     tags: string
-    difficulty: 1 | 2 | 3
+    difficulty: 1 | 2 | 3 | 4 | 5
     notes: string
     deck: string
   }>({
@@ -2982,7 +2980,7 @@ function App() {
                     <th className="col-source">출처</th>
                     <th className="col-tags">태그</th>
                     <th className="col-status">상태</th>
-                    <th className="col-stars">난이도</th>
+                    <th className="col-stars">사용빈도</th>
                     <th className="col-actions" aria-label="작업" />
                   </tr>
                 </thead>
@@ -3054,9 +3052,9 @@ function App() {
                         <td className="col-stars">
                           <span
                             className="list-star-row"
-                            aria-label={`난이도 ${item.difficulty}에 가까운 평점`}
+                            aria-label={`사용빈도 ${item.difficulty}단계`}
                           >
-                            {[1, 2, 3].map((n) => (
+                            {[1, 2, 3, 4, 5].map((n) => (
                               <span key={n} className={n <= item.difficulty ? 'star on' : 'star off'}>
                                 ★
                               </span>
@@ -3208,9 +3206,9 @@ function App() {
                               </span>
                               <span
                                 className="board-stars"
-                                aria-label={`중요도·난이도 ${item.difficulty}단계`}
+                                aria-label={`사용빈도 ${item.difficulty}단계`}
                               >
-                                {[1, 2, 3].map((n) => (
+                                {[1, 2, 3, 4, 5].map((n) => (
                                   <span
                                     key={n}
                                     className={n <= item.difficulty ? 'star on' : 'star off'}
@@ -3355,7 +3353,7 @@ function App() {
                               <div className="flashcard-stars">
                                 {'★'.repeat(stackCard.difficulty)}
                                 <span className="flashcard-stars-empty">
-                                  {'☆'.repeat(3 - stackCard.difficulty)}
+                                  {'☆'.repeat(5 - stackCard.difficulty)}
                                 </span>
                               </div>
                             </div>
@@ -3901,19 +3899,21 @@ function App() {
                   </div>
                   <div className="row2">
                     <label>
-                      난이도
+                      사용빈도
                       <select
                         value={profileEditor.difficulty}
                         onChange={(event) =>
                           setProfileEditor((prev) => ({
                             ...prev,
-                            difficulty: Number(event.target.value) as 1 | 2 | 3,
+                            difficulty: Number(event.target.value) as 1 | 2 | 3 | 4 | 5,
                           }))
                         }
                       >
-                        <option value={1}>★ 쉬움</option>
-                        <option value={2}>★★ 보통</option>
-                        <option value={3}>★★★ 어려움</option>
+                        <option value={1}>★☆☆☆☆ 매우 낮음</option>
+                        <option value={2}>★★☆☆☆ 낮음</option>
+                        <option value={3}>★★★☆☆ 보통</option>
+                        <option value={4}>★★★★☆ 높음</option>
+                        <option value={5}>★★★★★ 매우 높음</option>
                       </select>
                     </label>
                   </div>
@@ -4259,20 +4259,22 @@ function App() {
               </div>
               <div className="row2">
                 <label>
-                  난이도
+                  사용빈도
                   <select
                     value={form.difficulty}
                     onChange={(event) =>
                       setForm((prev) => ({
                         ...prev,
-                        difficulty: Number(event.target.value) as 1 | 2 | 3,
+                        difficulty: Number(event.target.value) as 1 | 2 | 3 | 4 | 5,
                       }))
                     }
                     disabled={isFormUsingProfile}
                   >
-                    <option value={1}>★ 쉬움</option>
-                    <option value={2}>★★ 보통</option>
-                    <option value={3}>★★★ 어려움</option>
+                    <option value={1}>★☆☆☆☆ 매우 낮음</option>
+                    <option value={2}>★★☆☆☆ 낮음</option>
+                    <option value={3}>★★★☆☆ 보통</option>
+                    <option value={4}>★★★★☆ 높음</option>
+                    <option value={5}>★★★★★ 매우 높음</option>
                   </select>
                 </label>
               </div>
@@ -4487,8 +4489,8 @@ function App() {
                   <dd>{detailItem.episode.trim() || '—'}</dd>
                   <dt>덱</dt>
                   <dd>{detailItem.deck.trim() || '—'}</dd>
-                  <dt>난이도</dt>
-                  <dd>{'★'.repeat(detailItem.difficulty) || '—'}</dd>
+                  <dt>사용빈도</dt>
+                  <dd>{'★'.repeat(detailItem.difficulty)}{'☆'.repeat(5 - detailItem.difficulty)}</dd>
                   <dt>카드 정보 프로파일</dt>
                   <dd>
                     {detailItem.profileId
