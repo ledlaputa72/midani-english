@@ -381,7 +381,13 @@ function highlightPhrase(text: string, phrase: string): React.ReactNode {
   // "→" 이후는 한국어 번역 → 강조 제외
   const arrowIdx = text.indexOf('\n→')
   const enPart = arrowIdx !== -1 ? text.slice(0, arrowIdx) : text
-  const koPart = arrowIdx !== -1 ? text.slice(arrowIdx) : ''
+  const rawKoPart = arrowIdx !== -1 ? text.slice(arrowIdx) : ''
+
+  // → 기호 제거 + 대화 레이블(B:, C:, ...) 앞에 줄바꿈 삽입
+  const koFormatted = rawKoPart
+    .replace(/^\n→\s*/, '\n')                    // "\n→ " → "\n" (화살표 제거, 줄바꿈 유지)
+    .replace(/([.!?。,])\s+([A-Z]:\s)/g, '$1\n$2') // 문장 끝 뒤 "B: " → 줄바꿈+레이블
+    .replace(/\s+(B:|C:|D:)\s/g, '\n$1 ')         // 공백으로 이어진 B:/C: → 줄바꿈
 
   const parts = enPart.split(regex)
   const nodes: React.ReactNode[] = parts.map((part, i) =>
@@ -397,7 +403,7 @@ function highlightPhrase(text: string, phrase: string): React.ReactNode {
   return (
     <>
       {nodes}
-      {koPart}
+      {koFormatted}
     </>
   )
 }
@@ -1034,7 +1040,7 @@ async function generateMeaningAndExampleWithGemini(
     'Rules:',
     '- examples array MUST have one object for each meaning: 1 for meaningKo + 1 for EACH item in altMeaningsKo.',
     '- "description" in each example: REQUIRED — 1-2 sentence Korean explanation of when/how/where this meaning is used. Always include this.',
-    '- For expression/idiom: each "en" must be a 2-line dialogue ("A: ...\\nB: ..."), "ko" translates both lines.',
+    '- For expression/idiom: each "en" must be a 2-line dialogue ("A: ...\\nB: ..."), "ko" must also use the same 2-line format ("A: ...\\nB: ...") — NOT a single line.',
     '- For vocabulary: each "en" is a single natural sentence.',
     '- DO NOT use markdown formatting (**bold**, *italic*, `code`) anywhere inside JSON string values.',
     '- DO NOT write parenthetical notation like "(on)" or "(to)" inside en/ko fields — use the actual word.',
