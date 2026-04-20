@@ -362,6 +362,48 @@ function parseMeaningBlocks(
   return [{ meaning: allMeanings[0] ?? '', description: '', dialogue: trimmed }]
 }
 
+/**
+ * 예문 텍스트에서 학습 구문을 찾아 <strong> 볼드로 강조합니다.
+ * - 대소문자 무시
+ * - 괄호 선택 표기가 있는 경우 (예: "catch up (on)") base/full 형태 모두 강조
+ * - 영어 부분만 강조 (→ 이후 한국어 번역 라인은 매칭 안 됨)
+ */
+function highlightPhrase(text: string, phrase: string): React.ReactNode {
+  if (!phrase.trim() || !text.trim()) return text
+
+  const parsed = parseOptionalPhrase(phrase)
+  // 더 긴 형태부터 매칭 (full → base 순서, 겹침 방지)
+  const forms = parsed.hasOptional
+    ? [parsed.full, parsed.base]
+    : [phrase.trim()]
+
+  const escapedForms = forms.map((f) => f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const regex = new RegExp(`(${escapedForms.join('|')})`, 'gi')
+
+  // "→" 이후는 한국어 번역 → 강조 제외
+  const arrowIdx = text.indexOf('\n→')
+  const enPart = arrowIdx !== -1 ? text.slice(0, arrowIdx) : text
+  const koPart = arrowIdx !== -1 ? text.slice(arrowIdx) : ''
+
+  const parts = enPart.split(regex)
+  const nodes: React.ReactNode[] = parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <strong key={i} className="highlight-phrase">
+        {part}
+      </strong>
+    ) : (
+      part
+    ),
+  )
+
+  return (
+    <>
+      {nodes}
+      {koPart}
+    </>
+  )
+}
+
 /** Split display phrase into tokens (whitespace; strip edge punctuation). */
 function splitPhraseWords(phrase: string): string[] {
   return phrase
@@ -4344,7 +4386,9 @@ function App() {
                                 <p className="meaning-accordion-desc">💡 {block.description}</p>
                               )}
                               {block.dialogue ? (
-                                <div className="det-example-box">{block.dialogue}</div>
+                                <div className="det-example-box">
+                                  {highlightPhrase(block.dialogue, detailItem.phrase)}
+                                </div>
                               ) : (
                                 <p className="det-empty-line">예문 없음</p>
                               )}
@@ -4375,7 +4419,9 @@ function App() {
                                 <p className="meaning-accordion-desc">💡 {block.description}</p>
                               )}
                               {block.dialogue ? (
-                                <div className="det-example-box">{block.dialogue}</div>
+                                <div className="det-example-box">
+                                  {highlightPhrase(block.dialogue, detailItem.phrase)}
+                                </div>
                               ) : (
                                 <p className="det-empty-line">예문 없음</p>
                               )}

@@ -2921,3 +2921,12 @@ button.danger {
   max-height: 220px;
   min-height: auto;
 }
+
+/* 예문 내 학습 구문 강조 */
+.highlight-phrase {
+  font-weight: 700;
+  color: #c4b5fd;
+  background: rgba(124, 92, 252, 0.15);
+  border-radius: 3px;
+  padding: 0 2px;
+}
