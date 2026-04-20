@@ -1036,7 +1036,7 @@ async function generateMeaningAndExampleWithGemini(
     '- altMeaningsKo must contain ONLY genuinely semantically different usages (different context, nuance, or function).',
     '- DO NOT create separate entries just because the subject pronoun differs (당신/너/자네/그/그녀 are all just "you/he/she" — do NOT list them as separate meanings).',
     '- DO NOT list the same meaning multiple times with different formality levels of the same word.',
-    '- Merge meanings that are essentially the same concept into ONE entry. Keep the list concise: typically 1-3 meanings total.',
+    '- Merge meanings that are essentially the same concept into ONE entry.',
     '- For Korean translations, use a neutral or context-appropriate subject (e.g., "상대방의", "그의", or omit the subject). Do NOT vary only the pronoun.',
     '- examples array MUST have one object for each meaning: 1 for meaningKo + 1 for EACH item in altMeaningsKo.',
     '- "description" in each example: REQUIRED — 1-2 sentence Korean explanation of when/how/where this meaning is used. Always include this.',
