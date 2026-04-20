@@ -879,15 +879,33 @@ async function generateMeaningAndExampleWithGemini(
 
   const typeLabel =
     itemType === 'vocabulary' ? 'vocabulary(word)' : itemType === 'idiom' ? 'idiom' : 'expression'
+
+  // 괄호(선택 표기) 파싱
+  const parsedPhrase = parseOptionalPhrase(phrase)
+
+  // 선택적 부분이 있는 경우 프롬프트에 추가 지시 삽입
+  const optionalNotes = parsedPhrase.hasOptional
+    ? [
+        `IMPORTANT: The phrase "${phrase}" contains an optional element "(${parsedPhrase.optional})".`,
+        `- Base form: "${parsedPhrase.base}" — used without "${parsedPhrase.optional}"`,
+        `- Full form: "${parsedPhrase.full}" — used with "${parsedPhrase.optional}"`,
+        `- meaningKo must explain BOTH usages and when to use each form.`,
+        `- altMeaningsKo should include at least one entry for each form showing the usage difference.`,
+        `- exampleEn dialogue: one line uses the base form ("${parsedPhrase.base}"), the other uses the full form ("${parsedPhrase.full}").`,
+        `- exampleKo must translate both lines accordingly.`,
+      ]
+    : []
+
   const prompt = [
     'You are an English learning assistant for Korean learners.',
     `Target text: "${phrase}"`,
     `Item type: ${typeLabel}`,
+    ...optionalNotes,
     'Return ONLY a valid JSON object with these keys:',
     '{ "meaningKo": string, "altMeaningsKo": string[], "definitionHint": string, "exampleEn": string, "exampleKo": string, "itemType": "vocabulary"|"expression"|"idiom" }',
     'Rules:',
     '- For expression/idiom, prioritize natural usage meaning (NOT literal translation).',
-    '- exampleEn must include the exact target text naturally.',
+    '- exampleEn must include the target text naturally.',
     '- For expression/idiom, make exampleEn a 2-line dialogue using "A:" and "B:".',
     '- meaningKo should be concise and practical for learners.',
     '- Return ONLY the JSON object, no markdown, no explanation.',
@@ -1057,14 +1075,38 @@ const IDIOM_PATTERNS: ReadonlyArray<RegExp> = [
   /\bcat out of the bag\b/i,
 ]
 
+/**
+ * 괄호로 표시된 선택적 부분이 있는 구문을 파싱합니다.
+ * 예) "catch up (on)" → { base: "catch up", optional: "on", full: "catch up on", hasOptional: true }
+ * 예) "give up"       → { base: "give up",  optional: "",   full: "give up",    hasOptional: false }
+ */
+function parseOptionalPhrase(phrase: string): {
+  base: string
+  optional: string
+  full: string
+  hasOptional: boolean
+} {
+  const match = phrase.match(/^(.*?)\s*\(([^)]+)\)\s*$/)
+  if (match) {
+    const base = match[1].trim()
+    const optional = match[2].trim()
+    return { base, optional, full: `${base} ${optional}`, hasOptional: true }
+  }
+  return { base: phrase.trim(), optional: '', full: phrase.trim(), hasOptional: false }
+}
+
 function isLikelyIdiom(lower: string): boolean {
-  return IDIOM_PATTERNS.some((pattern) => pattern.test(lower))
+  // 괄호 선택 표기가 있으면 base form과 full form 모두 검사
+  const { base, full } = parseOptionalPhrase(lower)
+  return IDIOM_PATTERNS.some((pattern) => pattern.test(base) || pattern.test(full))
 }
 
 function inferItemTypeAuto(phrase: string, definitionHint = ''): ItemType {
   const trimmed = phrase.trim()
   if (!trimmed) return 'vocabulary'
-  if (!/\s/.test(trimmed)) return 'vocabulary'
+  // 괄호 제거 후 공백 체크 (예: "(something)" 단독은 vocabulary)
+  const { base } = parseOptionalPhrase(trimmed)
+  if (!/\s/.test(base) && !trimmed.includes('(')) return 'vocabulary'
   const lower = trimmed.toLowerCase()
   const hint = definitionHint.toLowerCase()
   // 1순위: definitionHint 키워드
