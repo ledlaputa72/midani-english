@@ -1510,7 +1510,7 @@ function App() {
             show: profile.show,
             episode: profile.episode,
             tags: [...profile.tags],
-            difficulty: profile.difficulty,
+            // difficulty는 항목별로 개별 저장 (프로파일로 덮어쓰지 않음)
             notes: profile.notes,
             deck: profile.deck || '기본 덱',
           }
@@ -1535,7 +1535,7 @@ function App() {
               show: profile.show,
               episode: profile.episode,
               tags: [...profile.tags],
-              difficulty: profile.difficulty,
+              // difficulty는 항목별로 개별 저장 (프로파일로 덮어쓰지 않음)
               notes: profile.notes,
               deck: profile.deck,
             }
@@ -1610,7 +1610,7 @@ function App() {
             show: updatedProfile.show,
             episode: updatedProfile.episode,
             tags: [...updatedProfile.tags],
-            difficulty: updatedProfile.difficulty,
+            // difficulty는 항목별로 개별 저장 (프로파일 수정 시에도 덮어쓰지 않음)
             notes: updatedProfile.notes,
             deck: updatedProfile.deck,
           }
@@ -2683,7 +2683,7 @@ function App() {
           show: profile.show,
           episode: profile.episode,
           tags: [...profile.tags],
-          difficulty: profile.difficulty,
+          // difficulty는 항목별로 개별 저장 (프로파일로 덮어쓰지 않음)
           notes: profile.notes,
           deck: profile.deck,
         }
