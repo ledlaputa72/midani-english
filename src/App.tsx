@@ -318,6 +318,50 @@ function splitTranslationParts(text: string): { primary: string; secondary: stri
   return { primary, secondary }
 }
 
+/**
+ * example 필드를 파싱해 [뜻] 블록 배열로 변환합니다.
+ * 새 형식: "[뜻]\n📝 설명\nA:...\nB:...\n→ A:...\nB:..." 블록이 \n\n으로 구분됨
+ * 구형식: 헤더 없는 단일 예문 텍스트
+ */
+function parseMeaningBlocks(
+  example: string,
+  primary: string,
+  alts: string[],
+): MeaningBlock[] {
+  const trimmed = example.trim()
+  if (!trimmed) return []
+
+  const hasHeaders = /\n{2,}/.test(trimmed) || /^\[.+\]/.test(trimmed)
+
+  if (hasHeaders) {
+    const rawBlocks = trimmed.split(/\n{2,}/)
+    const blocks: MeaningBlock[] = []
+    for (const raw of rawBlocks) {
+      const lines = raw.split('\n')
+      let meaning = ''
+      let description = ''
+      const dialogueLines: string[] = []
+      for (const line of lines) {
+        const t = line.trim()
+        if (/^\[.+\]$/.test(t)) {
+          meaning = t.slice(1, -1).trim()
+        } else if (t.startsWith('📝')) {
+          description = t.slice(2).trim()
+        } else if (t) {
+          dialogueLines.push(line)
+        }
+      }
+      const dialogue = dialogueLines.join('\n').trim()
+      if (meaning || dialogue) blocks.push({ meaning, description, dialogue })
+    }
+    return blocks
+  }
+
+  // 구형식: 첫 번째 뜻을 레이블로 사용
+  const allMeanings = [primary, ...alts].filter(Boolean)
+  return [{ meaning: allMeanings[0] ?? '', description: '', dialogue: trimmed }]
+}
+
 /** Split display phrase into tokens (whitespace; strip edge punctuation). */
 function splitPhraseWords(phrase: string): string[] {
   return phrase
@@ -443,9 +487,16 @@ function pickWordMeaningCandidate(candidates: string[]): string {
 }
 
 type GeminiExample = {
-  meaning: string  // 어떤 뜻의 예문인지
-  en: string       // 영어 예문
-  ko: string       // 한국어 번역
+  meaning: string       // 어떤 뜻의 예문인지
+  description?: string  // 이 뜻의 사용 맥락 설명 (Korean)
+  en: string            // 영어 예문
+  ko: string            // 한국어 번역
+}
+
+type MeaningBlock = {
+  meaning: string
+  description: string  // when/how to use this meaning
+  dialogue: string     // dialogue example (may be empty)
 }
 
 type GeminiAutofillResult = {
@@ -941,6 +992,7 @@ async function generateMeaningAndExampleWithGemini(
     '',
     'Rules:',
     '- examples array MUST have one object for each meaning: 1 for meaningKo + 1 for EACH item in altMeaningsKo.',
+    '- Each example object now has a "description" field: a 1-2 sentence Korean explanation of when/how to use this meaning.',
     '- For expression/idiom: each "en" must be a 2-line dialogue ("A: ...\\nB: ..."), "ko" translates both lines.',
     '- For vocabulary: each "en" is a single natural sentence.',
     '- DO NOT use markdown formatting (**bold**, *italic*, `code`) anywhere inside JSON string values.',
@@ -991,6 +1043,7 @@ async function generateMeaningAndExampleWithGemini(
           .filter((ex) => ex && typeof ex.en === 'string' && ex.en.trim())
           .map((ex) => ({
             meaning: cleanGeminiText(String(ex.meaning ?? '')).trim(),
+            description: cleanGeminiText(String((ex as Record<string, unknown>).description ?? '')).trim(),
             en: cleanGeminiText(toSentenceCase(String(ex.en ?? '').trim())),
             ko: cleanGeminiText(normalizeKoreanMeaningLine(String(ex.ko ?? ''))),
           }))
@@ -1223,6 +1276,7 @@ function App() {
 
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [openMeaningIdx, setOpenMeaningIdx] = useState<number>(0)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [inputTab, setInputTab] = useState<InputTab>('text')
@@ -1889,6 +1943,7 @@ function App() {
 
   const openDetailModal = (id: string) => {
     setDetailId(id)
+    setOpenMeaningIdx(0)
     setIsDetailOpen(true)
   }
 
@@ -2233,8 +2288,10 @@ function App() {
           .map((ex, i) => {
             const label = ex.meaning || allMeanings[i] || ''
             const header = label ? `[${label}]` : ''
+            const descLine = ex.description ? `📝 ${ex.description}` : ''
             const body = ex.ko ? `${ex.en}\n→ ${ex.ko}` : ex.en
-            return header ? `${header}\n${body}` : body
+            const parts = [header, descLine, body].filter(Boolean)
+            return parts.join('\n')
           })
           .join('\n\n')
         if (examplesFormatted) {
@@ -4242,30 +4299,94 @@ function App() {
                 </div>
               </section>
 
-              <section className="det-sec det-sec--meaning" aria-labelledby="det-meaning-heading">
-                <h4 id="det-meaning-heading" className="det-sec-title">
-                  한글 뜻
-                </h4>
-                <p className="det-trans">{detailTranslation.primary || detailItem.translation}</p>
-                {detailTranslation.secondary.length > 0 && (
-                  <div className="det-trans-sub">
-                    {detailTranslation.secondary.map((line) => (
-                      <div key={line}>- {line}</div>
-                    ))}
-                  </div>
-                )}
-              </section>
+              {/* 뜻 + 예문 아코디언 */}
+              {(() => {
+                const blocks = parseMeaningBlocks(
+                  detailItem.example,
+                  detailTranslation.primary || detailItem.translation,
+                  detailTranslation.secondary,
+                )
+                const allMeanings = [
+                  detailTranslation.primary || detailItem.translation,
+                  ...detailTranslation.secondary,
+                ].filter(Boolean)
 
-              <section className="det-sec det-sec--example" aria-labelledby="det-example-heading">
-                <h4 id="det-example-heading" className="det-sec-title">
-                  예문
-                </h4>
-                {detailItem.example.trim() ? (
-                  <div className="det-example-box">{detailItem.example}</div>
-                ) : (
-                  <p className="det-empty-line">등록된 예문이 없습니다.</p>
-                )}
-              </section>
+                if (blocks.length === 0) {
+                  return (
+                    <section className="det-sec det-sec--meaning" aria-labelledby="det-meaning-heading">
+                      <h4 className="det-sec-title">한글 뜻</h4>
+                      <p className="det-trans">{detailItem.translation || '—'}</p>
+                    </section>
+                  )
+                }
+
+                return (
+                  <section className="det-sec det-sec--meanings-accordion">
+                    <h4 className="det-sec-title">뜻 &amp; 예문</h4>
+                    {allMeanings.map((meaning, idx) => {
+                      const block = blocks[idx] ?? blocks[0]
+                      const isOpen = openMeaningIdx === idx
+                      return (
+                        <div key={idx} className={`meaning-accordion-item${isOpen ? ' open' : ''}`}>
+                          <button
+                            type="button"
+                            className="meaning-accordion-header"
+                            onClick={() => setOpenMeaningIdx(isOpen ? -1 : idx)}
+                            aria-expanded={isOpen}
+                          >
+                            <span className="meaning-accordion-num">뜻 {idx + 1}</span>
+                            <span className="meaning-accordion-text">{meaning}</span>
+                            <span className="meaning-accordion-arrow">{isOpen ? '▲' : '▼'}</span>
+                          </button>
+                          {isOpen && (
+                            <div className="meaning-accordion-body">
+                              {block.description && (
+                                <p className="meaning-accordion-desc">💡 {block.description}</p>
+                              )}
+                              {block.dialogue ? (
+                                <div className="det-example-box">{block.dialogue}</div>
+                              ) : (
+                                <p className="det-empty-line">예문 없음</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                    {/* 예문에서 뜻보다 더 많은 블록이 있을 경우 보여주기 */}
+                    {blocks.slice(allMeanings.length).map((block, i) => {
+                      const idx = allMeanings.length + i
+                      const isOpen = openMeaningIdx === idx
+                      return (
+                        <div key={idx} className={`meaning-accordion-item${isOpen ? ' open' : ''}`}>
+                          <button
+                            type="button"
+                            className="meaning-accordion-header"
+                            onClick={() => setOpenMeaningIdx(isOpen ? -1 : idx)}
+                            aria-expanded={isOpen}
+                          >
+                            <span className="meaning-accordion-num">뜻 {idx + 1}</span>
+                            <span className="meaning-accordion-text">{block.meaning || '기타'}</span>
+                            <span className="meaning-accordion-arrow">{isOpen ? '▲' : '▼'}</span>
+                          </button>
+                          {isOpen && (
+                            <div className="meaning-accordion-body">
+                              {block.description && (
+                                <p className="meaning-accordion-desc">💡 {block.description}</p>
+                              )}
+                              {block.dialogue ? (
+                                <div className="det-example-box">{block.dialogue}</div>
+                              ) : (
+                                <p className="det-empty-line">예문 없음</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </section>
+                )
+              })()}
 
               <section className="det-sec det-sec--extra" aria-labelledby="det-extra-heading">
                 <h4 id="det-extra-heading" className="det-sec-title">
