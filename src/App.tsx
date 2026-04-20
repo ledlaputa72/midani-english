@@ -2215,7 +2215,7 @@ function App() {
             .split(',')
             .map((tag) => tag.trim())
             .filter(Boolean),
-      difficulty: selectedProfile ? selectedProfile.difficulty : form.difficulty,
+      difficulty: form.difficulty,  // 항상 폼 값 사용 (Gemini 자동빈도 반영, 프로파일로 덮어쓰지 않음)
       notes: selectedProfile ? selectedProfile.notes : form.notes.trim(),
       deck: selectedProfile ? selectedProfile.deck : form.deck.trim() || '기본 덱',
       profileId: selectedProfile ? selectedProfile.id : null,
