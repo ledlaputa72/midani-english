@@ -3343,6 +3343,7 @@ function App() {
                           }}
                         >
                           <div className="flashcard-inner">
+                            {/* ── 앞면: 구문 + 유형 + 별 ── */}
                             <div className="flashcard-face flashcard-front">
                               <span>{isCenter ? '클릭해서 뜻 확인' : stackCard.deck}</span>
                               <div className="flashcard-title-line">
@@ -3351,21 +3352,31 @@ function App() {
                                   {ITEM_TYPE_LABEL[itemType]}
                                 </small>
                               </div>
+                              <div className="flashcard-stars">
+                                {'★'.repeat(stackCard.difficulty)}
+                                <span className="flashcard-stars-empty">
+                                  {'☆'.repeat(3 - stackCard.difficulty)}
+                                </span>
+                              </div>
                             </div>
+                            {/* ── 뒷면: 번호별 뜻 목록 ── */}
                             <div className="flashcard-face flashcard-back">
                               <span>뜻</span>
                               {(() => {
                                 const translationParts = splitTranslationParts(stackCard.translation)
-                                const primaryMeaning = translationParts.primary || stackCard.translation
+                                const allMeanings = [
+                                  translationParts.primary || stackCard.translation,
+                                  ...translationParts.secondary,
+                                ].filter(Boolean)
                                 return (
-                                  <>
-                                    <h3>{primaryMeaning}</h3>
-                                    {translationParts.secondary.length > 0 && (
-                                      <p className="flashcard-secondary-meaning">
-                                        {translationParts.secondary.join(' · ')}
-                                      </p>
-                                    )}
-                                  </>
+                                  <div className="flashcard-meanings-list">
+                                    {allMeanings.map((meaning, idx) => (
+                                      <div key={idx} className="flashcard-meaning-row">
+                                        <span className="flashcard-meaning-badge">뜻 {idx + 1}</span>
+                                        <span className="flashcard-meaning-text">{meaning}</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 )
                               })()}
                             </div>

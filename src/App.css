@@ -1568,15 +1568,72 @@ button.danger {
   text-align: center;
 }
 
-.flashcard-example {
-  filter: blur(7px);
-  opacity: 0.5;
-  transition: filter 0.25s ease, opacity 0.25s ease;
+/* 앞면 빈도 별표시 */
+.flashcard-stars {
+  margin-top: 6px;
+  font-size: 20px;
+  letter-spacing: 3px;
+  color: #f59e0b;
+  text-align: center;
+  justify-self: center;
 }
 
-.flashcard-example.is-revealed {
-  filter: blur(0);
-  opacity: 1;
+.flashcard-stars-empty {
+  color: #4a4a72;
+}
+
+/* 뒷면 뜻 번호 목록 */
+.flashcard-meanings-list {
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 0 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #45456a transparent;
+  align-self: center;
+}
+
+.flashcard-meanings-list::-webkit-scrollbar {
+  width: 4px;
+}
+.flashcard-meanings-list::-webkit-scrollbar-thumb {
+  background: #45456a;
+  border-radius: 2px;
+}
+
+.flashcard-meaning-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+}
+
+.flashcard-meaning-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #c4b5fd;
+  background: rgba(124, 92, 252, 0.18);
+  border: 1px solid rgba(124, 92, 252, 0.35);
+  border-radius: 20px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.flashcard-meaning-text {
+  font-size: 15px;
+  color: #e8eaf6;
+  line-height: 1.45;
+  flex: 1;
+}
+
+/* 뒷면 h3 (레거시 — 숨김) */
+.flashcard-back h3 {
+  display: none;
 }
 
 .stack-pos-0 {
