@@ -922,17 +922,30 @@ async function generateMeaningAndExampleWithGemini(
     `Item type: ${typeLabel}`,
     ...optionalNotes,
     allMeaningsNote,
-    'Return ONLY a valid JSON object with these exact keys:',
-    '{ "meaningKo": string, "altMeaningsKo": string[], "definitionHint": string, "examples": [{"meaning": string, "en": string, "ko": string}], "itemType": "vocabulary"|"expression"|"idiom" }',
-    'Rules for examples array:',
-    '- For vocabulary: provide 1 example sentence (not a dialogue).',
-    '- For expression/idiom: provide one 2-line "A:"/"B:" dialogue PER MEANING (meaningKo + each altMeaningKo).',
-    '- Each example object: "meaning" = the Korean meaning it illustrates, "en" = English dialogue/sentence, "ko" = Korean translation.',
-    '- NEVER write parenthetical notation like "(on)" or "(to)" inside any "en" or "ko" field.',
-    '- Use natural, spoken English in every example.',
-    '- meaningKo should be concise and practical for Korean learners.',
-    '- Prioritize natural/idiomatic usage (NOT literal translation) for expression/idiom.',
-    '- Return ONLY the JSON object, no markdown, no explanation.',
+    '',
+    'Return ONLY a valid JSON object. No markdown, no explanation — just the raw JSON.',
+    'Required JSON keys:',
+    '{',
+    '  "meaningKo": string,          // main Korean meaning',
+    '  "altMeaningsKo": string[],    // ALL other Korean meanings/usages (no limit)',
+    '  "definitionHint": string,     // brief English definition',
+    '  "examples": [                 // one entry per meaning (meaningKo + each altMeaningKo)',
+    '    {',
+    '      "meaning": string,        // the Korean meaning this example illustrates',
+    '      "en": string,             // English example (2-line A:/B: dialogue for expression/idiom)',
+    '      "ko": string              // Korean translation of the dialogue',
+    '    }',
+    '  ],',
+    '  "itemType": "vocabulary"|"expression"|"idiom"',
+    '}',
+    '',
+    'Rules:',
+    '- examples array MUST have one object for each meaning: 1 for meaningKo + 1 for EACH item in altMeaningsKo.',
+    '- For expression/idiom: each "en" must be a 2-line dialogue ("A: ...\\nB: ..."), "ko" translates both lines.',
+    '- For vocabulary: each "en" is a single natural sentence.',
+    '- DO NOT use markdown formatting (**bold**, *italic*, `code`) anywhere inside JSON string values.',
+    '- DO NOT write parenthetical notation like "(on)" or "(to)" inside en/ko fields — use the actual word.',
+    '- Prioritize natural/idiomatic meaning (NOT literal translation) for expression/idiom.',
   ].filter(Boolean).join('\n')
 
   try {
@@ -962,28 +975,33 @@ async function generateMeaningAndExampleWithGemini(
           .map((line) => normalizeKoreanMeaningLine(String(line)))
           .filter(Boolean)
       : []
-    // 괄호 표기 잔재 제거 헬퍼 (예: "(on)" "(to)" 같은 것이 문장 안에 남아있을 때)
-    const stripParenNotation = (s: string) => s.replace(/\s*\([^)]{1,20}\)/g, '').replace(/\s{2,}/g, ' ').trim()
+    // Gemini 응답 텍스트 정리: 마크다운 제거 + 괄호 표기 잔재 제거
+    const cleanGeminiText = (s: string): string =>
+      s
+        .replace(/\*\*([^*]+)\*\*/g, '$1')   // **bold** → bold
+        .replace(/\*([^*]+)\*/g, '$1')         // *italic* → italic
+        .replace(/`([^`]+)`/g, '$1')           // `code` → code
+        .replace(/\s*\([^)]{1,20}\)/g, '')     // (on) (to) 같은 괄호 표기 제거
+        .replace(/\s{2,}/g, ' ')
+        .trim()
 
     // examples 배열 파싱 (뜻별 예문)
     const examples: GeminiExample[] = Array.isArray(parsed.examples)
       ? parsed.examples
           .filter((ex) => ex && typeof ex.en === 'string' && ex.en.trim())
           .map((ex) => ({
-            meaning: stripParenNotation(String(ex.meaning ?? '')).trim(),
-            en: stripParenNotation(toSentenceCase(String(ex.en ?? '').trim())),
-            ko: stripParenNotation(normalizeKoreanMeaningLine(String(ex.ko ?? ''))),
+            meaning: cleanGeminiText(String(ex.meaning ?? '')).trim(),
+            en: cleanGeminiText(toSentenceCase(String(ex.en ?? '').trim())),
+            ko: cleanGeminiText(normalizeKoreanMeaningLine(String(ex.ko ?? ''))),
           }))
           .filter((ex) => ex.en)
       : []
 
-    // 하위 호환: examples가 없으면 exampleEn/exampleKo 사용
-    const exampleEn = examples.length > 0
-      ? examples[0].en
-      : toSentenceCase(stripParenNotation(String(parsed.exampleEn ?? '').trim()))
-    const exampleKo = examples.length > 0
-      ? examples[0].ko
-      : normalizeKoreanMeaningLine(stripParenNotation(String(parsed.exampleKo ?? '')))
+    // 하위 호환: examples가 없거나 비어있으면 exampleEn/exampleKo 사용
+    const legacyEn = cleanGeminiText(toSentenceCase(String(parsed.exampleEn ?? '').trim()))
+    const legacyKo = cleanGeminiText(normalizeKoreanMeaningLine(String(parsed.exampleKo ?? '')))
+    const exampleEn = examples.length > 0 ? examples[0].en : legacyEn
+    const exampleKo = examples.length > 0 ? examples[0].ko : legacyKo
 
     const definitionHint = String(parsed.definitionHint ?? '').trim()
     const parsedItemType =
