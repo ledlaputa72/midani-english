@@ -180,8 +180,8 @@ function normalizeItems(source: StudyItem[] | unknown): StudyItem[] {
           .filter(Boolean),
     deck: (item as StudyItem).deck?.trim() || '기본 덱',
     difficulty:
-      [1, 2, 3, 4, 5].includes((item as StudyItem).difficulty)
-        ? (item as StudyItem).difficulty
+      ([1, 2, 3, 4, 5] as number[]).includes((item as StudyItem).difficulty)
+        ? ((item as StudyItem).difficulty as 1 | 2 | 3 | 4 | 5)
         : 2,
     profileId: typeof (item as StudyItem).profileId === 'string' ? (item as StudyItem).profileId : null,
     itemType: (() => {
@@ -211,7 +211,7 @@ function normalizeProfiles(source: CardInfoProfile[] | unknown): CardInfoProfile
               .split(',')
               .map((tag) => tag.trim())
               .filter(Boolean),
-        difficulty: [1, 2, 3, 4, 5].includes(raw.difficulty) ? raw.difficulty : 3,
+        difficulty: ([1, 2, 3, 4, 5] as number[]).includes(raw.difficulty as number) ? (raw.difficulty as 1 | 2 | 3 | 4 | 5) : 3,
         notes: (raw.notes ?? '').trim(),
         deck: (raw.deck ?? '').trim() || '기본 덱',
         createdAt: (raw.createdAt ?? '').trim() || now,
