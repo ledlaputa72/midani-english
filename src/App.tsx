@@ -886,13 +886,15 @@ async function generateMeaningAndExampleWithGemini(
   // 선택적 부분이 있는 경우 프롬프트에 추가 지시 삽입
   const optionalNotes = parsedPhrase.hasOptional
     ? [
-        `IMPORTANT: The phrase "${phrase}" contains an optional element "(${parsedPhrase.optional})".`,
-        `- Base form: "${parsedPhrase.base}" — used without "${parsedPhrase.optional}"`,
-        `- Full form: "${parsedPhrase.full}" — used with "${parsedPhrase.optional}"`,
-        `- meaningKo must explain BOTH usages and when to use each form.`,
-        `- altMeaningsKo should include at least one entry for each form showing the usage difference.`,
-        `- exampleEn dialogue: one line uses the base form ("${parsedPhrase.base}"), the other uses the full form ("${parsedPhrase.full}").`,
-        `- exampleKo must translate both lines accordingly.`,
+        `IMPORTANT: The notation "${phrase}" means the word/words in parentheses "(${parsedPhrase.optional})" are OPTIONAL.`,
+        `This phrase has TWO valid forms:`,
+        `  Form A (base): "${parsedPhrase.base}" — used when no object follows`,
+        `  Form B (full): "${parsedPhrase.full}" — used when specifying what you catch on TO`,
+        `DO NOT write "(${parsedPhrase.optional})" in any example sentence. Use only Form A or Form B as real words.`,
+        `- meaningKo: explain the meaning of both forms and clearly state when each is used.`,
+        `- altMeaningsKo: first entry shows "${parsedPhrase.base}" usage, second entry shows "${parsedPhrase.full}" usage.`,
+        `- exampleEn: write a 2-line dialogue where line A uses "${parsedPhrase.base}" naturally and line B uses "${parsedPhrase.full}" naturally. Never use "(${parsedPhrase.optional})" notation in the dialogue.`,
+        `- exampleKo: translate both lines of the dialogue naturally in Korean.`,
       ]
     : []
 
@@ -905,7 +907,7 @@ async function generateMeaningAndExampleWithGemini(
     '{ "meaningKo": string, "altMeaningsKo": string[], "definitionHint": string, "exampleEn": string, "exampleKo": string, "itemType": "vocabulary"|"expression"|"idiom" }',
     'Rules:',
     '- For expression/idiom, prioritize natural usage meaning (NOT literal translation).',
-    '- exampleEn must include the target text naturally.',
+    '- exampleEn must use actual spoken/written English (no parenthetical notation like "(on)" or "(to)" inside sentences).',
     '- For expression/idiom, make exampleEn a 2-line dialogue using "A:" and "B:".',
     '- meaningKo should be concise and practical for learners.',
     '- Return ONLY the JSON object, no markdown, no explanation.',
@@ -937,8 +939,10 @@ async function generateMeaningAndExampleWithGemini(
           .filter(Boolean)
           .slice(0, 2)
       : []
-    const exampleEn = toSentenceCase(String(parsed.exampleEn ?? '').trim())
-    const exampleKo = normalizeKoreanMeaningLine(String(parsed.exampleKo ?? ''))
+    // 예문에서 "(on)" "(to)" 같은 괄호 표기 잔재 제거 후 공백 정리
+    const stripParenNotation = (s: string) => s.replace(/\s*\([^)]{1,20}\)/g, '').replace(/\s{2,}/g, ' ').trim()
+    const exampleEn = toSentenceCase(stripParenNotation(String(parsed.exampleEn ?? '').trim()))
+    const exampleKo = normalizeKoreanMeaningLine(stripParenNotation(String(parsed.exampleKo ?? '')))
     const definitionHint = String(parsed.definitionHint ?? '').trim()
     const parsedItemType =
       parsed.itemType === 'vocabulary' || parsed.itemType === 'expression' || parsed.itemType === 'idiom'
