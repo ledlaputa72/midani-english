@@ -2319,9 +2319,20 @@ button.danger {
 
 .det-phrase-line {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
   gap: 10px 12px;
+}
+
+.det-freq-stars {
+  font-size: 17px;
+  letter-spacing: 2px;
+  color: #f59e0b;
+  white-space: nowrap;
+}
+
+.det-freq-stars-empty {
+  color: #3a3a5c;
 }
 
 .det-phrase-title {

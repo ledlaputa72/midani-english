@@ -4342,6 +4342,10 @@ function App() {
                   >
                     {ITEM_TYPE_LABEL[detailItem.itemType ?? inferItemType(detailItem.phrase)]}
                   </span>
+                  <span className="det-freq-stars" aria-label={`사용빈도 ${detailItem.difficulty}단계`}>
+                    {'★'.repeat(detailItem.difficulty)}
+                    <span className="det-freq-stars-empty">{'☆'.repeat(5 - detailItem.difficulty)}</span>
+                  </span>
                 </div>
               </section>
 
