@@ -1009,22 +1009,17 @@ async function generateMeaningAndExampleWithGemini(
       ]
     : []
 
-  const allMeaningsNote = itemType !== 'vocabulary'
-    ? 'Include ALL meaningful usage variants in altMeaningsKo (no limit — include every distinct meaning).'
-    : ''
-
   const prompt = [
     'You are an English learning assistant for Korean learners.',
     `Target text: "${phrase}"`,
     `Item type: ${typeLabel}`,
     ...optionalNotes,
-    allMeaningsNote,
     '',
     'Return ONLY a valid JSON object. No markdown, no explanation — just the raw JSON.',
     'Required JSON keys:',
     '{',
-    '  "meaningKo": string,          // main Korean meaning',
-    '  "altMeaningsKo": string[],    // ALL other Korean meanings/usages (no limit)',
+    '  "meaningKo": string,          // main Korean meaning (use neutral subject like "~을/를" or omit subject)',
+    '  "altMeaningsKo": string[],    // other GENUINELY DIFFERENT meanings/usages only',
     '  "definitionHint": string,     // brief English definition',
     '  "examples": [                 // one entry per meaning (meaningKo + each altMeaningKo)',
     '    {',
@@ -1038,6 +1033,11 @@ async function generateMeaningAndExampleWithGemini(
     '}',
     '',
     'Rules:',
+    '- altMeaningsKo must contain ONLY genuinely semantically different usages (different context, nuance, or function).',
+    '- DO NOT create separate entries just because the subject pronoun differs (당신/너/자네/그/그녀 are all just "you/he/she" — do NOT list them as separate meanings).',
+    '- DO NOT list the same meaning multiple times with different formality levels of the same word.',
+    '- Merge meanings that are essentially the same concept into ONE entry. Keep the list concise: typically 1-3 meanings total.',
+    '- For Korean translations, use a neutral or context-appropriate subject (e.g., "상대방의", "그의", or omit the subject). Do NOT vary only the pronoun.',
     '- examples array MUST have one object for each meaning: 1 for meaningKo + 1 for EACH item in altMeaningsKo.',
     '- "description" in each example: REQUIRED — 1-2 sentence Korean explanation of when/how/where this meaning is used. Always include this.',
     '- For expression/idiom: each "en" must be a 2-line dialogue ("A: ...\\nB: ..."), "ko" must also use the same 2-line format ("A: ...\\nB: ...") — NOT a single line.',
