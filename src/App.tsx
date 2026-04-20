@@ -2176,6 +2176,20 @@ function App() {
     event.preventDefault()
     if (!form.phrase.trim() || !form.translation.trim()) return
 
+    // 새 항목 추가 시 중복 체크
+    if (!editingId) {
+      const normalizedPhrase = normalizeForContains(form.phrase.trim())
+      const duplicate = items.find(
+        (item) => normalizeForContains(item.phrase) === normalizedPhrase,
+      )
+      if (duplicate) {
+        const confirm = window.confirm(
+          `"${form.phrase.trim()}"은(는) 이미 등록된 단어/구문입니다.\n\n등록된 항목: "${duplicate.phrase}" (${duplicate.translation})\n\n그래도 저장하시겠습니까?`,
+        )
+        if (!confirm) return
+      }
+    }
+
     const selectedProfileId = form.profileId.trim()
     const selectedProfile = selectedProfileId ? profileMap.get(selectedProfileId) ?? null : null
     const payload = {
@@ -2227,6 +2241,21 @@ function App() {
   const autoFillFromEnglish = async (forceUpdate = false, provider: AiProvider = formAiProvider) => {
     const phrase = form.phrase.trim()
     if (!phrase || isAutoFilling) return
+
+    // 중복 단어/구문 확인 (새 항목 추가 시에만)
+    if (!editingId) {
+      const normalizedPhrase = normalizeForContains(phrase)
+      const duplicate = items.find(
+        (item) => normalizeForContains(item.phrase) === normalizedPhrase,
+      )
+      if (duplicate) {
+        const confirm = window.confirm(
+          `"${phrase}"은(는) 이미 등록된 단어/구문입니다.\n\n등록된 항목: "${duplicate.phrase}" (${duplicate.translation})\n\n그래도 계속 진행하시겠습니까?`,
+        )
+        if (!confirm) return
+      }
+    }
+
     const inferredType = inferItemTypeAuto(phrase)
     const phraseOverride = PHRASE_USAGE_OVERRIDES[normalizeForContains(phrase)]
 
@@ -2584,6 +2613,33 @@ function App() {
     a.click()
     URL.revokeObjectURL(url)
     setSettingsMsg('백업 파일을 내보냈습니다.')
+  }
+
+  const exportItemsCsv = () => {
+    const escape = (s: string) => `"${String(s ?? '').replace(/"/g, '""')}"`
+    const headers = ['단어/구문', '한국어 뜻', '유형', '출처', '에피소드', '태그', '상태', '사용빈도', '복습횟수', '추가일']
+    const rows = items.map((item) => [
+      escape(item.phrase),
+      escape(item.translation),
+      escape(item.itemType ?? ''),
+      escape(item.show),
+      escape(item.episode),
+      escape(item.tags.join(', ')),
+      escape(item.status),
+      String(item.difficulty),
+      String(item.reviewCount),
+      escape(item.createdAt),
+    ])
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    // BOM 추가: Excel에서 한글 깨짐 방지
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `midani-vocabulary-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setSettingsMsg(`CSV 파일을 내보냈습니다. (${items.length}개 항목)`)
   }
 
   const importItemsJson = async (file: File | null) => {
@@ -3810,7 +3866,10 @@ function App() {
                     지금 동기화
                   </button>
                   <button type="button" className="secondary" onClick={exportItemsJson}>
-                    데이터 내보내기
+                    JSON 백업
+                  </button>
+                  <button type="button" className="secondary" onClick={exportItemsCsv}>
+                    CSV 내보내기
                   </button>
                   <button type="button" className="secondary" onClick={() => importFileRef.current?.click()}>
                     데이터 가져오기
