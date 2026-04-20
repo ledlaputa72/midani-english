@@ -3323,7 +3323,6 @@ function App() {
                       if (!stackCard) return null
                       const isCenter = offset === 0
                       const itemType = stackCard.itemType ?? inferItemType(stackCard.phrase)
-                      const isExampleRevealed = !isCenter || cardTimerProgress <= 0.5
                       const card = (
                         <button
                           type="button"
@@ -3352,13 +3351,6 @@ function App() {
                                   {ITEM_TYPE_LABEL[itemType]}
                                 </small>
                               </div>
-                              {stackCard.example && (
-                                <p
-                                  className={`flashcard-example ${isExampleRevealed ? 'is-revealed' : ''}`}
-                                >
-                                  "{stackCard.example}"
-                                </p>
-                              )}
                             </div>
                             <div className="flashcard-face flashcard-back">
                               <span>뜻</span>
@@ -3376,7 +3368,6 @@ function App() {
                                   </>
                                 )
                               })()}
-                              {stackCard.notes && <p>{stackCard.notes}</p>}
                             </div>
                           </div>
                         </button>
