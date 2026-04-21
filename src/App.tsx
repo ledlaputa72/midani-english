@@ -2025,25 +2025,41 @@ function App() {
     setOpenMeaningIdx(0)
     setIsDetailOpen(true)
     setDetailPhonetic('')
-    // Free Dictionary API로 발음기호 가져오기 (첫 단어만 조회)
+    // Free Dictionary API로 모든 단어의 발음기호 조회
     const target = items.find((item) => item.id === id)
-    if (target) {
-      const firstWord = target.phrase.trim().split(/\s+/)[0]
-      fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(firstWord)}`)
-        .then((r) => r.json())
-        .then((data: unknown) => {
-          const arr = data as Array<{ phonetics?: Array<{ text?: string }>, phonetic?: string }>
-          if (!Array.isArray(arr) || arr.length === 0) return
-          const entry = arr[0]
-          // phonetic 필드 또는 phonetics 배열에서 텍스트 추출
-          const phonetic =
-            entry.phonetic?.trim() ||
-            entry.phonetics?.find((p) => p.text?.trim())?.text?.trim() ||
-            ''
-          if (phonetic) setDetailPhonetic(phonetic)
-        })
-        .catch(() => {/* 발음기호 없으면 조용히 무시 */})
+    if (!target) return
+
+    // 괄호 제거 후 단어 분리 (예: "catch up (on)" → ["catch", "up"])
+    const words = target.phrase
+      .replace(/\(.*?\)/g, '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+
+    type DictEntry = { phonetics?: Array<{ text?: string }>; phonetic?: string }
+    const extractPhonetic = (data: unknown): string => {
+      const arr = data as DictEntry[]
+      if (!Array.isArray(arr) || arr.length === 0) return ''
+      const entry = arr[0]
+      return (
+        entry.phonetic?.trim() ||
+        entry.phonetics?.find((p) => p.text?.trim())?.text?.trim() ||
+        ''
+      )
     }
+
+    // 단어별 병렬 조회 후 순서대로 합치기
+    Promise.all(
+      words.map((word) =>
+        fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => (data ? extractPhonetic(data) : ''))
+          .catch(() => '')
+      )
+    ).then((phonetics) => {
+      const combined = phonetics.filter(Boolean).join('  ')
+      if (combined) setDetailPhonetic(combined)
+    })
   }
 
   const closeAddModal = () => {
