@@ -636,31 +636,43 @@ button.danger {
 }
 
 .list-toolbar {
-  display: grid;
-  grid-template-columns: 1fr repeat(4, minmax(120px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 7px;
   margin-bottom: 14px;
   align-items: center;
+  overflow-x: auto;
 }
 
-.list-toolbar .list-search,
-.list-toolbar .list-filter-select {
-  width: 100%;
+.list-toolbar .list-search {
+  flex: 1 1 140px;
+  min-width: 100px;
   background: #212136;
   border: 1px solid #373752;
   color: #e8e8f2;
   border-radius: 9px;
-  padding: 10px 11px;
-  font: inherit;
+  padding: 9px 10px;
+  font-size: 0.88rem;
+}
+
+.list-toolbar .list-filter-select {
+  flex: 0 0 auto;
+  background: #212136;
+  border: 1px solid #373752;
+  color: #e8e8f2;
+  border-radius: 9px;
+  padding: 9px 6px;
+  font-size: 0.82rem;
+  min-width: 0;
 }
 
 @media (max-width: 960px) {
   .list-toolbar {
-    grid-template-columns: 1fr 1fr;
+    gap: 5px;
   }
-
-  .list-toolbar .list-search {
-    grid-column: 1 / -1;
+  .list-toolbar .list-filter-select {
+    font-size: 0.78rem;
+    padding: 8px 4px;
   }
 }
 
