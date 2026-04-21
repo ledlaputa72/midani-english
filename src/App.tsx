@@ -2057,8 +2057,12 @@ function App() {
           .catch(() => '')
       )
     ).then((phonetics) => {
-      const combined = phonetics.filter(Boolean).join('  ')
-      if (combined) setDetailPhonetic(combined)
+      // 각 발음기호에서 앞뒤 / 제거 후 합치고, 전체 앞뒤에만 / 붙이기
+      const stripped = phonetics
+        .filter(Boolean)
+        .map((p) => p.replace(/^\/|\/$/g, '').trim())
+        .filter(Boolean)
+      if (stripped.length > 0) setDetailPhonetic('/' + stripped.join('  ') + '/')
     })
   }
 
