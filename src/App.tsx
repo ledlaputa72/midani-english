@@ -2131,12 +2131,18 @@ function App() {
   }
 
   const removeItem = (id: string) => {
+    const target = items.find((item) => item.id === id)
+    const label = target ? `"${target.phrase}"` : '이 항목'
+    if (!window.confirm(`${label}을(를) 삭제할까요?\n삭제하면 복구할 수 없습니다.`)) return
     const next = items.filter((item) => item.id !== id)
     persist(next)
     setIsDetailOpen(false)
   }
 
   const removeItemFromDeck = (id: string) => {
+    const target = items.find((item) => item.id === id)
+    const label = target ? `"${target.phrase}"` : '이 항목'
+    if (!window.confirm(`${label}을(를) 삭제할까요?\n삭제하면 복구할 수 없습니다.`)) return
     const next = items.filter((item) => item.id !== id)
     persist(next)
   }
