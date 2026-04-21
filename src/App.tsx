@@ -2830,14 +2830,18 @@ function App() {
                 ? '📋 전체 목록'
                 : page === 'board'
                   ? '📌 카드 보드'
-                  : '학습 노트'}
+                  : page === 'calendar'
+                    ? '학습 캘린더'
+                    : '학습 노트'}
             </h2>
             <p>
               {page === 'list'
                 ? '단어·구문·뜻을 한눈에 보고 복습해 보세요.'
                 : page === 'board'
                   ? '상태별 칸에서 예문·복습·출처를 함께 보며 진행도를 관리해 보세요.'
-                  : '프로토타입 기반 모달 + 카드 학습 흐름'}
+                  : page === 'calendar'
+                    ? '카드를 날짜에 배정하고 학습 일정을 관리해 보세요.'
+                    : '프로토타입 기반 모달 + 카드 학습 흐름'}
             </p>
           </div>
           <div className="header-actions">
@@ -3752,8 +3756,24 @@ function App() {
 
         {page === 'calendar' && (
           <section className="calendar-page">
-            <div className="calendar-header">
-              <h3>학습 캘린더</h3>
+            {/* 월간/주간 버튼 + 날짜 네비게이션 한 줄 */}
+            <div className="calendar-view-toggle">
+              <div className="cal-view-btns">
+                <button
+                  type="button"
+                  className={calendarView === 'month' ? 'cal-view-btn active' : 'cal-view-btn'}
+                  onClick={() => setCalendarView('month')}
+                >
+                  월간
+                </button>
+                <button
+                  type="button"
+                  className={calendarView === 'week' ? 'cal-view-btn active' : 'cal-view-btn'}
+                  onClick={() => setCalendarView('week')}
+                >
+                  주간
+                </button>
+              </div>
               <div className="calendar-nav">
                 <button
                   className="secondary"
@@ -3771,24 +3791,6 @@ function App() {
                   →
                 </button>
               </div>
-            </div>
-
-            {/* 월간 / 주간 전환 버튼 */}
-            <div className="calendar-view-toggle">
-              <button
-                type="button"
-                className={calendarView === 'month' ? 'cal-view-btn active' : 'cal-view-btn'}
-                onClick={() => setCalendarView('month')}
-              >
-                월간
-              </button>
-              <button
-                type="button"
-                className={calendarView === 'week' ? 'cal-view-btn active' : 'cal-view-btn'}
-                onClick={() => setCalendarView('week')}
-              >
-                주간
-              </button>
             </div>
 
             <div className="calendar-layout">

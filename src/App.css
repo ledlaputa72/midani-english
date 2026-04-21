@@ -1793,17 +1793,17 @@ button.danger {
   gap: 10px;
 }
 
-.calendar-header {
+/* 월간 / 주간 전환 버튼 + 날짜 네비 한 줄 */
+.calendar-view-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin: 0 0 10px;
 }
 
-/* 월간 / 주간 전환 버튼 */
-.calendar-view-toggle {
+.cal-view-btns {
   display: flex;
   gap: 4px;
-  margin: 10px 0 6px;
 }
 
 .cal-view-btn {
