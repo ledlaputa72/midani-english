@@ -1433,6 +1433,14 @@ function App() {
   const [cardFlipped, setCardFlipped] = useState(false)
   const [cardEnterDir, setCardEnterDir] = useState<CardEnterDir>('next')
   const [calendarMonth, setCalendarMonth] = useState(() => new Date())
+  const [calendarView, setCalendarView] = useState<'month' | 'week'>('month')
+  const [calendarWeekStart, setCalendarWeekStart] = useState(() => {
+    const today = new Date()
+    const d = new Date(today)
+    d.setDate(today.getDate() - today.getDay())
+    d.setHours(0, 0, 0, 0)
+    return d
+  })
   const googleProviderRef = useRef(new GoogleAuthProvider())
   const accountMenuRef = useRef<HTMLDivElement>(null)
   const importFileRef = useRef<HTMLInputElement>(null)
@@ -1838,6 +1846,14 @@ function App() {
     })
   }, [calendarMonth])
 
+  const calendarWeekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const day = new Date(calendarWeekStart)
+      day.setDate(calendarWeekStart.getDate() + i)
+      return day
+    })
+  }, [calendarWeekStart])
+
   const itemsByDate = useMemo(() => {
     const map: Record<string, StudyItem[]> = {}
     for (const item of items) {
@@ -2127,6 +2143,24 @@ function App() {
 
   const moveMonth = (delta: number) => {
     setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1))
+  }
+
+  const moveWeek = (delta: number) => {
+    setCalendarWeekStart((prev) => {
+      const d = new Date(prev)
+      d.setDate(prev.getDate() + delta * 7)
+      return d
+    })
+  }
+
+  const weekTitle = (weekStart: Date): string => {
+    const end = new Date(weekStart)
+    end.setDate(weekStart.getDate() + 6)
+    const sy = weekStart.getFullYear(), sm = weekStart.getMonth() + 1, sd = weekStart.getDate()
+    const ey = end.getFullYear(), em = end.getMonth() + 1, ed = end.getDate()
+    if (sy === ey && sm === em) return `${sy}년 ${sm}월 ${sd}일 – ${ed}일`
+    if (sy === ey) return `${sy}년 ${sm}월 ${sd}일 – ${em}월 ${ed}일`
+    return `${sy}.${sm}.${sd} – ${ey}.${em}.${ed}`
   }
 
   const scheduleItem = (itemId: string, dateKey: string) => {
@@ -3721,14 +3755,40 @@ function App() {
             <div className="calendar-header">
               <h3>학습 캘린더</h3>
               <div className="calendar-nav">
-                <button className="secondary" onClick={() => moveMonth(-1)}>
+                <button
+                  className="secondary"
+                  onClick={() => calendarView === 'month' ? moveMonth(-1) : moveWeek(-1)}
+                >
                   ←
                 </button>
-                <strong>{monthTitle(calendarMonth)}</strong>
-                <button className="secondary" onClick={() => moveMonth(1)}>
+                <strong>
+                  {calendarView === 'month' ? monthTitle(calendarMonth) : weekTitle(calendarWeekStart)}
+                </strong>
+                <button
+                  className="secondary"
+                  onClick={() => calendarView === 'month' ? moveMonth(1) : moveWeek(1)}
+                >
                   →
                 </button>
               </div>
+            </div>
+
+            {/* 월간 / 주간 전환 버튼 */}
+            <div className="calendar-view-toggle">
+              <button
+                type="button"
+                className={calendarView === 'month' ? 'cal-view-btn active' : 'cal-view-btn'}
+                onClick={() => setCalendarView('month')}
+              >
+                월간
+              </button>
+              <button
+                type="button"
+                className={calendarView === 'week' ? 'cal-view-btn active' : 'cal-view-btn'}
+                onClick={() => setCalendarView('week')}
+              >
+                주간
+              </button>
             </div>
 
             <div className="calendar-layout">
@@ -3762,45 +3822,103 @@ function App() {
 
               <div className="calendar-grid-wrap">
                 <div className="calendar-weekdays">
-                  {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
-                    <div key={day}>{day}</div>
-                  ))}
+                  {calendarView === 'week'
+                    ? calendarWeekDays.map((day) => {
+                        const today = new Date()
+                        const isToday =
+                          day.getFullYear() === today.getFullYear() &&
+                          day.getMonth() === today.getMonth() &&
+                          day.getDate() === today.getDate()
+                        return (
+                          <div key={day.toISOString()} className={isToday ? 'today-label' : ''}>
+                            {['일', '월', '화', '수', '목', '금', '토'][day.getDay()]}
+                            <span className="week-day-num">{day.getDate()}</span>
+                          </div>
+                        )
+                      })
+                    : ['일', '월', '화', '수', '목', '금', '토'].map((d) => (
+                        <div key={d}>{d}</div>
+                      ))
+                  }
                 </div>
-                <div className="calendar-grid">
-                  {calendarDays.map((day) => {
-                    const key = toDateKey(day)
-                    const inMonth = day.getMonth() === calendarMonth.getMonth()
-                    const dayItems = itemsByDate[key] ?? []
-                    return (
-                      <div
-                        key={key}
-                        className={`calendar-cell ${inMonth ? '' : 'out-month'}`}
-                        onDragOver={(event) => event.preventDefault()}
-                        onDrop={(event) => {
-                          event.preventDefault()
-                          const itemId = event.dataTransfer.getData('text/plain')
-                          if (itemId) scheduleItem(itemId, key)
-                        }}
-                      >
-                        <div className="cell-date">{day.getDate()}</div>
-                        <div className="cell-cards">
-                          {dayItems.map((item) => (
-                            <div
-                              key={item.id}
-                              className="cal-card"
-                              draggable
-                              onDragStart={(event) => event.dataTransfer.setData('text/plain', item.id)}
-                              onClick={() => openDetailModal(item.id)}
-                            >
-                              <strong>{item.phrase}</strong>
-                              <small>{item.show || '작품 미입력'}</small>
-                            </div>
-                          ))}
+
+                {calendarView === 'month' ? (
+                  <div className="calendar-grid">
+                    {calendarDays.map((day) => {
+                      const key = toDateKey(day)
+                      const inMonth = day.getMonth() === calendarMonth.getMonth()
+                      const dayItems = itemsByDate[key] ?? []
+                      return (
+                        <div
+                          key={key}
+                          className={`calendar-cell ${inMonth ? '' : 'out-month'}`}
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={(event) => {
+                            event.preventDefault()
+                            const itemId = event.dataTransfer.getData('text/plain')
+                            if (itemId) scheduleItem(itemId, key)
+                          }}
+                        >
+                          <div className="cell-date">{day.getDate()}</div>
+                          <div className="cell-cards">
+                            {dayItems.map((item) => (
+                              <div
+                                key={item.id}
+                                className="cal-card"
+                                draggable
+                                onDragStart={(event) => event.dataTransfer.setData('text/plain', item.id)}
+                                onClick={() => openDetailModal(item.id)}
+                              >
+                                <strong>{item.phrase}</strong>
+                                <small>{item.show || '작품 미입력'}</small>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="calendar-grid calendar-grid--week">
+                    {calendarWeekDays.map((day) => {
+                      const key = toDateKey(day)
+                      const dayItems = itemsByDate[key] ?? []
+                      const today = new Date()
+                      const isToday =
+                        day.getFullYear() === today.getFullYear() &&
+                        day.getMonth() === today.getMonth() &&
+                        day.getDate() === today.getDate()
+                      return (
+                        <div
+                          key={key}
+                          className={`calendar-cell calendar-cell--week${isToday ? ' is-today' : ''}`}
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={(event) => {
+                            event.preventDefault()
+                            const itemId = event.dataTransfer.getData('text/plain')
+                            if (itemId) scheduleItem(itemId, key)
+                          }}
+                        >
+                          <div className="cell-cards">
+                            {dayItems.map((item) => (
+                              <div
+                                key={item.id}
+                                className="cal-card"
+                                draggable
+                                onDragStart={(event) => event.dataTransfer.setData('text/plain', item.id)}
+                                onClick={() => openDetailModal(item.id)}
+                              >
+                                <strong>{item.phrase}</strong>
+                                <small>{item.show || '작품 미입력'}</small>
+                              </div>
+                            ))}
+                            {dayItems.length === 0 && <div className="cal-empty-week">—</div>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </section>

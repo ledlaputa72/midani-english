@@ -1799,6 +1799,81 @@ button.danger {
   justify-content: space-between;
 }
 
+/* 월간 / 주간 전환 버튼 */
+.calendar-view-toggle {
+  display: flex;
+  gap: 4px;
+  margin: 10px 0 6px;
+}
+
+.cal-view-btn {
+  padding: 5px 16px;
+  border-radius: 20px;
+  border: 1px solid #4a4a70;
+  background: transparent;
+  color: #9ba0be;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.cal-view-btn:hover {
+  background: #2a2a45;
+  color: #cdd0f0;
+}
+
+.cal-view-btn.active {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #fff;
+}
+
+/* 주간 요일 헤더 — 날짜 숫자 */
+.calendar-weekdays > div .week-day-num {
+  display: block;
+  font-size: 17px;
+  font-weight: 600;
+  color: #d0d4f0;
+  line-height: 1.2;
+}
+
+.calendar-weekdays > div.today-label {
+  color: #7c6bff;
+}
+
+.calendar-weekdays > div.today-label .week-day-num {
+  color: #a78bfa;
+}
+
+/* 주간 그리드 */
+.calendar-grid--week {
+  grid-template-rows: 1fr;
+  min-height: 480px;
+}
+
+.calendar-cell--week {
+  min-height: 480px;
+  border-right: 1px solid #303049;
+  padding: 10px 6px;
+  background: #181828;
+}
+
+.calendar-cell--week.is-today {
+  background: #1e1b3a;
+}
+
+.calendar-cell--week:last-child {
+  border-right: none;
+}
+
+.cal-empty-week {
+  color: #3a3a5c;
+  font-size: 20px;
+  text-align: center;
+  padding-top: 20px;
+}
+
 .calendar-header h3 {
   margin: 0;
 }
