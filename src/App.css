@@ -2399,6 +2399,21 @@ button.danger {
   gap: 10px 12px;
 }
 
+/* 발음기호 줄 */
+.det-phonetic-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.det-phonetic {
+  font-size: 13.5px;
+  color: #9ba0be;
+  letter-spacing: 0.5px;
+  font-family: 'Segoe UI', sans-serif;
+}
+
 /* 스피커 버튼 공통 */
 .speak-btn {
   background: none;
@@ -2425,6 +2440,11 @@ button.danger {
 /* 리스트 뷰용 (작게) */
 .speak-btn--sm {
   font-size: 14px;
+}
+
+/* 발음기호 옆 (상세보기) */
+.speak-btn--phonetic {
+  font-size: 15px;
 }
 
 /* 플래시카드용 */

@@ -1338,6 +1338,7 @@ function App() {
 
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [detailPhonetic, setDetailPhonetic] = useState<string>('')
   const [openMeaningIdx, setOpenMeaningIdx] = useState<number>(0)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -2023,6 +2024,26 @@ function App() {
     setDetailId(id)
     setOpenMeaningIdx(0)
     setIsDetailOpen(true)
+    setDetailPhonetic('')
+    // Free Dictionary API로 발음기호 가져오기 (첫 단어만 조회)
+    const target = items.find((item) => item.id === id)
+    if (target) {
+      const firstWord = target.phrase.trim().split(/\s+/)[0]
+      fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(firstWord)}`)
+        .then((r) => r.json())
+        .then((data: unknown) => {
+          const arr = data as Array<{ phonetics?: Array<{ text?: string }>, phonetic?: string }>
+          if (!Array.isArray(arr) || arr.length === 0) return
+          const entry = arr[0]
+          // phonetic 필드 또는 phonetics 배열에서 텍스트 추출
+          const phonetic =
+            entry.phonetic?.trim() ||
+            entry.phonetics?.find((p) => p.text?.trim())?.text?.trim() ||
+            ''
+          if (phonetic) setDetailPhonetic(phonetic)
+        })
+        .catch(() => {/* 발음기호 없으면 조용히 무시 */})
+    }
   }
 
   const closeAddModal = () => {
@@ -4567,18 +4588,11 @@ function App() {
             </header>
             <div className="card-detail-body">
               <section className="det-sec det-sec--phrase" aria-labelledby="det-phrase-heading">
+                {/* 1행: 구문 제목 + 유형 배지 + 별 */}
                 <div className="det-phrase-line">
                   <h2 id="det-phrase-heading" className="det-phrase-title">
                     {detailItem.phrase}
                   </h2>
-                  <button
-                    type="button"
-                    className="speak-btn"
-                    title="영어 발음 듣기"
-                    onClick={() => speakEnglish(detailItem.phrase)}
-                  >
-                    🔊
-                  </button>
                   <span
                     className={`item-type-pill item-type-${detailItem.itemType ?? inferItemType(detailItem.phrase)}`}
                   >
@@ -4588,6 +4602,20 @@ function App() {
                     {'★'.repeat(detailItem.difficulty)}
                     <span className="det-freq-stars-empty">{'☆'.repeat(5 - detailItem.difficulty)}</span>
                   </span>
+                </div>
+                {/* 2행: 발음기호 + 스피커 */}
+                <div className="det-phonetic-line">
+                  {detailPhonetic && (
+                    <span className="det-phonetic">{detailPhonetic}</span>
+                  )}
+                  <button
+                    type="button"
+                    className="speak-btn speak-btn--phonetic"
+                    title="영어 발음 듣기"
+                    onClick={() => speakEnglish(detailItem.phrase)}
+                  >
+                    🔊
+                  </button>
                 </div>
               </section>
 
