@@ -1339,6 +1339,7 @@ function App() {
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [detailPhonetic, setDetailPhonetic] = useState<string>('')
+  const [cardPhonetic, setCardPhonetic] = useState<string>('')
   const [openMeaningIdx, setOpenMeaningIdx] = useState<number>(0)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -1938,6 +1939,32 @@ function App() {
       setCardIndex(0)
     }
   }, [cardItems.length, cardIndex])
+
+  // 카드가 바뀔 때 발음기호 fetch
+  useEffect(() => {
+    const card = cardItems[cardIndex]
+    if (!card) { setCardPhonetic(''); return }
+    setCardPhonetic('')
+    const words = card.phrase.replace(/\(.*?\)/g, '').trim().split(/\s+/).filter(Boolean)
+    type DictEntry = { phonetics?: Array<{ text?: string }>; phonetic?: string }
+    const extract = (data: unknown): string => {
+      const arr = data as DictEntry[]
+      if (!Array.isArray(arr) || arr.length === 0) return ''
+      const e = arr[0]
+      return e.phonetic?.trim() || e.phonetics?.find((p) => p.text?.trim())?.text?.trim() || ''
+    }
+    Promise.all(
+      words.map((w) =>
+        fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => (d ? extract(d) : ''))
+          .catch(() => '')
+      )
+    ).then((phonetics) => {
+      const stripped = phonetics.filter(Boolean).map((p) => p.replace(/^\/|\/$/g, '').trim()).filter(Boolean)
+      if (stripped.length > 0) setCardPhonetic('/' + stripped.join('  ') + '/')
+    })
+  }, [cardIndex, cardItems])
 
   useEffect(() => {
     if (!isAddOpen || inputTab !== 'ocr') return
@@ -3521,7 +3548,7 @@ function App() {
                           }}
                         >
                           <div className="flashcard-inner">
-                            {/* ── 앞면: 구문 + 유형 + 별 ── */}
+                            {/* ── 앞면: 구문 → 발음기호+스피커 → 별표 ── */}
                             <div className="flashcard-face flashcard-front">
                               <span>{isCenter ? '클릭해서 뜻 확인' : stackCard.deck}</span>
                               <div className="flashcard-title-line">
@@ -3530,22 +3557,27 @@ function App() {
                                   {ITEM_TYPE_LABEL[itemType]}
                                 </small>
                               </div>
+                              {isCenter && (
+                                <div className="flashcard-phonetic-line">
+                                  {cardPhonetic && (
+                                    <span className="flashcard-phonetic">{cardPhonetic}</span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="speak-btn speak-btn--card"
+                                    title="발음 듣기"
+                                    onClick={(e) => { e.stopPropagation(); speakEnglish(stackCard.phrase) }}
+                                  >
+                                    🔊
+                                  </button>
+                                </div>
+                              )}
                               <div className="flashcard-stars">
                                 {'★'.repeat(stackCard.difficulty)}
                                 <span className="flashcard-stars-empty">
                                   {'☆'.repeat(5 - stackCard.difficulty)}
                                 </span>
                               </div>
-                              {isCenter && (
-                                <button
-                                  type="button"
-                                  className="speak-btn speak-btn--card"
-                                  title="발음 듣기"
-                                  onClick={(e) => { e.stopPropagation(); speakEnglish(stackCard.phrase) }}
-                                >
-                                  🔊
-                                </button>
-                              )}
                             </div>
                             {/* ── 뒷면: 번호별 뜻 목록 ── */}
                             <div className="flashcard-face flashcard-back">

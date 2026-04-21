@@ -2442,6 +2442,21 @@ button.danger {
   font-size: 14px;
 }
 
+/* 플래시카드 발음기호 줄 */
+.flashcard-phonetic-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 4px 0 2px;
+}
+
+.flashcard-phonetic {
+  font-size: 13.5px;
+  color: #9ba0be;
+  letter-spacing: 0.5px;
+}
+
 /* 발음기호 옆 (상세보기) */
 .speak-btn--phonetic {
   font-size: 15px;
