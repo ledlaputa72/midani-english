@@ -294,6 +294,16 @@ function toFormState(item: StudyItem): FormState {
   }
 }
 
+/** 영어 텍스트를 브라우저 TTS로 읽어줍니다 */
+function speakEnglish(text: string) {
+  if (!window.speechSynthesis) return
+  window.speechSynthesis.cancel()
+  const utter = new SpeechSynthesisUtterance(text)
+  utter.lang = 'en-US'
+  utter.rate = 0.9
+  window.speechSynthesis.speak(utter)
+}
+
 function inferItemType(phrase: string): ItemType {
   return /\s/.test(phrase.trim()) ? 'expression' : 'vocabulary'
 }
@@ -3118,6 +3128,14 @@ function App() {
                         <td className="col-phrase">
                           <div className="list-phrase-line">
                             <strong className="list-phrase-main">{item.phrase}</strong>
+                            <button
+                              type="button"
+                              className="speak-btn speak-btn--sm"
+                              title="발음 듣기"
+                              onClick={(e) => { e.stopPropagation(); speakEnglish(item.phrase) }}
+                            >
+                              🔊
+                            </button>
                             <span className={`item-type-pill item-type-${itemType}`}>
                               {ITEM_TYPE_LABEL[itemType]}
                             </span>
@@ -3477,6 +3495,16 @@ function App() {
                                   {'☆'.repeat(5 - stackCard.difficulty)}
                                 </span>
                               </div>
+                              {isCenter && (
+                                <button
+                                  type="button"
+                                  className="speak-btn speak-btn--card"
+                                  title="발음 듣기"
+                                  onClick={(e) => { e.stopPropagation(); speakEnglish(stackCard.phrase) }}
+                                >
+                                  🔊
+                                </button>
+                              )}
                             </div>
                             {/* ── 뒷면: 번호별 뜻 목록 ── */}
                             <div className="flashcard-face flashcard-back">
@@ -4543,6 +4571,14 @@ function App() {
                   <h2 id="det-phrase-heading" className="det-phrase-title">
                     {detailItem.phrase}
                   </h2>
+                  <button
+                    type="button"
+                    className="speak-btn"
+                    title="영어 발음 듣기"
+                    onClick={() => speakEnglish(detailItem.phrase)}
+                  >
+                    🔊
+                  </button>
                   <span
                     className={`item-type-pill item-type-${detailItem.itemType ?? inferItemType(detailItem.phrase)}`}
                   >

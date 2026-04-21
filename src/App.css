@@ -2399,6 +2399,41 @@ button.danger {
   gap: 10px 12px;
 }
 
+/* 스피커 버튼 공통 */
+.speak-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.15s, transform 0.1s;
+  flex-shrink: 0;
+}
+
+.speak-btn:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.speak-btn:active {
+  transform: scale(0.95);
+}
+
+/* 리스트 뷰용 (작게) */
+.speak-btn--sm {
+  font-size: 14px;
+}
+
+/* 플래시카드용 */
+.speak-btn--card {
+  font-size: 22px;
+  margin-top: 10px;
+  opacity: 0.85;
+}
+
 .det-freq-stars {
   font-size: 17px;
   letter-spacing: 2px;
