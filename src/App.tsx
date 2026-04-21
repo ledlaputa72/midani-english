@@ -12,7 +12,7 @@ type ItemType = 'vocabulary' | 'expression' | 'idiom'
 type AiProvider = 'default' | 'gemini'
 type Page = 'dashboard' | 'list' | 'board' | 'cards' | 'calendar'
 type InputTab = 'text' | 'ocr'
-type ListSort = 'latest' | 'oldest' | 'phrase'
+type ListSort = 'latest' | 'oldest' | 'phrase' | 'freq-high' | 'freq-low'
 type CardRating = 'again' | 'good' | 'easy' | 'skip'
 type CardEnterDir = 'next' | 'prev'
 
@@ -1334,6 +1334,7 @@ function App() {
   const [statusFilter, setStatusFilter] = useState<'all' | Status>('all')
   const [itemTypeFilter, setItemTypeFilter] = useState<'all' | ItemType>('all')
   const [listShowFilter, setListShowFilter] = useState<string>('all')
+  const [frequencyFilter, setFrequencyFilter] = useState<'all' | '1' | '2' | '3' | '4' | '5'>('all')
   const [listSort, setListSort] = useState<ListSort>('latest')
 
   const [isAddOpen, setIsAddOpen] = useState(false)
@@ -1668,6 +1669,7 @@ function App() {
       const itemType = item.itemType ?? inferItemType(item.phrase)
       if (statusFilter !== 'all' && item.status !== statusFilter) return false
       if (itemTypeFilter !== 'all' && itemType !== itemTypeFilter) return false
+      if (frequencyFilter !== 'all' && item.difficulty !== Number(frequencyFilter)) return false
       if (listShowFilter !== 'all') {
         if (listShowFilter === '__none__') {
           if (item.show?.trim()) return false
@@ -1687,10 +1689,12 @@ function App() {
     const sorted = [...rows].sort((a, b) => {
       if (listSort === 'latest') return b.createdAt.localeCompare(a.createdAt)
       if (listSort === 'oldest') return a.createdAt.localeCompare(b.createdAt)
+      if (listSort === 'freq-high') return b.difficulty - a.difficulty
+      if (listSort === 'freq-low') return a.difficulty - b.difficulty
       return a.phrase.localeCompare(b.phrase, 'en', { sensitivity: 'base' })
     })
     return sorted
-  }, [items, query, statusFilter, itemTypeFilter, listShowFilter, listSort])
+  }, [items, query, statusFilter, itemTypeFilter, frequencyFilter, listShowFilter, listSort])
 
   const stats = useMemo(
     () => ({
@@ -3174,12 +3178,26 @@ function App() {
               </select>
               <select
                 className="list-filter-select"
+                value={frequencyFilter}
+                onChange={(event) => setFrequencyFilter(event.target.value as typeof frequencyFilter)}
+              >
+                <option value="all">전체 빈도</option>
+                <option value="5">★★★★★ 매우 높음</option>
+                <option value="4">★★★★☆ 높음</option>
+                <option value="3">★★★☆☆ 보통</option>
+                <option value="2">★★☆☆☆ 낮음</option>
+                <option value="1">★☆☆☆☆ 매우 낮음</option>
+              </select>
+              <select
+                className="list-filter-select"
                 value={listSort}
                 onChange={(event) => setListSort(event.target.value as ListSort)}
               >
                 <option value="latest">최신순</option>
                 <option value="oldest">오래된순</option>
                 <option value="phrase">가나다·ABC순</option>
+                <option value="freq-high">빈도 높은순</option>
+                <option value="freq-low">빈도 낮은순</option>
               </select>
             </section>
 
