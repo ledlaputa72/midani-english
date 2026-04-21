@@ -2859,6 +2859,19 @@ function App() {
             </button>
           ))}
         </nav>
+        <div className="sidebar-add-btn-wrap">
+          <button
+            type="button"
+            className="sidebar-add-btn"
+            onClick={() => {
+              setPage('dashboard')
+              openCreateModal()
+            }}
+          >
+            + 단어 / 구문 추가
+          </button>
+        </div>
+
         <div className="sidebar-account" ref={accountMenuRef}>
           {!authUser ? (
             <>

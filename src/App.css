@@ -35,8 +35,34 @@
   gap: 8px;
 }
 
-.sidebar-account {
+.sidebar-add-btn-wrap {
   margin-top: auto;
+  padding-bottom: 10px;
+}
+
+.sidebar-add-btn {
+  width: 100%;
+  padding: 10px 14px;
+  background: #4f46e5;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  text-align: center;
+}
+
+.sidebar-add-btn:hover {
+  background: #6056f0;
+}
+
+.sidebar-add-btn:active {
+  transform: scale(0.98);
+}
+
+.sidebar-account {
   border-top: 1px solid #2a2a3d;
   padding-top: 12px;
   position: relative;
