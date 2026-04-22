@@ -917,13 +917,36 @@ button.danger {
 
 .item-type-filter-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
+}
+
+.item-type-filter-row button {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 20px;
+  border: 1px solid #373752;
+  background: #1d1f35;
+  color: #9ea4c8;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font: inherit;
+}
+
+.item-type-filter-row button:hover {
+  background: #26284a;
+  border-color: #7458ec;
+  color: #e0e2f4;
 }
 
 .item-type-filter-row button.active {
-  border-color: #7458ec;
-  background: #2a2157;
+  background: linear-gradient(135deg, #7458ec, #5a3ecf);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(116, 88, 236, 0.35);
 }
 
 .list-phrase-example {
