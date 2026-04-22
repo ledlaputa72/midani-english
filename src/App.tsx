@@ -1053,7 +1053,7 @@ async function generateMeaningAndExampleWithGemini(
     '- For Korean translations, use a neutral or context-appropriate subject (e.g., "상대방의", "그의", or omit the subject). Do NOT vary only the pronoun.',
     '- examples array MUST have one object for each meaning: 1 for meaningKo + 1 for EACH item in altMeaningsKo.',
     '- "description" in each example: REQUIRED — 1-2 sentence Korean explanation of when/how/where this meaning is used. Always include this.',
-    '- For expression/idiom: each "en" must be a 2-line dialogue ("A: ...\\nB: ..."), "ko" must also use the same 2-line format ("A: ...\\nB: ...") — NOT a single line.',
+    '- For expression/idiom: each "en" must be a 2-line dialogue ("A: ...\\nB: ..."), "ko" must also use the EXACT SAME format with "A:" and "B:" labels. NEVER translate "A:"/"B:" to Korean — labels like "질문:", "답변:", "사람1:", "사람2:", "갑:", "을:" are all WRONG. Only use "A:" and "B:" in Korean dialogue too.',
     '- For vocabulary: each "en" is a single natural sentence.',
     '- DO NOT use markdown formatting (**bold**, *italic*, `code`) anywhere inside JSON string values.',
     '- DO NOT write parenthetical notation like "(on)" or "(to)" inside en/ko fields — use the actual word.',
@@ -1097,6 +1097,14 @@ async function generateMeaningAndExampleWithGemini(
         .replace(/\s{2,}/g, ' ')
         .trim()
 
+    /** ko 필드에서 한국어 대화 레이블을 A:/B:로 정규화 */
+    const normalizeDialogueLabels = (s: string): string =>
+      s
+        // 첫 번째 화자 레이블: 질문:, 사람1:, 갑: 등 → A:
+        .replace(/^(질문|사람\s*1|갑|화자\s*1|학생|친구1)\s*[:：]/i, 'A:')
+        // 두 번째 화자 레이블: 답변:, 사람2:, 을: 등 → B:
+        .replace(/\n(답변|사람\s*2|을|화자\s*2|교사|친구2)\s*[:：]/gi, '\nB:')
+
     // examples 배열 파싱 (뜻별 예문)
     const examples: GeminiExample[] = Array.isArray(parsed.examples)
       ? parsed.examples
@@ -1105,14 +1113,14 @@ async function generateMeaningAndExampleWithGemini(
             meaning: cleanGeminiText(String(ex.meaning ?? '')).trim(),
             description: cleanGeminiText(String((ex as Record<string, unknown>).description ?? '')).trim(),
             en: cleanGeminiText(toSentenceCase(String(ex.en ?? '').trim())),
-            ko: cleanGeminiText(normalizeKoreanMeaningLine(String(ex.ko ?? ''))),
+            ko: normalizeDialogueLabels(cleanGeminiText(normalizeKoreanMeaningLine(String(ex.ko ?? '')))),
           }))
           .filter((ex) => ex.en)
       : []
 
     // 하위 호환: examples가 없거나 비어있으면 exampleEn/exampleKo 사용
     const legacyEn = cleanGeminiText(toSentenceCase(String(parsed.exampleEn ?? '').trim()))
-    const legacyKo = cleanGeminiText(normalizeKoreanMeaningLine(String(parsed.exampleKo ?? '')))
+    const legacyKo = normalizeDialogueLabels(cleanGeminiText(normalizeKoreanMeaningLine(String(parsed.exampleKo ?? ''))))
     const exampleEn = examples.length > 0 ? examples[0].en : legacyEn
     const exampleKo = examples.length > 0 ? examples[0].ko : legacyKo
 
