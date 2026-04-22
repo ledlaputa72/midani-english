@@ -189,9 +189,14 @@
 }
 
 .settings-modal {
-  width: min(600px, 94vw);
+  width: min(520px, 94vw);
   max-height: 88vh;
   overflow-y: auto;
+}
+
+.profiles-modal {
+  width: min(640px, 94vw);
+}
 }
 
 .settings-tab-row {

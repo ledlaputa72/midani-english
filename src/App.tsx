@@ -1332,7 +1332,7 @@ function App() {
   const [syncError, setSyncError] = useState('')
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [settingsTab, setSettingsTab] = useState<'account' | 'profiles'>('account')
+  const [isProfilesOpen, setIsProfilesOpen] = useState(false)
   const [settingsMsg, setSettingsMsg] = useState('')
   const [profileEditor, setProfileEditor] = useState<{
     id: string | null
@@ -2167,7 +2167,7 @@ function App() {
   }
 
   const startEditProfile = (profile: CardInfoProfile) => {
-    setSettingsTab('profiles')
+    setIsProfilesOpen(true)
     setProfileEditor({
       id: profile.id,
       name: profile.name,
@@ -2930,9 +2930,18 @@ function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      setIsSettingsOpen(true)
-                      setSettingsTab('account')
+                      setIsProfilesOpen(true)
                       resetProfileEditor()
+                      setSettingsMsg('')
+                      setIsAccountMenuOpen(false)
+                    }}
+                  >
+                    카드 정보 프로파일
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSettingsOpen(true)
                       setSettingsMsg('')
                       setIsAccountMenuOpen(false)
                     }}
@@ -4139,6 +4148,7 @@ function App() {
         document.body,
       )}
 
+      {/* ── 계정 및 동기화 설정 모달 ── */}
       {isSettingsOpen && (
         <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
           <section className="modal settings-modal" onClick={(event) => event.stopPropagation()}>
@@ -4154,234 +4164,225 @@ function App() {
                 ✕
               </button>
             </header>
-            <div className="settings-tab-row">
-              <button
-                type="button"
-                className={settingsTab === 'account' ? 'active' : ''}
-                onClick={() => setSettingsTab('account')}
-              >
-                계정/동기화
-              </button>
-              <button
-                type="button"
-                className={settingsTab === 'profiles' ? 'active' : ''}
-                onClick={() => setSettingsTab('profiles')}
-              >
-                카드 정보 프로파일
-              </button>
+            <div className="settings-block">
+              <small>계정</small>
+              <strong>{authUser?.displayName || 'Google 사용자'}</strong>
+              <p>{authUser?.email || '이메일 없음'}</p>
             </div>
-            {settingsTab === 'account' ? (
-              <>
-                <div className="settings-block">
-                  <small>계정</small>
-                  <strong>{authUser?.displayName || 'Google 사용자'}</strong>
-                  <p>{authUser?.email || '이메일 없음'}</p>
-                </div>
-                <div className="settings-block">
-                  <small>자동 생성 기본 모델</small>
-                  <strong>{AI_PROVIDER_LABEL[appSettings.defaultAiProvider]}</strong>
-                  <div className="ai-provider-row">
-                    <select
-                      value={appSettings.defaultAiProvider}
-                      onChange={(event) => {
-                        void updateDefaultAiProvider(event.target.value as AiProvider)
-                      }}
-                    >
-                      <option value="default">{AI_PROVIDER_LABEL.default}</option>
-                      <option value="gemini">{AI_PROVIDER_LABEL.gemini}</option>
-                    </select>
-                    <small>
-                      {appSettings.defaultAiProvider === 'gemini' && !GEMINI_API_KEY
-                        ? 'Gemini 키가 없으면 기본 엔진으로 자동 전환됩니다.'
-                        : '카드 추가/수정에서 기본값으로 사용됩니다.'}
-                    </small>
-                  </div>
-                </div>
-                <div className="settings-actions">
-                  <button type="button" className="secondary" onClick={forceSyncNow} disabled={!authUser}>
-                    지금 동기화
-                  </button>
-                  <button type="button" className="secondary" onClick={exportItemsJson}>
-                    JSON 백업
-                  </button>
-                  <button type="button" className="secondary" onClick={exportItemsCsv}>
-                    CSV 내보내기
-                  </button>
-                  <button type="button" className="secondary" onClick={() => importFileRef.current?.click()}>
-                    데이터 가져오기
-                  </button>
-                  <input
-                    ref={importFileRef}
-                    type="file"
-                    accept="application/json"
-                    className="settings-hidden-file"
-                    onChange={(event) => {
-                      importItemsJson(event.target.files?.[0] ?? null)
-                      event.currentTarget.value = ''
-                    }}
-                  />
-                </div>
-              </>
-            ) : (
-              <div className="profile-settings-panel">
-                <form className="profile-editor-form modal-form" onSubmit={submitProfileEditor}>
-                  <label>
-                    프로파일 이름 *
-                    <input
-                      value={profileEditor.name}
-                      onChange={(event) =>
-                        setProfileEditor((prev) => ({
-                          ...prev,
-                          name: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <div className="row2">
-                    <label>
-                      드라마 / 작품명
-                      <input
-                        list="show-keywords"
-                        value={profileEditor.show}
-                        onChange={(event) =>
-                          setProfileEditor((prev) => ({
-                            ...prev,
-                            show: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <label>
-                      에피소드
-                      <input
-                        list="episode-keywords"
-                        value={profileEditor.episode}
-                        onChange={(event) =>
-                          setProfileEditor((prev) => ({
-                            ...prev,
-                            episode: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                  <div className="row2">
-                    <label>
-                      태그 (쉼표 구분)
-                      <input
-                        list="tag-keywords"
-                        value={profileEditor.tags}
-                        onChange={(event) =>
-                          setProfileEditor((prev) => ({
-                            ...prev,
-                            tags: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <label>
-                      덱(그룹)
-                      <input
-                        list="deck-keywords"
-                        value={profileEditor.deck}
-                        onChange={(event) =>
-                          setProfileEditor((prev) => ({
-                            ...prev,
-                            deck: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                  <div className="row2">
-                    <label>
-                      사용빈도
-                      <select
-                        value={profileEditor.difficulty}
-                        onChange={(event) =>
-                          setProfileEditor((prev) => ({
-                            ...prev,
-                            difficulty: Number(event.target.value) as 1 | 2 | 3 | 4 | 5,
-                          }))
-                        }
-                      >
-                        <option value={1}>★☆☆☆☆ 매우 낮음</option>
-                        <option value={2}>★★☆☆☆ 낮음</option>
-                        <option value={3}>★★★☆☆ 보통</option>
-                        <option value={4}>★★★★☆ 높음</option>
-                        <option value={5}>★★★★★ 매우 높음</option>
-                      </select>
-                    </label>
-                  </div>
-                  <label>
-                    메모
-                    <textarea
-                      value={profileEditor.notes}
-                      onChange={(event) =>
-                        setProfileEditor((prev) => ({
-                          ...prev,
-                          notes: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <div className="profile-editor-actions">
-                    <button type="submit" className="secondary">
-                      {profileEditor.id ? '프로파일 업데이트' : '새 프로파일 저장'}
-                    </button>
-                    <button type="button" className="secondary" onClick={resetProfileEditor}>
-                      새로 작성
-                    </button>
-                  </div>
-                </form>
-                <div className="profile-list">
-                  {profiles.length === 0 ? (
-                    <p className="profile-list-empty">저장된 프로파일이 없습니다.</p>
-                  ) : (
-                    profiles.map((profile) => (
-                      <div key={profile.id} className="profile-list-item">
-                        <div>
-                          <strong>{profile.name}</strong>
-                          <p>
-                            {profile.show || '작품 미입력'} · {profile.episode || '에피소드 미입력'} ·{' '}
-                            {profile.deck}
-                          </p>
-                          <small>연결 카드 {profileUsageCounts[profile.id] ?? 0}개</small>
-                        </div>
-                        <div className="profile-list-actions">
-                          <button type="button" className="secondary" onClick={() => startEditProfile(profile)}>
-                            수정
-                          </button>
-                          <button
-                            type="button"
-                            className="danger"
-                            onClick={() => {
-                              if (
-                                window.confirm(
-                                  `"${profile.name}" 프로파일을 삭제할까요? 연결 카드들은 프로파일 연결만 해제됩니다.`,
-                                )
-                              ) {
-                                void deleteProfile(profile.id)
-                              }
-                            }}
-                          >
-                            삭제
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+            <div className="settings-block">
+              <small>자동 생성 기본 모델</small>
+              <strong>{AI_PROVIDER_LABEL[appSettings.defaultAiProvider]}</strong>
+              <div className="ai-provider-row">
+                <select
+                  value={appSettings.defaultAiProvider}
+                  onChange={(event) => {
+                    void updateDefaultAiProvider(event.target.value as AiProvider)
+                  }}
+                >
+                  <option value="default">{AI_PROVIDER_LABEL.default}</option>
+                  <option value="gemini">{AI_PROVIDER_LABEL.gemini}</option>
+                </select>
+                <small>
+                  {appSettings.defaultAiProvider === 'gemini' && !GEMINI_API_KEY
+                    ? 'Gemini 키가 없으면 기본 엔진으로 자동 전환됩니다.'
+                    : '카드 추가/수정에서 기본값으로 사용됩니다.'}
+                </small>
               </div>
-            )}
-            {settingsMsg && <p className="settings-msg">{settingsMsg}</p>}
+            </div>
+            <div className="settings-actions">
+              <button type="button" className="secondary" onClick={forceSyncNow} disabled={!authUser}>
+                지금 동기화
+              </button>
+              <button type="button" className="secondary" onClick={exportItemsJson}>
+                JSON 백업
+              </button>
+              <button type="button" className="secondary" onClick={exportItemsCsv}>
+                CSV 내보내기
+              </button>
+              <button type="button" className="secondary" onClick={() => importFileRef.current?.click()}>
+                데이터 가져오기
+              </button>
+              <input
+                ref={importFileRef}
+                type="file"
+                accept="application/json"
+                className="settings-hidden-file"
+                onChange={(event) => {
+                  importItemsJson(event.target.files?.[0] ?? null)
+                  event.currentTarget.value = ''
+                }}
+              />
+            </div>
             {syncError && <p className="settings-error">{syncError}</p>}
             <footer>
               <button
                 type="button"
-                className="secondary"
                 onClick={() => {
                   setIsSettingsOpen(false)
+                  setSettingsMsg('')
+                }}
+              >
+                닫기
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {/* ── 카드 정보 프로파일 모달 ── */}
+      {isProfilesOpen && (
+        <div className="modal-overlay" onClick={() => { setIsProfilesOpen(false); setSettingsMsg('') }}>
+          <section className="modal settings-modal profiles-modal" onClick={(event) => event.stopPropagation()}>
+            <header>
+              <h3>카드 정보 프로파일</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfilesOpen(false)
+                  setSettingsMsg('')
+                }}
+              >
+                ✕
+              </button>
+            </header>
+            <div className="profile-settings-panel">
+              <form className="profile-editor-form modal-form" onSubmit={submitProfileEditor}>
+                <label>
+                  프로파일 이름 *
+                  <input
+                    value={profileEditor.name}
+                    onChange={(event) =>
+                      setProfileEditor((prev) => ({ ...prev, name: event.target.value }))
+                    }
+                  />
+                </label>
+                <div className="row2">
+                  <label>
+                    드라마 / 작품명
+                    <input
+                      list="show-keywords"
+                      value={profileEditor.show}
+                      onChange={(event) =>
+                        setProfileEditor((prev) => ({ ...prev, show: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    에피소드
+                    <input
+                      list="episode-keywords"
+                      value={profileEditor.episode}
+                      onChange={(event) =>
+                        setProfileEditor((prev) => ({ ...prev, episode: event.target.value }))
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="row2">
+                  <label>
+                    태그 (쉼표 구분)
+                    <input
+                      list="tag-keywords"
+                      value={profileEditor.tags}
+                      onChange={(event) =>
+                        setProfileEditor((prev) => ({ ...prev, tags: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    덱(그룹)
+                    <input
+                      list="deck-keywords"
+                      value={profileEditor.deck}
+                      onChange={(event) =>
+                        setProfileEditor((prev) => ({ ...prev, deck: event.target.value }))
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="row2">
+                  <label>
+                    사용빈도
+                    <select
+                      value={profileEditor.difficulty}
+                      onChange={(event) =>
+                        setProfileEditor((prev) => ({
+                          ...prev,
+                          difficulty: Number(event.target.value) as 1 | 2 | 3 | 4 | 5,
+                        }))
+                      }
+                    >
+                      <option value={1}>★☆☆☆☆ 매우 낮음</option>
+                      <option value={2}>★★☆☆☆ 낮음</option>
+                      <option value={3}>★★★☆☆ 보통</option>
+                      <option value={4}>★★★★☆ 높음</option>
+                      <option value={5}>★★★★★ 매우 높음</option>
+                    </select>
+                  </label>
+                </div>
+                <label>
+                  메모
+                  <textarea
+                    value={profileEditor.notes}
+                    onChange={(event) =>
+                      setProfileEditor((prev) => ({ ...prev, notes: event.target.value }))
+                    }
+                  />
+                </label>
+                <div className="profile-editor-actions">
+                  <button type="submit">
+                    {profileEditor.id ? '프로파일 업데이트' : '새 프로파일 저장'}
+                  </button>
+                  <button type="button" onClick={resetProfileEditor}>
+                    새로 작성
+                  </button>
+                </div>
+              </form>
+              {settingsMsg && <p className="settings-msg">{settingsMsg}</p>}
+              <div className="profile-list">
+                {profiles.length === 0 ? (
+                  <p className="profile-list-empty">저장된 프로파일이 없습니다.</p>
+                ) : (
+                  profiles.map((profile) => (
+                    <div key={profile.id} className="profile-list-item">
+                      <div>
+                        <strong>{profile.name}</strong>
+                        <p>
+                          {profile.show || '작품 미입력'} · {profile.episode || '에피소드 미입력'} ·{' '}
+                          {profile.deck}
+                        </p>
+                        <small>연결 카드 {profileUsageCounts[profile.id] ?? 0}개</small>
+                      </div>
+                      <div className="profile-list-actions">
+                        <button type="button" className="secondary" onClick={() => startEditProfile(profile)}>
+                          수정
+                        </button>
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `"${profile.name}" 프로파일을 삭제할까요? 연결 카드들은 프로파일 연결만 해제됩니다.`,
+                              )
+                            ) {
+                              void deleteProfile(profile.id)
+                            }
+                          }}
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            <footer>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfilesOpen(false)
                   setSettingsMsg('')
                 }}
               >
