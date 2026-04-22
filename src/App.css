@@ -1028,6 +1028,15 @@ button.danger {
 .list-star-row {
   font-size: 14px;
   letter-spacing: 2px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  padding: 3px 5px;
+  gap: 1px;
+}
+
+.list-star-row.list-filter-chip:hover .star.on {
+  color: #ffca4a;
 }
 
 .list-star-row .star.on {

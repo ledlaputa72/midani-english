@@ -3338,8 +3338,17 @@ function App() {
                         </td>
                         <td className="col-stars">
                           <span
-                            className="list-star-row"
-                            aria-label={`사용빈도 ${item.difficulty}단계`}
+                            className={`list-star-row list-filter-chip${frequencyFilter === String(item.difficulty) ? ' chip-active' : ''}`}
+                            aria-label={`사용빈도 ${item.difficulty}단계 — 클릭하면 동일 빈도만 필터`}
+                            title="클릭하면 동일 빈도로 필터"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setFrequencyFilter(
+                                frequencyFilter === String(item.difficulty)
+                                  ? 'all'
+                                  : (String(item.difficulty) as '1' | '2' | '3' | '4' | '5')
+                              )
+                            }}
                           >
                             {[1, 2, 3, 4, 5].map((n) => (
                               <span key={n} className={n <= item.difficulty ? 'star on' : 'star off'}>
