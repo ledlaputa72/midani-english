@@ -197,41 +197,10 @@
 .profiles-modal {
   width: min(640px, 94vw);
 }
-}
 
-.settings-tab-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  margin-bottom: 16px;
-  background: #181830;
-  border-radius: 10px;
-  padding: 4px;
-  border: 1px solid #2d2d4a;
-}
-
-.settings-tab-row button {
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: #9ea4c8;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 9px 12px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.settings-tab-row button:hover {
-  background: #25253d;
-  color: #e0e2f4;
-}
-
-.settings-tab-row button.active {
-  background: linear-gradient(135deg, #7458ec, #5a3ecf);
-  color: #fff;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(116, 88, 236, 0.4);
+/* (legacy) 예전 settings 탭 스타일 - 현재 사용 안함 */
+.settings-tab-row-legacy {
+  display: none;
 }
 
 /* 계정/동기화 탭 */
