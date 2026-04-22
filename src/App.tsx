@@ -371,6 +371,25 @@ function parseMeaningBlocks(
 }
 
 /**
+ * 대화 예문 ko 텍스트에서 한국어 화자 레이블(답변:, 질문:, 사람1: 등)을
+ * 등장 순서대로 A: / B: / C: 로 정규화합니다.
+ * 이미 "A:" / "B:" 형식(단일 대문자)인 레이블은 그대로 유지합니다.
+ */
+function normalizeKoDialogueLabels(text: string): string {
+  const labels = ['A', 'B', 'C', 'D']
+  let idx = 0
+  // 줄 시작 + 한글 포함 레이블 + 콜론 → 순서대로 A:/B: 로 교체
+  return text.replace(
+    /(^|\n)([^\n:]{0,10}[가-힣][^\n:]{0,6})\s*[:：]\s*/g,
+    (_m, nl, _label) => {
+      const l = labels[idx] ?? 'B'
+      idx++
+      return `${nl}${l}: `
+    }
+  )
+}
+
+/**
  * 예문 텍스트에서 학습 구문을 찾아 <strong> 볼드로 강조합니다.
  * - 대소문자 무시
  * - 괄호 선택 표기가 있는 경우 (예: "catch up (on)") base/full 형태 모두 강조
@@ -393,11 +412,13 @@ function highlightPhrase(text: string, phrase: string): React.ReactNode {
   const enPart = arrowIdx !== -1 ? text.slice(0, arrowIdx) : text
   const rawKoPart = arrowIdx !== -1 ? text.slice(arrowIdx) : ''
 
-  // → 기호 제거 + 대화 레이블(B:, C:, ...) 앞에 줄바꿈 삽입
-  const koFormatted = rawKoPart
-    .replace(/^\n→\s*/, '\n')                    // "\n→ " → "\n" (화살표 제거, 줄바꿈 유지)
-    .replace(/([.!?。,])\s+([A-Z]:\s)/g, '$1\n$2') // 문장 끝 뒤 "B: " → 줄바꿈+레이블
-    .replace(/\s+(B:|C:|D:)\s/g, '\n$1 ')         // 공백으로 이어진 B:/C: → 줄바꿈
+  // → 기호 제거 + 한국어 레이블 정규화 + 대화 레이블 줄바꿈 삽입
+  const koFormatted = normalizeKoDialogueLabels(
+    rawKoPart
+      .replace(/^\n→\s*/, '\n')                       // "\n→ " → "\n" (화살표 제거, 줄바꿈 유지)
+  )
+    .replace(/([.!?。,])\s+([A-Z]:\s)/g, '$1\n$2')   // 문장 끝 뒤 "B: " → 줄바꿈+레이블
+    .replace(/\s+(B:|C:|D:)\s/g, '\n$1 ')             // 공백으로 이어진 B:/C: → 줄바꿈
 
   const parts = enPart.split(regex)
   const nodes: React.ReactNode[] = parts.map((part, i) =>
@@ -1097,13 +1118,8 @@ async function generateMeaningAndExampleWithGemini(
         .replace(/\s{2,}/g, ' ')
         .trim()
 
-    /** ko 필드에서 한국어 대화 레이블을 A:/B:로 정규화 */
-    const normalizeDialogueLabels = (s: string): string =>
-      s
-        // 첫 번째 화자 레이블: 질문:, 사람1:, 갑: 등 → A:
-        .replace(/^(질문|사람\s*1|갑|화자\s*1|학생|친구1)\s*[:：]/i, 'A:')
-        // 두 번째 화자 레이블: 답변:, 사람2:, 을: 등 → B:
-        .replace(/\n(답변|사람\s*2|을|화자\s*2|교사|친구2)\s*[:：]/gi, '\nB:')
+    // ko 필드 한국어 레이블 정규화: 상위 normalizeKoDialogueLabels 함수 위임
+    const normalizeDialogueLabels = (s: string): string => normalizeKoDialogueLabels(s)
 
     // examples 배열 파싱 (뜻별 예문)
     const examples: GeminiExample[] = Array.isArray(parsed.examples)
