@@ -157,10 +157,6 @@
   cursor: pointer;
 }
 
-.settings-modal {
-  width: min(560px, 92vw);
-}
-
 .settings-block {
   border: 1px solid #343754;
   background: #1d2036;
@@ -192,36 +188,148 @@
   gap: 8px;
 }
 
+.settings-modal {
+  width: min(600px, 94vw);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
 .settings-tab-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 6px;
+  margin-bottom: 16px;
+  background: #181830;
+  border-radius: 10px;
+  padding: 4px;
+  border: 1px solid #2d2d4a;
+}
+
+.settings-tab-row button {
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #9ea4c8;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.settings-tab-row button:hover {
+  background: #25253d;
+  color: #e0e2f4;
 }
 
 .settings-tab-row button.active {
-  border-color: #7458ec;
-  background: #2a2157;
+  background: linear-gradient(135deg, #7458ec, #5a3ecf);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(116, 88, 236, 0.4);
 }
 
+/* 계정/동기화 탭 */
+.settings-block {
+  border: 1px solid #2d2d4a;
+  background: #181830;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  display: grid;
+  gap: 5px;
+}
+
+.settings-block small {
+  color: #7a7fa8;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settings-block strong {
+  font-size: 15px;
+  color: #e8e8f2;
+}
+
+.settings-block p {
+  margin: 0;
+  color: #a0a6c8;
+  font-size: 12px;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.settings-actions button {
+  flex: 1 1 calc(50% - 4px);
+  padding: 10px 14px;
+  font-size: 13px;
+  border-radius: 10px;
+  border: 1px solid #373752;
+  background: #1d1f35;
+  color: #c8cadf;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.settings-actions button:hover {
+  background: #26284a;
+  border-color: #7458ec;
+  color: #e8e8f2;
+}
+
+/* 카드 정보 프로파일 탭 */
 .profile-settings-panel {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .profile-editor-form {
-  border: 1px solid #343754;
-  background: #1d2036;
-  border-radius: 10px;
-  padding: 10px;
-  display: grid;
-  gap: 8px;
+  border: 1px solid #2d2d4a;
+  background: #181830;
+  border-radius: 12px;
+  padding: 16px;
+  gap: 12px;
 }
 
 .profile-editor-actions {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.profile-editor-actions button {
+  padding: 9px 18px;
+  font-size: 13px;
+  border-radius: 10px;
+  border: 1px solid #373752;
+  background: #1d1f35;
+  color: #c8cadf;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.profile-editor-actions button[type='submit'] {
+  background: linear-gradient(135deg, #7458ec, #5a3ecf);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+
+.profile-editor-actions button:hover {
+  background: #26284a;
+  border-color: #7458ec;
+  color: #e8e8f2;
+}
+
+.profile-editor-actions button[type='submit']:hover {
+  background: linear-gradient(135deg, #8568ff, #6a4edf);
 }
 
 .profile-list {
@@ -230,29 +338,42 @@
 }
 
 .profile-list-item {
-  border: 1px solid #343754;
-  background: #1d2036;
-  border-radius: 10px;
-  padding: 10px;
+  border: 1px solid #2d2d4a;
+  background: #181830;
+  border-radius: 12px;
+  padding: 12px 14px;
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 10px;
+  transition: border-color 0.15s;
+}
+
+.profile-list-item:hover {
+  border-color: #7458ec;
+}
+
+.profile-list-item strong {
+  font-size: 14px;
+  color: #e8e8f2;
 }
 
 .profile-list-item p {
-  margin: 4px 0;
-  color: #b4b9d8;
+  margin: 4px 0 0;
+  color: #8a90b8;
   font-size: 12px;
 }
 
 .profile-list-item small {
-  color: #9196b7;
+  color: #6a6f98;
+  font-size: 11px;
 }
 
 .profile-list-actions {
   display: flex;
   gap: 6px;
-  align-items: start;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .profile-list-empty {

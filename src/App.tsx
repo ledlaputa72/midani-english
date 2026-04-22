@@ -4215,7 +4215,7 @@ function App() {
               </>
             ) : (
               <div className="profile-settings-panel">
-                <form className="profile-editor-form" onSubmit={submitProfileEditor}>
+                <form className="profile-editor-form modal-form" onSubmit={submitProfileEditor}>
                   <label>
                     프로파일 이름 *
                     <input
