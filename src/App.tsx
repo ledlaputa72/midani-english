@@ -1980,17 +1980,35 @@ function App() {
     const extract = (data: unknown): string => {
       const arr = data as DictEntry[]
       if (!Array.isArray(arr) || arr.length === 0) return ''
-      const e = arr[0]
-      return e.phonetic?.trim() || e.phonetics?.find((p) => p.text?.trim())?.text?.trim() || ''
+      for (const entry of arr) {
+        if (entry.phonetic?.trim()) return entry.phonetic.trim()
+        const fromList = entry.phonetics?.find((p) => p.text?.trim())?.text?.trim()
+        if (fromList) return fromList
+      }
+      return ''
     }
-    Promise.all(
-      words.map((w) =>
-        fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`)
-          .then((r) => (r.ok ? r.json() : null))
-          .then((d) => (d ? extract(d) : ''))
-          .catch(() => '')
-      )
-    ).then((phonetics) => {
+    const tryFetch = async (w: string): Promise<string> => {
+      try {
+        const r = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`)
+        if (!r.ok) return ''
+        return extract(await r.json())
+      } catch { return '' }
+    }
+    const fetchWord = async (word: string): Promise<string> => {
+      let r = await tryFetch(word)
+      if (r) return r
+      const lower = word.toLowerCase()
+      const cands: string[] = []
+      if (lower.endsWith('ies') && lower.length > 3) cands.push(lower.slice(0, -3) + 'y')
+      if (lower.endsWith('es') && lower.length > 2) cands.push(lower.slice(0, -2))
+      if (lower.endsWith('s') && lower.length > 1) cands.push(lower.slice(0, -1))
+      for (const c of cands) {
+        r = await tryFetch(c)
+        if (r) return r
+      }
+      return ''
+    }
+    Promise.all(words.map(fetchWord)).then((phonetics) => {
       const stripped = phonetics.filter(Boolean).map((p) => p.replace(/^\/|\/$/g, '').trim()).filter(Boolean)
       if (stripped.length > 0) setCardPhonetic('/' + stripped.join('  ') + '/')
     })
@@ -2097,23 +2115,44 @@ function App() {
     const extractPhonetic = (data: unknown): string => {
       const arr = data as DictEntry[]
       if (!Array.isArray(arr) || arr.length === 0) return ''
-      const entry = arr[0]
-      return (
-        entry.phonetic?.trim() ||
-        entry.phonetics?.find((p) => p.text?.trim())?.text?.trim() ||
-        ''
-      )
+      // 모든 entry / 모든 phonetics를 순회하며 첫 번째 유효한 발음기호 찾기
+      for (const entry of arr) {
+        if (entry.phonetic?.trim()) return entry.phonetic.trim()
+        const fromList = entry.phonetics?.find((p) => p.text?.trim())?.text?.trim()
+        if (fromList) return fromList
+      }
+      return ''
+    }
+
+    /** 복수형/활용형일 경우 기본형으로 폴백 조회 */
+    const fetchPhoneticForWord = async (word: string): Promise<string> => {
+      const tryFetch = async (w: string): Promise<string> => {
+        try {
+          const r = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`)
+          if (!r.ok) return ''
+          const data = await r.json()
+          return extractPhonetic(data)
+        } catch {
+          return ''
+        }
+      }
+      let result = await tryFetch(word)
+      if (result) return result
+      // 폴백: 복수형 -s / -es / -ies 제거 후 재시도
+      const lower = word.toLowerCase()
+      const candidates: string[] = []
+      if (lower.endsWith('ies') && lower.length > 3) candidates.push(lower.slice(0, -3) + 'y')
+      if (lower.endsWith('es') && lower.length > 2) candidates.push(lower.slice(0, -2))
+      if (lower.endsWith('s') && lower.length > 1) candidates.push(lower.slice(0, -1))
+      for (const cand of candidates) {
+        result = await tryFetch(cand)
+        if (result) return result
+      }
+      return ''
     }
 
     // 단어별 병렬 조회 후 순서대로 합치기
-    Promise.all(
-      words.map((word) =>
-        fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`)
-          .then((r) => (r.ok ? r.json() : null))
-          .then((data) => (data ? extractPhonetic(data) : ''))
-          .catch(() => '')
-      )
-    ).then((phonetics) => {
+    Promise.all(words.map(fetchPhoneticForWord)).then((phonetics) => {
       // 각 발음기호에서 앞뒤 / 제거 후 합치고, 전체 앞뒤에만 / 붙이기
       const stripped = phonetics
         .filter(Boolean)
