@@ -1358,6 +1358,7 @@ function App() {
   const [statusFilter, setStatusFilter] = useState<'all' | Status>('all')
   const [itemTypeFilter, setItemTypeFilter] = useState<'all' | ItemType>('all')
   const [listShowFilter, setListShowFilter] = useState<string>('all')
+  const [tagFilter, setTagFilter] = useState<string>('all')
   const [frequencyFilter, setFrequencyFilter] = useState<'all' | '1' | '2' | '3' | '4' | '5'>('all')
   const [listSort, setListSort] = useState<ListSort>('latest')
 
@@ -1694,6 +1695,7 @@ function App() {
       if (statusFilter !== 'all' && item.status !== statusFilter) return false
       if (itemTypeFilter !== 'all' && itemType !== itemTypeFilter) return false
       if (frequencyFilter !== 'all' && item.difficulty !== Number(frequencyFilter)) return false
+      if (tagFilter !== 'all' && !item.tags.includes(tagFilter)) return false
       if (listShowFilter !== 'all') {
         if (listShowFilter === '__none__') {
           if (item.show?.trim()) return false
@@ -1718,7 +1720,7 @@ function App() {
       return a.phrase.localeCompare(b.phrase, 'en', { sensitivity: 'base' })
     })
     return sorted
-  }, [items, query, statusFilter, itemTypeFilter, frequencyFilter, listShowFilter, listSort])
+  }, [items, query, statusFilter, itemTypeFilter, frequencyFilter, tagFilter, listShowFilter, listSort])
 
   const stats = useMemo(
     () => ({
@@ -3286,7 +3288,15 @@ function App() {
                           <span className="list-meaning-text">{koPrimary}</span>
                         </td>
                         <td className="col-source">
-                          <span className="list-source-badge">
+                          <span
+                            className={`list-source-badge list-filter-chip${listShowFilter === (item.show ?? '').trim() ? ' chip-active' : ''}`}
+                            title="클릭하면 이 출처로 필터"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              const show = (item.show ?? '').trim()
+                              if (show) setListShowFilter(listShowFilter === show ? 'all' : show)
+                            }}
+                          >
                             <span className="list-source-icon" aria-hidden>
                               🎬
                             </span>{' '}
@@ -3297,7 +3307,15 @@ function App() {
                           <div className="list-tag-cell" onClick={(event) => event.stopPropagation()}>
                             {item.tags.length > 0 ? (
                               item.tags.map((tag) => (
-                                <span key={tag} className="list-tag-pill">
+                                <span
+                                  key={tag}
+                                  className={`list-tag-pill list-filter-chip${tagFilter === tag ? ' chip-active' : ''}`}
+                                  title="클릭하면 이 태그로 필터"
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    setTagFilter(tagFilter === tag ? 'all' : tag)
+                                  }}
+                                >
                                   {tag}
                                 </span>
                               ))
@@ -3307,7 +3325,14 @@ function App() {
                           </div>
                         </td>
                         <td className="col-status">
-                          <span className={`list-status-pill list-status-${item.status}`}>
+                          <span
+                            className={`list-status-pill list-status-${item.status} list-filter-chip${statusFilter === item.status ? ' chip-active' : ''}`}
+                            title="클릭하면 이 상태로 필터"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setStatusFilter(statusFilter === item.status ? 'all' : item.status)
+                            }}
+                          >
                             {STATUS_LABEL[item.status]}
                           </span>
                         </td>

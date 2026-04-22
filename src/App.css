@@ -886,6 +886,24 @@ button.danger {
   color: #b8f0cc;
 }
 
+/* 클릭 필터 가능한 칩 공통 스타일 */
+.list-filter-chip {
+  cursor: pointer;
+  transition: filter 0.15s, box-shadow 0.15s, outline 0.1s;
+  user-select: none;
+}
+.list-filter-chip:hover {
+  filter: brightness(1.25);
+  box-shadow: 0 0 0 2px rgba(160, 140, 255, 0.35);
+}
+/* 현재 활성 필터 상태 */
+.list-filter-chip.chip-active {
+  outline: 2px solid #a08cff;
+  outline-offset: 1px;
+  filter: brightness(1.35);
+  box-shadow: 0 0 6px rgba(160, 140, 255, 0.5);
+}
+
 .list-star-row {
   font-size: 14px;
   letter-spacing: 2px;
