@@ -398,6 +398,31 @@
   font-size: 12px;
 }
 
+.settings-modal footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #2d2d4a;
+}
+
+.settings-modal footer button {
+  padding: 9px 24px;
+  font-size: 13px;
+  border-radius: 10px;
+  border: 1px solid #373752;
+  background: #1d1f35;
+  color: #c8cadf;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.settings-modal footer button:hover {
+  background: #26284a;
+  border-color: #7458ec;
+  color: #e8e8f2;
+}
+
 .sidebar nav button {
   border: 1px solid #34344c;
   background: #17172a;
@@ -741,7 +766,10 @@ button.danger {
 .toolbar select,
 .modal-form input,
 .modal-form textarea,
-.modal-form select {
+.modal-form select,
+.settings-block input,
+.settings-block select,
+.settings-block textarea {
   width: 100%;
   background: #212136;
   border: 1px solid #373752;
@@ -2453,6 +2481,23 @@ button.danger {
 .ai-provider-row {
   display: grid;
   gap: 6px;
+}
+
+.ai-provider-row select {
+  width: 100%;
+  background: #212136;
+  border: 1px solid #373752;
+  color: #e8e8f2;
+  border-radius: 9px;
+  padding: 10px 11px;
+  font: inherit;
+  cursor: pointer;
+  appearance: auto;
+}
+
+.ai-provider-row select:focus {
+  outline: none;
+  border-color: #7458ec;
 }
 
 .ai-provider-row small {
