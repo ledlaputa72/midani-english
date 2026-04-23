@@ -1492,6 +1492,7 @@ function App() {
   const [cardFlipped, setCardFlipped] = useState(false)
   const [cardEnterDir, setCardEnterDir] = useState<CardEnterDir>('next')
   const [calendarMonth, setCalendarMonth] = useState(() => new Date())
+  const [calendarSelectedKey, setCalendarSelectedKey] = useState<string | null>(null)
   const [calendarView, setCalendarView] = useState<'month' | 'week'>('month')
   const [calendarWeekStart, setCalendarWeekStart] = useState(() => {
     const today = new Date()
@@ -4127,10 +4128,12 @@ function App() {
                         day.getFullYear() === today.getFullYear() &&
                         day.getMonth() === today.getMonth() &&
                         day.getDate() === today.getDate()
+                      const isSelected = calendarSelectedKey === key
                       return (
                         <div
                           key={key}
-                          className={`calendar-cell ${inMonth ? '' : 'out-month'}${isToday ? ' is-today' : ''}`}
+                          className={`calendar-cell ${inMonth ? '' : 'out-month'}${isToday ? ' is-today' : ''}${isSelected ? ' is-selected' : ''}`}
+                          onClick={() => setCalendarSelectedKey(key)}
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={(event) => {
                             event.preventDefault()
@@ -4170,10 +4173,12 @@ function App() {
                         day.getFullYear() === today.getFullYear() &&
                         day.getMonth() === today.getMonth() &&
                         day.getDate() === today.getDate()
+                      const isSelected = calendarSelectedKey === key
                       return (
                         <div
                           key={key}
-                          className={`calendar-cell calendar-cell--week${isToday ? ' is-today' : ''}`}
+                          className={`calendar-cell calendar-cell--week${isToday ? ' is-today' : ''}${isSelected ? ' is-selected' : ''}`}
+                          onClick={() => setCalendarSelectedKey(key)}
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={(event) => {
                             event.preventDefault()
