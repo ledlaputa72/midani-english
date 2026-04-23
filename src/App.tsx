@@ -1053,7 +1053,7 @@ async function generateMeaningAndExampleWithGemini(
     '  "meaningKo": string,          // main Korean meaning (use neutral subject like "~을/를" or omit subject)',
     '  "altMeaningsKo": string[],    // other GENUINELY DIFFERENT meanings/usages only',
     '  "definitionHint": string,     // brief English definition',
-    '  "usageFrequency": number,     // how commonly used in everyday English: 1=very rare, 2=uncommon, 3=moderate, 4=common, 5=very common/everyday',
+    '  "usageFrequency": number,     // 1=very rare/archaic/literary, 2=uncommon, 3=moderate, 4=common, 5=extremely common everyday basics',
     '  "examples": [                 // one entry per meaning (meaningKo + each altMeaningKo)',
     '    {',
     '      "meaning": string,        // the Korean meaning this example illustrates',
@@ -1066,7 +1066,27 @@ async function generateMeaningAndExampleWithGemini(
     '}',
     '',
     'Rules:',
-    '- "usageFrequency": rate how commonly native English speakers use this word/phrase daily. Be accurate — most idioms/slang are 1-2, common phrases are 3-4, everyday basics are 5.',
+    '- "usageFrequency": rate RELATIVE TO ITS OWN CATEGORY (vocabulary / expression / idiom). Do NOT compare expressions against basic vocabulary. Do NOT default to 4 — distribute across 1–5.',
+    '  ▸ If itemType is "vocabulary", calibrate against other single words:',
+    '    • 5 = core daily vocabulary everyone uses constantly (e.g., "the", "go", "people", "want", "know", "time", "good", "among")',
+    '    • 4 = common words used regularly in conversation/writing (e.g., "gratitude", "credentials", "proper", "suppose", "aware")',
+    '    • 3 = moderately common, typical of specific contexts (e.g., "jurisdiction", "nevertheless", "acquire", "reluctant")',
+    '    • 2 = uncommon, formal, technical, or bookish (e.g., "henceforth", "notwithstanding", "pernicious")',
+    '    • 1 = rare, archaic, literary, or highly specialized (e.g., "thee", "forsooth", obscure jargon)',
+    '  ▸ If itemType is "expression", calibrate against other everyday English expressions/collocations:',
+    '    • 5 = extremely common expressions natives say daily (e.g., "thank you so much", "I don\'t know", "by the way", "take a look")',
+    '    • 4 = frequently heard expressions (e.g., "as a matter of fact", "in the long run", "to be honest")',
+    '    • 3 = moderately used in specific registers (e.g., "bear in mind", "on behalf of")',
+    '    • 2 = uncommon, formal, or dated expressions (e.g., "come forth", "the proper gratitude", "I suppose you aren\'t aware")',
+    '    • 1 = archaic/literary/very rare phrasings rarely heard today',
+    '  ▸ If itemType is "idiom", calibrate against other idioms (NOT against basic vocabulary — even the most common idiom is less frequent than "the"):',
+    '    • 5 = top-tier idioms almost every native knows and uses (e.g., "break a leg", "hit the sack", "piece of cake", "under the weather", "once in a blue moon")',
+    '    • 4 = well-known idioms used regularly (e.g., "spill the beans", "hit the nail on the head", "bite the bullet")',
+    '    • 3 = moderately known idioms, somewhat context-dependent (e.g., "burn the midnight oil", "cut corners")',
+    '    • 2 = less common or regional/dated idioms (e.g., "mad as a hatter", "cry over spilt milk")',
+    '    • 1 = obscure/archaic/literary idioms rarely used in modern speech',
+    '- Key principle: a 5-star idiom is the MOST COMMON among idioms — not as common as "the". Same for expressions. Each category has its own distribution.',
+    '- Only assign 4 or 5 when you are genuinely confident the item is at the top of its category. If uncertain between two levels, pick the lower one.',
     '- altMeaningsKo must contain ONLY genuinely semantically different usages (different context, nuance, or function).',
     '- DO NOT create separate entries just because the subject pronoun differs (당신/너/자네/그/그녀 are all just "you/he/she" — do NOT list them as separate meanings).',
     '- DO NOT list the same meaning multiple times with different formality levels of the same word.',
@@ -1374,6 +1394,7 @@ function App() {
   const [formAiProvider, setFormAiProvider] = useState<AiProvider>(DEFAULT_APP_SETTINGS.defaultAiProvider)
   const [isAutoFilling, setIsAutoFilling] = useState(false)
   const [autoFillMsg, setAutoFillMsg] = useState('')
+  const lastGeneratedPhraseRef = useRef<string>('')
 
   const [ocrPreviewUrl, setOcrPreviewUrl] = useState<string | null>(null)
   const [ocrLines, setOcrLines] = useState<string[]>([])
@@ -2061,6 +2082,8 @@ function App() {
     setFormAiProvider(appSettings.defaultAiProvider)
     setInputTab('text')
     setIsAddOpen(true)
+    lastGeneratedPhraseRef.current = ''
+    setAutoFillMsg('')
   }
 
   const openCreateModalWithPhrase = (phrase: string, sourceItem?: StudyItem) => {
@@ -2083,6 +2106,8 @@ function App() {
     setInputTab('text')
     setIsDetailOpen(false)
     setIsAddOpen(true)
+    lastGeneratedPhraseRef.current = ''
+    setAutoFillMsg('')
   }
 
   const openEditModal = (item: StudyItem) => {
@@ -2093,6 +2118,8 @@ function App() {
     setInputTab('text')
     setIsDetailOpen(false)
     setIsAddOpen(true)
+    lastGeneratedPhraseRef.current = ''
+    setAutoFillMsg('')
   }
 
   const openDetailModal = (id: string) => {
@@ -2637,6 +2664,7 @@ function App() {
       itemType: resolvedItemType,
       ...(resolvedFrequency ? { difficulty: resolvedFrequency } : {}),
     }))
+    lastGeneratedPhraseRef.current = phrase.toLowerCase()
 
     if (editingId) {
       const nextItems = items.map((item) => {
@@ -4094,10 +4122,15 @@ function App() {
                       const key = toDateKey(day)
                       const inMonth = day.getMonth() === calendarMonth.getMonth()
                       const dayItems = itemsByDate[key] ?? []
+                      const today = new Date()
+                      const isToday =
+                        day.getFullYear() === today.getFullYear() &&
+                        day.getMonth() === today.getMonth() &&
+                        day.getDate() === today.getDate()
                       return (
                         <div
                           key={key}
-                          className={`calendar-cell ${inMonth ? '' : 'out-month'}`}
+                          className={`calendar-cell ${inMonth ? '' : 'out-month'}${isToday ? ' is-today' : ''}`}
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={(event) => {
                             event.preventDefault()
@@ -4105,7 +4138,10 @@ function App() {
                             if (itemId) scheduleItem(itemId, key)
                           }}
                         >
-                          <div className="cell-date">{day.getDate()}</div>
+                          <div className="cell-date">
+                            {day.getDate()}
+                            {isToday && <span className="cell-today-badge">오늘</span>}
+                          </div>
                           <div className="cell-cards">
                             {dayItems.map((item) => (
                               <div
@@ -4569,11 +4605,22 @@ function App() {
                     value={form.phrase}
                     onChange={(event) => {
                       const phrase = event.target.value
+                      const normalized = phrase.trim().toLowerCase()
+                      const lastGenerated = lastGeneratedPhraseRef.current
+                      const phraseChangedFromGenerated =
+                        Boolean(lastGenerated) && normalized !== lastGenerated
                       setForm((prev) => ({
                         ...prev,
                         phrase,
                         itemType: inferItemTypeAuto(phrase.trim(), ''),
+                        ...(phraseChangedFromGenerated
+                          ? { translation: '', example: '' }
+                          : {}),
                       }))
+                      if (phraseChangedFromGenerated) {
+                        lastGeneratedPhraseRef.current = ''
+                        setAutoFillMsg('')
+                      }
                     }}
                   />
                   <select
