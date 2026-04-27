@@ -2638,7 +2638,9 @@ function App() {
           const exData = (await exRes.json()) as {
             responseData?: { translatedText?: string }
           }
-          koExample = sanitizeTranslationApiText(exData.responseData?.translatedText?.trim() || '')
+          koExample = normalizeKoDialogueLabels(
+            sanitizeTranslationApiText(exData.responseData?.translatedText?.trim() || ''),
+          )
         }
       } catch {
         // Ignore example translation failure; keep English example.
@@ -2687,13 +2689,27 @@ function App() {
       void persist(nextItems)
     }
 
+    const summarizeGeminiError = (raw: string | undefined): string => {
+      if (!raw) return 'unknown'
+      // 가장 흔한 패턴 우선 매칭
+      if (/http-429|exceeded.*quota|RESOURCE_EXHAUSTED/i.test(raw)) return '쿼터 초과 (429)'
+      if (/http-404/i.test(raw)) return '모델 없음 (404)'
+      if (/http-503|overloaded|UNAVAILABLE/i.test(raw)) return '서버 과부하 (503)'
+      if (/http-401|http-403|API_KEY|PERMISSION/i.test(raw)) return '인증 실패'
+      if (/missing-key/i.test(raw)) return 'API 키 없음'
+      if (/invalid-json|empty-fields/i.test(raw)) return '응답 형식 오류'
+      // 첫 번째 http-XXX 또는 첫 단어만 추출
+      const httpMatch = raw.match(/http-(\d{3})/i)
+      if (httpMatch) return `오류 ${httpMatch[1]}`
+      return raw.slice(0, 40)
+    }
     const providerMsg =
       provider === 'gemini' && !GEMINI_API_KEY
         ? `${AI_PROVIDER_LABEL.default} 사용 (Gemini 키 없음)`
         : usedGemini
           ? `${AI_PROVIDER_LABEL.gemini} 사용`
           : provider === 'gemini'
-            ? `${AI_PROVIDER_LABEL.default} 사용 (Gemini 실패: ${geminiResponse.error ?? 'unknown'})`
+            ? `${AI_PROVIDER_LABEL.default} 사용 (Gemini 실패: ${summarizeGeminiError(geminiResponse.error)})`
             : `${AI_PROVIDER_LABEL.default} 사용`
     setAutoFillMsg(
       forceUpdate
