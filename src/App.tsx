@@ -4695,7 +4695,14 @@ function App() {
                   <button
                     type="button"
                     className="secondary af-btn-inline"
-                    onClick={() => autoFillFromEnglish(Boolean(editingId), formAiProvider)}
+                    onClick={() => {
+                      // 같은 단어로 재시도(자동 생성 재클릭)이거나 편집 모드면 강제 덮어쓰기
+                      const isRetryOnSamePhrase =
+                        lastGeneratedPhraseRef.current !== '' &&
+                        lastGeneratedPhraseRef.current === form.phrase.trim().toLowerCase()
+                      const force = Boolean(editingId) || isRetryOnSamePhrase
+                      autoFillFromEnglish(force, formAiProvider)
+                    }}
                     disabled={isAutoFilling}
                   >
                     {isAutoFilling ? (editingId ? '업데이트 중...' : '생성 중...') : editingId ? '업데이트' : '자동 생성'}
