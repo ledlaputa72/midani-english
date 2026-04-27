@@ -2628,7 +2628,7 @@ function App() {
     }
 
     // 멀티 예문(Gemini examples 사용)이 아닐 때만 MyMemory 번역 호출
-    const isMultiExample = enExample.includes('\n\n') || enExample.startsWith('[')
+    let isMultiExample = enExample.includes('\n\n') || enExample.startsWith('[')
     if (!isMultiExample) {
       try {
         const exRes = await fetch(
@@ -2645,6 +2645,46 @@ function App() {
       } catch {
         // Ignore example translation failure; keep English example.
       }
+    }
+
+    // Gemini 폴백 시: 대체 뜻이 있으면 뜻별 예문 블록을 합성
+    // (Gemini가 죽어도 [뜻] + 📝 설명 + A:/B: 구조를 보존)
+    if (!geminiResult && !isMultiExample && altMeanings.length > 0 && resolvedItemType !== 'vocabulary') {
+      const allMeanings = [koMeaning, ...altMeanings]
+      const dialogueTemplates = (p: string) => [
+        `A: What does "${p}" mean exactly?\nB: It's used to express a specific idea — context matters a lot.`,
+        `A: Have you heard the phrase "${p}"?\nB: Yes, it's quite common — let me show you how it's used.`,
+        `A: Can you give me an example using "${p}"?\nB: Sure — it often comes up in everyday conversation.`,
+        `A: Is "${p}" formal or informal?\nB: It depends on context, but it's frequently used.`,
+        `A: When would I use "${p}"?\nB: Usually when you want to convey that particular nuance.`,
+      ]
+      const variants = dialogueTemplates(phrase)
+      const exampleBlocks = await Promise.all(
+        allMeanings.map(async (meaning, i) => {
+          const en = variants[i % variants.length]
+          let ko = ''
+          try {
+            const r = await fetch(
+              `https://api.mymemory.translated.net/get?q=${encodeURIComponent(en)}&langpair=en|ko`,
+            )
+            if (r.ok) {
+              const j = (await r.json()) as { responseData?: { translatedText?: string } }
+              ko = normalizeKoDialogueLabels(
+                sanitizeTranslationApiText(j.responseData?.translatedText?.trim() || ''),
+              )
+            }
+          } catch {
+            // Ignore translation failure.
+          }
+          const header = `[${meaning}]`
+          const desc = `📝 "${phrase}"이(가) "${meaning}"의 뜻으로 사용될 때의 예시입니다.`
+          const body = ko ? `${en}\n→ ${ko}` : en
+          return [header, desc, body].join('\n')
+        }),
+      )
+      enExample = exampleBlocks.join('\n\n')
+      koExample = ''
+      isMultiExample = true
     }
 
     const meaningLines = [koMeaning, ...altMeanings].filter(Boolean)
