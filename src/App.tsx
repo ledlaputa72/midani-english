@@ -1664,9 +1664,29 @@ function App() {
     writeLocalData(nextItems, nextProfiles, nextSettings)
     if (!authUser || !db) return
     try {
+      // Firestore는 undefined 값을 거부하므로 모든 객체에서 undefined 필드 제거
+      const stripUndefined = <T,>(value: T): T => {
+        if (Array.isArray(value)) {
+          return value.map((entry) => stripUndefined(entry)) as unknown as T
+        }
+        if (value && typeof value === 'object') {
+          const out: Record<string, unknown> = {}
+          for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+            if (v === undefined) continue
+            out[k] = stripUndefined(v)
+          }
+          return out as unknown as T
+        }
+        return value
+      }
       await setDoc(
         doc(db, 'users', authUser.uid, 'appData', FIREBASE_DOC_KEY),
-        { items: nextItems, profiles: nextProfiles, settings: nextSettings, updatedAt: serverTimestamp() },
+        {
+          items: stripUndefined(nextItems),
+          profiles: stripUndefined(nextProfiles),
+          settings: stripUndefined(nextSettings),
+          updatedAt: serverTimestamp(),
+        },
         { merge: true },
       )
       setSyncError('')
@@ -4989,16 +5009,15 @@ function App() {
                       <span className="det-view-count-icon" aria-hidden="true">👁</span>
                       <strong>{(detailItem.viewCount ?? 0).toLocaleString()}</strong>
                     </span>
-                    <div className="det-view-count-adjust" role="group" aria-label="횟수 조정">
-                      {[-500, -200, -100, +100, +200, +500].map((delta) => (
+                    <div className="det-view-count-adjust" role="group" aria-label="횟수 누적">
+                      {[100, 200, 500].map((delta) => (
                         <button
                           key={delta}
                           type="button"
-                          className={`det-view-count-chip ${delta < 0 ? 'is-minus' : 'is-plus'}`}
+                          className="det-view-count-chip is-plus"
                           onClick={() => adjustViewCount(detailItem.id, delta)}
-                          aria-label={`${delta > 0 ? '+' : ''}${delta}`}
+                          aria-label={`접속 횟수 ${delta} 추가`}
                         >
-                          {delta > 0 ? '+' : ''}
                           {delta}
                         </button>
                       ))}
