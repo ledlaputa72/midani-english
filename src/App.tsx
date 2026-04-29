@@ -31,6 +31,9 @@ type StudyItem = {
   reviewCount: number
   createdAt: string
   lastReviewedAt?: string
+  lastViewedAt?: string
+  studyNote?: string
+  reviewNote?: string
   scheduledDate?: string
   profileId?: string | null
   itemType?: ItemType
@@ -172,6 +175,9 @@ function normalizeItems(source: StudyItem[] | unknown): StudyItem[] {
     show: (item as StudyItem).show ?? '',
     episode: (item as StudyItem).episode ?? '',
     notes: (item as StudyItem).notes ?? '',
+    studyNote: (item as StudyItem).studyNote ?? '',
+    reviewNote: (item as StudyItem).reviewNote ?? '',
+    lastViewedAt: (item as StudyItem).lastViewedAt,
     tags: Array.isArray((item as StudyItem).tags)
       ? (item as StudyItem).tags
       : String((item as StudyItem).tags ?? '')
@@ -1391,6 +1397,10 @@ function App() {
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [detailPhonetic, setDetailPhonetic] = useState<string>('')
+  const [highlightedNoteBtn, setHighlightedNoteBtn] = useState<'study' | 'review' | null>(null)
+  const [noteEditor, setNoteEditor] = useState<
+    { kind: 'study' | 'review'; itemId: string; draft: string } | null
+  >(null)
   const [cardPhonetic, setCardPhonetic] = useState<string>('')
   const [openMeaningIdx, setOpenMeaningIdx] = useState<number>(0)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -2134,6 +2144,13 @@ function App() {
     setOpenMeaningIdx(0)
     setIsDetailOpen(true)
     setDetailPhonetic('')
+    setHighlightedNoteBtn(null)
+    // 최근 확인일 기록
+    const todayKey = new Date().toISOString().slice(0, 10)
+    const stamped = items.map((it) =>
+      it.id === id ? { ...it, lastViewedAt: todayKey } : it,
+    )
+    void persist(stamped)
     // Free Dictionary API로 모든 단어의 발음기호 조회
     const target = items.find((item) => item.id === id)
     if (!target) return
@@ -2309,6 +2326,47 @@ function App() {
     const next = items.map((item) => (item.id === id ? { ...item, status } : item))
     persist(next)
     if (isDetailOpen) setDetailId(id)
+  }
+
+  const handleNoteBtnClick = (kind: 'study' | 'review', itemId: string) => {
+    if (highlightedNoteBtn === kind) {
+      // 두 번째 클릭 → 에디터 열기
+      const target = items.find((it) => it.id === itemId)
+      const draft = target
+        ? kind === 'study'
+          ? target.studyNote ?? ''
+          : target.reviewNote ?? ''
+        : ''
+      setNoteEditor({ kind, itemId, draft })
+      setHighlightedNoteBtn(null)
+    } else {
+      // 첫 번째 클릭 → 하이라이트 + 툴팁
+      setHighlightedNoteBtn(kind)
+    }
+  }
+
+  // 다른 곳 클릭 시 노트 버튼 하이라이트 해제
+  useEffect(() => {
+    if (!highlightedNoteBtn) return
+    const handler = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target) return
+      if (target.closest('.meta-note-cell')) return
+      setHighlightedNoteBtn(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [highlightedNoteBtn])
+
+  const closeNoteEditor = () => {
+    if (!noteEditor) return
+    const fieldName = noteEditor.kind === 'study' ? 'studyNote' : 'reviewNote'
+    const trimmed = noteEditor.draft.slice(0, 1000)
+    const next = items.map((it) =>
+      it.id === noteEditor.itemId ? { ...it, [fieldName]: trimmed } : it,
+    )
+    void persist(next)
+    setNoteEditor(null)
   }
 
   const removeItem = (id: string) => {
@@ -5024,28 +5082,86 @@ function App() {
                     <span key={tag}>{tag}</span>
                   ))}
                 </div>
-                <div className="meta-grid">
-                  <div>
-                    <strong>{detailItem.reviewCount}</strong>
-                    <small>복습 횟수</small>
+                <div className="meta-grid meta-grid--notes">
+                  <div className="meta-note-cell">
+                    <button
+                      type="button"
+                      className={`meta-note-btn${highlightedNoteBtn === 'study' ? ' is-highlighted' : ''}`}
+                      onClick={() => handleNoteBtnClick('study', detailItem.id)}
+                    >
+                      <strong>학습 내용</strong>
+                      <small>
+                        {(detailItem.studyNote ?? '').trim()
+                          ? `${(detailItem.studyNote ?? '').trim().length}자`
+                          : '클릭해서 작성'}
+                      </small>
+                    </button>
+                    {highlightedNoteBtn === 'study' && (
+                      <div className="meta-note-tooltip" role="tooltip">
+                        {(detailItem.studyNote ?? '').trim() ? (
+                          <p>{detailItem.studyNote}</p>
+                        ) : (
+                          <p className="meta-note-tooltip--empty">저장된 학습 내용이 없습니다. 한 번 더 클릭하면 작성할 수 있습니다.</p>
+                        )}
+                        <small className="meta-note-tooltip-hint">한 번 더 클릭 → 편집</small>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <strong>{dateText(detailItem.lastReviewedAt)}</strong>
-                    <small>마지막 복습</small>
+                  <div className="meta-note-cell">
+                    <button
+                      type="button"
+                      className={`meta-note-btn${highlightedNoteBtn === 'review' ? ' is-highlighted' : ''}`}
+                      onClick={() => handleNoteBtnClick('review', detailItem.id)}
+                    >
+                      <strong>복습 내용</strong>
+                      <small>
+                        {(detailItem.reviewNote ?? '').trim()
+                          ? `${(detailItem.reviewNote ?? '').trim().length}자`
+                          : '클릭해서 작성'}
+                      </small>
+                    </button>
+                    {highlightedNoteBtn === 'review' && (
+                      <div className="meta-note-tooltip" role="tooltip">
+                        {(detailItem.reviewNote ?? '').trim() ? (
+                          <p>{detailItem.reviewNote}</p>
+                        ) : (
+                          <p className="meta-note-tooltip--empty">저장된 복습 내용이 없습니다. 한 번 더 클릭하면 작성할 수 있습니다.</p>
+                        )}
+                        <small className="meta-note-tooltip-hint">한 번 더 클릭 → 편집</small>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <strong>{dateText(detailItem.createdAt)}</strong>
-                    <small>추가일</small>
+                  <div className="meta-date-cell">
+                    <div className="meta-date-row">
+                      <small>추가일</small>
+                      <strong>{dateText(detailItem.createdAt)}</strong>
+                    </div>
+                    <div className="meta-date-row">
+                      <small>최근 확인일</small>
+                      <strong>{dateText(detailItem.lastViewedAt)}</strong>
+                    </div>
                   </div>
                 </div>
                 <div className="status-actions">
-                  <button type="button" onClick={() => updateStatus(detailItem.id, 'new')}>
+                  <button
+                    type="button"
+                    className={detailItem.status === 'new' ? 'is-active' : ''}
+                    onClick={() => updateStatus(detailItem.id, 'new')}
+                  >
                     → 새 단어
                   </button>
-                  <button type="button" onClick={() => updateStatus(detailItem.id, 'learning')}>
+                  <button
+                    type="button"
+                    className={detailItem.status === 'learning' ? 'is-active' : ''}
+                    onClick={() => updateStatus(detailItem.id, 'learning')}
+                  >
                     → 학습 중
                   </button>
-                  <button type="button" onClick={() => updateStatus(detailItem.id, 'mastered')}>
+                  <button
+                    type="button"
+                    className={detailItem.status === 'mastered' ? 'is-active' : ''}
+                    onClick={() => updateStatus(detailItem.id, 'mastered')}
+                  >
                     → 완료
                   </button>
                 </div>
@@ -5107,6 +5223,55 @@ function App() {
               </button>
               <button type="button" className="danger" onClick={() => removeItem(detailItem.id)}>
                 삭제
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+      {noteEditor && (
+        <div
+          className="modal-overlay note-editor-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeNoteEditor()
+          }}
+        >
+          <section className="modal note-editor-modal" role="dialog" aria-modal="true">
+            <header className="modal-header">
+              <h3>{noteEditor.kind === 'study' ? '학습 내용' : '복습 내용'}</h3>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={closeNoteEditor}
+                aria-label="닫기 (자동 저장됨)"
+              >
+                ✕
+              </button>
+            </header>
+            <div className="note-editor-body">
+              <textarea
+                className="note-editor-textarea"
+                value={noteEditor.draft}
+                maxLength={1000}
+                placeholder={
+                  noteEditor.kind === 'study'
+                    ? '이 단어/구문에 대한 학습 메모를 자유롭게 작성하세요. (최대 1000자)'
+                    : '복습할 때 유용한 메모를 자유롭게 작성하세요. (최대 1000자)'
+                }
+                onChange={(event) =>
+                  setNoteEditor((prev) =>
+                    prev ? { ...prev, draft: event.target.value.slice(0, 1000) } : prev,
+                  )
+                }
+                autoFocus
+              />
+              <div className="note-editor-meta">
+                <small>{noteEditor.draft.length} / 1000자</small>
+                <small className="note-editor-hint">닫기를 누르면 자동 저장됩니다.</small>
+              </div>
+            </div>
+            <footer className="modal-actions">
+              <button type="button" className="primary" onClick={closeNoteEditor}>
+                닫기 (저장)
               </button>
             </footer>
           </section>

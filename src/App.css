@@ -2913,6 +2913,171 @@ button.danger {
   margin-bottom: 10px;
 }
 
+.status-actions button.is-active {
+  border-color: #b29bff;
+  background: linear-gradient(180deg, #4a3a9a 0%, #3a2c80 100%);
+  color: #fff;
+  box-shadow: 0 0 0 1px #b29bff inset, 0 0 0 3px rgba(178, 155, 255, 0.18);
+}
+
+/* 학습 내용 / 복습 내용 / 날짜 셀 */
+.meta-grid--notes > .meta-note-cell,
+.meta-grid--notes > .meta-date-cell {
+  position: relative;
+  padding: 0;
+}
+
+.meta-note-btn {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 10px;
+  background: #25253d;
+  border: 1px solid #3d3d5e;
+  border-radius: 9px;
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.meta-note-btn:hover {
+  border-color: #5d5d8a;
+  background: #2c2c4a;
+}
+
+.meta-note-btn strong {
+  font-size: 14px;
+  color: #e8e8f3;
+}
+
+.meta-note-btn small {
+  font-size: 12px;
+  color: #9ea2c3;
+}
+
+.meta-note-btn.is-highlighted {
+  border-color: #b29bff;
+  box-shadow: 0 0 0 1px #b29bff inset, 0 0 0 3px rgba(178, 155, 255, 0.18);
+  background: #2e2754;
+}
+
+.meta-note-tooltip {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #1a1a2e;
+  border: 1px solid #b29bff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  text-align: left;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.meta-note-tooltip p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: #e8e8f3;
+}
+
+.meta-note-tooltip-hint {
+  display: block;
+  margin-top: 6px;
+  color: #b29bff;
+  font-size: 11px;
+}
+
+.meta-note-tooltip--empty {
+  color: #9ea2c3 !important;
+  font-style: italic;
+}
+
+.meta-date-cell {
+  border: 1px solid #3d3d5e;
+  border-radius: 9px;
+  padding: 10px;
+  background: #25253d;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.meta-date-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.meta-date-row small {
+  color: #9ea2c3;
+  font-size: 11px;
+}
+
+.meta-date-row strong {
+  font-size: 13px;
+  color: #e8e8f3;
+}
+
+/* 노트 에디터 모달 */
+.note-editor-overlay {
+  z-index: 200;
+}
+
+.note-editor-modal {
+  width: min(560px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.note-editor-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.note-editor-textarea {
+  width: 100%;
+  min-height: 240px;
+  resize: vertical;
+  background: #1a1a2e;
+  border: 1px solid #3d3d5e;
+  border-radius: 8px;
+  padding: 12px;
+  color: #e8e8f3;
+  font-size: 14px;
+  line-height: 1.55;
+  font-family: inherit;
+}
+
+.note-editor-textarea:focus {
+  outline: none;
+  border-color: #7c6bff;
+  box-shadow: 0 0 0 2px rgba(124, 107, 255, 0.25);
+}
+
+.note-editor-meta {
+  display: flex;
+  justify-content: space-between;
+  color: #9ea2c3;
+  font-size: 12px;
+}
+
+.note-editor-hint {
+  color: #b29bff;
+}
+
 /* 상세 모달 안에서는 통계 행을 좁은 화면에서도 3열 유지 (가독성) */
 .modal.detail.card-detail-modal .meta-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
