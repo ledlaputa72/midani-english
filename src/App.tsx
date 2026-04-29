@@ -32,6 +32,7 @@ type StudyItem = {
   createdAt: string
   lastReviewedAt?: string
   lastViewedAt?: string
+  viewCount?: number
   studyNote?: string
   reviewNote?: string
   scheduledDate?: string
@@ -178,6 +179,9 @@ function normalizeItems(source: StudyItem[] | unknown): StudyItem[] {
     studyNote: (item as StudyItem).studyNote ?? '',
     reviewNote: (item as StudyItem).reviewNote ?? '',
     lastViewedAt: (item as StudyItem).lastViewedAt,
+    viewCount: typeof (item as StudyItem).viewCount === 'number'
+      ? Math.max(0, (item as StudyItem).viewCount as number)
+      : 0,
     tags: Array.isArray((item as StudyItem).tags)
       ? (item as StudyItem).tags
       : String((item as StudyItem).tags ?? '')
@@ -2145,10 +2149,16 @@ function App() {
     setIsDetailOpen(true)
     setDetailPhonetic('')
     setHighlightedNoteBtn(null)
-    // 최근 확인일 기록
+    // 최근 확인일 기록 + 상세 보기 접속 횟수 +1
     const todayKey = new Date().toISOString().slice(0, 10)
     const stamped = items.map((it) =>
-      it.id === id ? { ...it, lastViewedAt: todayKey } : it,
+      it.id === id
+        ? {
+            ...it,
+            lastViewedAt: todayKey,
+            viewCount: Math.max(0, (it.viewCount ?? 0) + 1),
+          }
+        : it,
     )
     void persist(stamped)
     // Free Dictionary API로 모든 단어의 발음기호 조회
@@ -2326,6 +2336,15 @@ function App() {
     const next = items.map((item) => (item.id === id ? { ...item, status } : item))
     persist(next)
     if (isDetailOpen) setDetailId(id)
+  }
+
+  const adjustViewCount = (id: string, delta: number) => {
+    const next = items.map((it) =>
+      it.id === id
+        ? { ...it, viewCount: Math.max(0, (it.viewCount ?? 0) + delta) }
+        : it,
+    )
+    void persist(next)
   }
 
   const handleNoteBtnClick = (kind: 'study' | 'review', itemId: string) => {
@@ -4962,6 +4981,29 @@ function App() {
                     {'★'.repeat(detailItem.difficulty)}
                     <span className="det-freq-stars-empty">{'☆'.repeat(5 - detailItem.difficulty)}</span>
                   </span>
+                  <div className="det-view-count-group" aria-label="상세 보기 접속 횟수">
+                    <span
+                      className="det-view-count"
+                      title="지금까지 상세 보기를 연 횟수"
+                    >
+                      <span className="det-view-count-icon" aria-hidden="true">👁</span>
+                      <strong>{(detailItem.viewCount ?? 0).toLocaleString()}</strong>
+                    </span>
+                    <div className="det-view-count-adjust" role="group" aria-label="횟수 조정">
+                      {[-500, -200, -100, +100, +200, +500].map((delta) => (
+                        <button
+                          key={delta}
+                          type="button"
+                          className={`det-view-count-chip ${delta < 0 ? 'is-minus' : 'is-plus'}`}
+                          onClick={() => adjustViewCount(detailItem.id, delta)}
+                          aria-label={`${delta > 0 ? '+' : ''}${delta}`}
+                        >
+                          {delta > 0 ? '+' : ''}
+                          {delta}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 {/* 2행: 발음기호 + 스피커 */}
                 <div className="det-phonetic-line">

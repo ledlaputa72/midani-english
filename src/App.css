@@ -2752,6 +2752,78 @@ button.danger {
   color: #3a3a5c;
 }
 
+/* 상세 보기 접속 횟수 + 조정 버튼 */
+.det-view-count-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.det-view-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid #3d3d5e;
+  border-radius: 999px;
+  background: #25253d;
+  font-size: 13px;
+  color: #e8e8f3;
+}
+
+.det-view-count-icon {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.det-view-count strong {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.det-view-count-adjust {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.det-view-count-chip {
+  appearance: none;
+  border: 1px solid #3d3d5e;
+  background: #1f1f33;
+  color: #c8c8e0;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease, transform 0.08s ease;
+  font-variant-numeric: tabular-nums;
+}
+
+.det-view-count-chip:hover {
+  border-color: #7c6bff;
+  color: #fff;
+}
+
+.det-view-count-chip:active {
+  transform: scale(0.94);
+}
+
+.det-view-count-chip.is-plus:hover {
+  background: #2c3a52;
+  border-color: #7ad7ff;
+  color: #cfeeff;
+}
+
+.det-view-count-chip.is-minus:hover {
+  background: #3a2230;
+  border-color: #ff8aa8;
+  color: #ffd2dd;
+}
+
 .det-phrase-title {
   margin: 0;
   font-size: clamp(1.35rem, 4vw, 1.75rem);
