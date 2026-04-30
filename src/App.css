@@ -62,6 +62,36 @@
   transform: scale(0.98);
 }
 
+.sidebar-analytics-btn-wrap {
+  padding-bottom: 12px;
+}
+
+.sidebar-analytics-btn {
+  width: 100%;
+  padding: 9px 14px;
+  background: #1f1f33;
+  color: #cfcfe6;
+  border: 1px solid #3d3d5e;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  text-align: center;
+}
+
+.sidebar-analytics-btn:hover {
+  background: #2c2c4a;
+  border-color: #5d5d8a;
+  color: #fff;
+}
+
+.sidebar-analytics-btn.active {
+  background: linear-gradient(180deg, #2e7d6e 0%, #1f5e54 100%);
+  border-color: #4dccb5;
+  color: #fff;
+}
+
 .sidebar-account {
   border-top: 1px solid #2a2a3d;
   padding-top: 12px;
@@ -3662,4 +3692,316 @@ button.danger {
   background: rgba(124, 92, 252, 0.15);
   border-radius: 3px;
   padding: 0 2px;
+}
+
+/* ========== 학습 분석 페이지 ========== */
+.analytics-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 40px;
+}
+
+.analytics-header h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  color: #f3f3fa;
+}
+
+.analytics-header p {
+  margin: 0;
+  color: #9ea2c3;
+  font-size: 13px;
+}
+
+.analytics-range-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  background: #1a1a2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.analytics-range-tabs button {
+  background: #25253d;
+  border: 1px solid #3d3d5e;
+  border-radius: 8px;
+  padding: 6px 14px;
+  color: #cfcfe6;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.analytics-range-tabs button:hover {
+  border-color: #5d5d8a;
+  background: #2c2c4a;
+}
+
+.analytics-range-tabs button.active {
+  background: linear-gradient(180deg, #2e7d6e 0%, #1f5e54 100%);
+  border-color: #4dccb5;
+  color: #fff;
+}
+
+.analytics-custom-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.analytics-custom-range input[type='date'] {
+  background: #25253d;
+  color: #e8e8f3;
+  border: 1px solid #3d3d5e;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.analytics-custom-range span {
+  color: #9ea2c3;
+}
+
+.analytics-range-info {
+  margin-left: auto;
+  color: #9ea2c3;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.analytics-card {
+  background: #1a1a2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.analytics-card small {
+  color: #9ea2c3;
+  font-size: 12px;
+}
+
+.analytics-card strong {
+  color: #f3f3fa;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-section {
+  background: #1a1a2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.analytics-section h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: #e8e8f3;
+}
+
+.analytics-empty {
+  margin: 8px 0 0;
+  color: #9ea2c3;
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* 일별 막대 차트 */
+.analytics-bars {
+  display: grid;
+  align-items: end;
+  gap: 2px;
+  height: 110px;
+  padding: 4px 0;
+}
+
+.analytics-bar {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 3px;
+  background: #1f1f33;
+}
+
+.analytics-bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, #4dccb5 0%, #2e7d6e 100%);
+  border-radius: 3px;
+}
+
+/* 365일 히트맵 */
+.analytics-heatmap-wrap {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.analytics-heatmap {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.analytics-heatmap-week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.analytics-heatmap-day {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: #25253d;
+}
+
+.analytics-heatmap-day.is-future {
+  visibility: hidden;
+}
+
+.analytics-heatmap-day.level-0 {
+  background: #25253d;
+}
+.analytics-heatmap-day.level-1 {
+  background: #1f5e54;
+}
+.analytics-heatmap-day.level-2 {
+  background: #2e7d6e;
+}
+.analytics-heatmap-day.level-3 {
+  background: #4dccb5;
+}
+.analytics-heatmap-day.level-4 {
+  background: #7af0d6;
+}
+
+.analytics-heatmap-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  color: #9ea2c3;
+  font-size: 11px;
+}
+
+.analytics-heatmap-legend-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.analytics-heatmap-legend-cell.level-0 { background: #25253d; }
+.analytics-heatmap-legend-cell.level-1 { background: #1f5e54; }
+.analytics-heatmap-legend-cell.level-2 { background: #2e7d6e; }
+.analytics-heatmap-legend-cell.level-3 { background: #4dccb5; }
+.analytics-heatmap-legend-cell.level-4 { background: #7af0d6; }
+
+/* 트렌딩 랭킹 */
+.analytics-ranking {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.analytics-ranking-row {
+  display: grid;
+  grid-template-columns: 32px minmax(140px, 1.5fr) auto 1fr 70px 100px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #25253d;
+  border: 1px solid #3d3d5e;
+  border-radius: 8px;
+}
+
+.analytics-rank {
+  font-weight: 800;
+  color: #b29bff;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.analytics-ranking-phrase {
+  background: transparent;
+  border: none;
+  color: #f3f3fa;
+  font-weight: 600;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.analytics-ranking-phrase:hover {
+  color: #b29bff;
+  text-decoration: underline;
+}
+
+.analytics-ranking-meta {
+  color: #9ea2c3;
+  font-size: 11px;
+  background: #1f1f33;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.analytics-ranking-bar {
+  height: 6px;
+  background: linear-gradient(90deg, #4dccb5 0%, #b29bff 100%);
+  border-radius: 4px;
+  align-self: center;
+}
+
+.analytics-ranking-count {
+  text-align: right;
+  font-weight: 700;
+  color: #4dccb5;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-ranking-total {
+  text-align: right;
+  color: #9ea2c3;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-footer {
+  text-align: center;
+  color: #9ea2c3;
+  font-size: 11px;
+}
+
+@media (max-width: 720px) {
+  .analytics-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .analytics-ranking-row {
+    grid-template-columns: 28px 1fr 70px;
+  }
+  .analytics-ranking-meta,
+  .analytics-ranking-bar,
+  .analytics-ranking-total {
+    display: none;
+  }
 }

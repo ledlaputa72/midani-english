@@ -10,7 +10,7 @@ import './App.css'
 type Status = 'new' | 'learning' | 'mastered'
 type ItemType = 'vocabulary' | 'expression' | 'idiom'
 type AiProvider = 'default' | 'gemini'
-type Page = 'dashboard' | 'list' | 'board' | 'cards' | 'calendar'
+type Page = 'dashboard' | 'list' | 'board' | 'cards' | 'calendar' | 'analytics'
 type InputTab = 'text' | 'ocr'
 type ListSort = 'latest' | 'oldest' | 'phrase' | 'freq-high' | 'freq-low'
 type CardRating = 'again' | 'good' | 'easy' | 'skip'
@@ -33,6 +33,8 @@ type StudyItem = {
   lastReviewedAt?: string
   lastViewedAt?: string
   viewCount?: number
+  /** 일자별 조회 횟수 누적 (key: 'YYYY-MM-DD', value: 그 날의 조회 수) */
+  viewLog?: Record<string, number>
   studyNote?: string
   reviewNote?: string
   scheduledDate?: string
@@ -182,6 +184,20 @@ function normalizeItems(source: StudyItem[] | unknown): StudyItem[] {
     viewCount: typeof (item as StudyItem).viewCount === 'number'
       ? Math.max(0, (item as StudyItem).viewCount as number)
       : 0,
+    viewLog: (() => {
+      const raw = (item as StudyItem).viewLog
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        const out: Record<string, number> = {}
+        for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+          const n = Number(v)
+          if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(n) && n > 0) {
+            out[k] = Math.floor(n)
+          }
+        }
+        return out
+      }
+      return {}
+    })(),
     tags: Array.isArray((item as StudyItem).tags)
       ? (item as StudyItem).tags
       : String((item as StudyItem).tags ?? '')
@@ -1511,6 +1527,9 @@ function App() {
   const [openedDeck, setOpenedDeck] = useState<string | null>(null)
   const [cardFlipped, setCardFlipped] = useState(false)
   const [cardEnterDir, setCardEnterDir] = useState<CardEnterDir>('next')
+  const [analyticsRange, setAnalyticsRange] = useState<'1d' | '7d' | '30d' | '365d' | 'custom'>('30d')
+  const [analyticsCustomFrom, setAnalyticsCustomFrom] = useState<string>('')
+  const [analyticsCustomTo, setAnalyticsCustomTo] = useState<string>('')
   const [calendarMonth, setCalendarMonth] = useState(() => new Date())
   const [calendarSelectedKey, setCalendarSelectedKey] = useState<string | null>(null)
   const [calendarView, setCalendarView] = useState<'month' | 'week'>('month')
@@ -2169,17 +2188,19 @@ function App() {
     setIsDetailOpen(true)
     setDetailPhonetic('')
     setHighlightedNoteBtn(null)
-    // 최근 확인일 기록 + 상세 보기 접속 횟수 +1
+    // 최근 확인일 기록 + 상세 보기 접속 횟수 +1 + 일자별 로그 누적
     const todayKey = new Date().toISOString().slice(0, 10)
-    const stamped = items.map((it) =>
-      it.id === id
-        ? {
-            ...it,
-            lastViewedAt: todayKey,
-            viewCount: Math.max(0, (it.viewCount ?? 0) + 1),
-          }
-        : it,
-    )
+    const stamped = items.map((it) => {
+      if (it.id !== id) return it
+      const prevLog = it.viewLog ?? {}
+      const nextLog = { ...prevLog, [todayKey]: (prevLog[todayKey] ?? 0) + 1 }
+      return {
+        ...it,
+        lastViewedAt: todayKey,
+        viewCount: Math.max(0, (it.viewCount ?? 0) + 1),
+        viewLog: nextLog,
+      }
+    })
     void persist(stamped)
     // Free Dictionary API로 모든 단어의 발음기호 조회
     const target = items.find((item) => item.id === id)
@@ -2542,13 +2563,18 @@ function App() {
       )
       persist(next)
     } else {
+      const today = new Date().toISOString().slice(0, 10)
       const next: StudyItem[] = [
         {
           id: crypto.randomUUID(),
           ...payload,
           status: 'new',
           reviewCount: 0,
-          createdAt: new Date().toISOString().slice(0, 10),
+          createdAt: today,
+          // 생성도 view 1회로 처리 (학습 분석 baseline)
+          viewCount: 1,
+          viewLog: { [today]: 1 },
+          lastViewedAt: today,
         },
         ...items,
       ]
@@ -3117,6 +3143,16 @@ function App() {
             }}
           >
             + 단어 / 구문 추가
+          </button>
+        </div>
+
+        <div className="sidebar-analytics-btn-wrap">
+          <button
+            type="button"
+            className={`sidebar-analytics-btn${page === 'analytics' ? ' active' : ''}`}
+            onClick={() => setPage('analytics')}
+          >
+            📊 학습 분석
           </button>
         </div>
 
@@ -4360,6 +4396,301 @@ function App() {
             </div>
           </section>
         )}
+
+        {page === 'analytics' && (() => {
+          // 분석 페이지: 기간 정의
+          const today = new Date()
+          const todayKey = today.toISOString().slice(0, 10)
+          const fromDate = new Date(today)
+          fromDate.setHours(0, 0, 0, 0)
+          let rangeDays = 30
+          let customFromKey = ''
+          let customToKey = todayKey
+          if (analyticsRange === '1d') rangeDays = 1
+          else if (analyticsRange === '7d') rangeDays = 7
+          else if (analyticsRange === '30d') rangeDays = 30
+          else if (analyticsRange === '365d') rangeDays = 365
+          else if (analyticsRange === 'custom') {
+            customFromKey = analyticsCustomFrom || todayKey
+            customToKey = analyticsCustomTo || todayKey
+            const fromD = new Date(customFromKey)
+            const toD = new Date(customToKey)
+            rangeDays =
+              Math.max(1, Math.round((toD.getTime() - fromD.getTime()) / 86400000) + 1)
+          }
+          const inRange = (key: string): boolean => {
+            if (analyticsRange === 'custom') {
+              return key >= customFromKey && key <= customToKey
+            }
+            const startMs = today.getTime() - (rangeDays - 1) * 86400000
+            const startKey = new Date(startMs).toISOString().slice(0, 10)
+            return key >= startKey && key <= todayKey
+          }
+          const startKey = analyticsRange === 'custom'
+            ? customFromKey
+            : new Date(today.getTime() - (rangeDays - 1) * 86400000).toISOString().slice(0, 10)
+          const endKey = analyticsRange === 'custom' ? customToKey : todayKey
+
+          // 일별 합계 집계
+          const dailyTotals: Record<string, number> = {}
+          for (const it of items) {
+            for (const [k, v] of Object.entries(it.viewLog ?? {})) {
+              if (!inRange(k)) continue
+              dailyTotals[k] = (dailyTotals[k] ?? 0) + v
+            }
+          }
+          // 날짜 키 시퀀스 생성 (startKey~endKey)
+          const dateKeys: string[] = []
+          {
+            const start = new Date(startKey)
+            const end = new Date(endKey)
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+              dateKeys.push(d.toISOString().slice(0, 10))
+            }
+          }
+          const totalViews = Object.values(dailyTotals).reduce((a, b) => a + b, 0)
+          const activeDays = Object.values(dailyTotals).filter((v) => v > 0).length
+          const avgPerActiveDay = activeDays > 0 ? Math.round(totalViews / activeDays) : 0
+          let mostActiveDay: { date: string; count: number } | null = null
+          for (const [k, v] of Object.entries(dailyTotals)) {
+            if (!mostActiveDay || v > mostActiveDay.count) mostActiveDay = { date: k, count: v }
+          }
+
+          // 항목별 기간 내 view 합 → 랭킹
+          const itemTotals = items
+            .map((it) => {
+              const log = it.viewLog ?? {}
+              let inRangeSum = 0
+              for (const [k, v] of Object.entries(log)) {
+                if (inRange(k)) inRangeSum += v
+              }
+              return { item: it, inRangeViews: inRangeSum }
+            })
+            .filter((row) => row.inRangeViews > 0)
+            .sort((a, b) => b.inRangeViews - a.inRangeViews)
+
+          // 365일 히트맵 데이터 (최근 1년)
+          const heatmapDays = 365
+          const heatmapStart = new Date(today.getTime() - (heatmapDays - 1) * 86400000)
+          heatmapStart.setHours(0, 0, 0, 0)
+          // 시작점을 일요일로 정렬
+          const startDay = heatmapStart.getDay() // 0=일
+          const heatmapAlignedStart = new Date(heatmapStart)
+          heatmapAlignedStart.setDate(heatmapStart.getDate() - startDay)
+          const heatmapTotals: Record<string, number> = {}
+          for (const it of items) {
+            for (const [k, v] of Object.entries(it.viewLog ?? {})) {
+              const d = new Date(k)
+              if (d >= heatmapAlignedStart && d <= today) {
+                heatmapTotals[k] = (heatmapTotals[k] ?? 0) + v
+              }
+            }
+          }
+          let heatmapMax = 0
+          for (const v of Object.values(heatmapTotals)) {
+            if (v > heatmapMax) heatmapMax = v
+          }
+          const heatmapWeeks: Array<Array<{ key: string; count: number; inFuture: boolean }>> = []
+          {
+            const cur = new Date(heatmapAlignedStart)
+            while (cur <= today || heatmapWeeks.length === 0 || heatmapWeeks[heatmapWeeks.length - 1].length < 7) {
+              const week: Array<{ key: string; count: number; inFuture: boolean }> = []
+              for (let i = 0; i < 7; i++) {
+                const k = cur.toISOString().slice(0, 10)
+                week.push({
+                  key: k,
+                  count: heatmapTotals[k] ?? 0,
+                  inFuture: cur > today,
+                })
+                cur.setDate(cur.getDate() + 1)
+              }
+              heatmapWeeks.push(week)
+              if (cur > today) break
+            }
+          }
+          const heatmapLevel = (count: number): number => {
+            if (count <= 0) return 0
+            if (heatmapMax <= 0) return 0
+            const ratio = count / heatmapMax
+            if (ratio < 0.25) return 1
+            if (ratio < 0.5) return 2
+            if (ratio < 0.75) return 3
+            return 4
+          }
+
+          // 일별 바 차트 (현재 range 기준)
+          const dailyMax = Math.max(1, ...dateKeys.map((k) => dailyTotals[k] ?? 0))
+
+          return (
+            <section className="analytics-page">
+              <header className="analytics-header">
+                <h2>📊 학습 분석</h2>
+                <p>조회 기록(viewCount + 일자별 viewLog)을 기반으로 학습 패턴을 분석합니다. AI 학습 지도의 데이터 소스로 사용됩니다.</p>
+              </header>
+
+              {/* 기간 선택 */}
+              <div className="analytics-range-tabs">
+                {([
+                  { key: '1d', label: '1일' },
+                  { key: '7d', label: '7일' },
+                  { key: '30d', label: '30일' },
+                  { key: '365d', label: '1년' },
+                  { key: 'custom', label: '커스텀' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    className={analyticsRange === opt.key ? 'active' : ''}
+                    onClick={() => setAnalyticsRange(opt.key)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+                {analyticsRange === 'custom' && (
+                  <div className="analytics-custom-range">
+                    <input
+                      type="date"
+                      value={analyticsCustomFrom}
+                      onChange={(e) => setAnalyticsCustomFrom(e.target.value)}
+                      max={analyticsCustomTo || todayKey}
+                    />
+                    <span>~</span>
+                    <input
+                      type="date"
+                      value={analyticsCustomTo}
+                      onChange={(e) => setAnalyticsCustomTo(e.target.value)}
+                      min={analyticsCustomFrom}
+                      max={todayKey}
+                    />
+                  </div>
+                )}
+                <div className="analytics-range-info">
+                  {startKey} ~ {endKey} ({rangeDays}일)
+                </div>
+              </div>
+
+              {/* 요약 카드 */}
+              <div className="analytics-summary">
+                <div className="analytics-card">
+                  <small>총 조회</small>
+                  <strong>{totalViews.toLocaleString()}회</strong>
+                </div>
+                <div className="analytics-card">
+                  <small>활성일</small>
+                  <strong>{activeDays}일</strong>
+                </div>
+                <div className="analytics-card">
+                  <small>활성일 평균</small>
+                  <strong>{avgPerActiveDay.toLocaleString()}회</strong>
+                </div>
+                <div className="analytics-card">
+                  <small>최다 학습일</small>
+                  <strong>
+                    {mostActiveDay
+                      ? `${mostActiveDay.date} (${mostActiveDay.count}회)`
+                      : '—'}
+                  </strong>
+                </div>
+              </div>
+
+              {/* 일별 막대 차트 */}
+              <section className="analytics-section">
+                <h3>일별 조회 추이</h3>
+                <div className="analytics-bars" style={{ gridTemplateColumns: `repeat(${dateKeys.length}, minmax(6px, 1fr))` }}>
+                  {dateKeys.map((k) => {
+                    const v = dailyTotals[k] ?? 0
+                    const ratio = dailyMax > 0 ? v / dailyMax : 0
+                    return (
+                      <div
+                        key={k}
+                        className="analytics-bar"
+                        title={`${k}: ${v}회`}
+                      >
+                        <div
+                          className="analytics-bar-fill"
+                          style={{ height: `${Math.max(2, ratio * 100)}%` }}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {/* 365일 히트맵 */}
+              <section className="analytics-section">
+                <h3>연간 활동 히트맵 (최근 1년)</h3>
+                <div className="analytics-heatmap-wrap">
+                  <div className="analytics-heatmap">
+                    {heatmapWeeks.map((week, wi) => (
+                      <div key={wi} className="analytics-heatmap-week">
+                        {week.map((d, di) => (
+                          <div
+                            key={`${wi}-${di}`}
+                            className={`analytics-heatmap-day level-${heatmapLevel(d.count)}${d.inFuture ? ' is-future' : ''}`}
+                            title={d.inFuture ? '' : `${d.key} — ${d.count}회`}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="analytics-heatmap-legend">
+                    <small>적음</small>
+                    {[0, 1, 2, 3, 4].map((lv) => (
+                      <span key={lv} className={`analytics-heatmap-legend-cell level-${lv}`} />
+                    ))}
+                    <small>많음</small>
+                  </div>
+                </div>
+              </section>
+
+              {/* 트렌딩 단어 랭킹 */}
+              <section className="analytics-section">
+                <h3>기간 내 학습량 순위 (Top 30)</h3>
+                {itemTotals.length === 0 ? (
+                  <p className="analytics-empty">이 기간에 조회된 단어가 없습니다.</p>
+                ) : (
+                  <ol className="analytics-ranking">
+                    {itemTotals.slice(0, 30).map((row, idx) => (
+                      <li key={row.item.id} className="analytics-ranking-row">
+                        <span className="analytics-rank">{idx + 1}</span>
+                        <button
+                          type="button"
+                          className="analytics-ranking-phrase"
+                          onClick={() => openDetailModal(row.item.id)}
+                          title="상세 보기 열기"
+                        >
+                          {row.item.phrase}
+                        </button>
+                        <span className="analytics-ranking-meta">
+                          {row.item.itemType ? ITEM_TYPE_LABEL[row.item.itemType] : ''}
+                        </span>
+                        <div
+                          className="analytics-ranking-bar"
+                          aria-hidden="true"
+                          style={{
+                            width: `${Math.max(4, (row.inRangeViews / itemTotals[0].inRangeViews) * 100)}%`,
+                          }}
+                        />
+                        <span className="analytics-ranking-count">
+                          {row.inRangeViews.toLocaleString()}회
+                        </span>
+                        <span className="analytics-ranking-total">
+                          (전체 {(row.item.viewCount ?? 0).toLocaleString()})
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+
+              <footer className="analytics-footer">
+                <small>
+                  데이터 기준: 항목 생성 시 1회 + 상세 보기 열 때마다 1회 누적. AI 학습 지도용 raw 데이터로 활용됩니다.
+                </small>
+              </footer>
+            </section>
+          )
+        })()}
       </main>
 
       {createPortal(
