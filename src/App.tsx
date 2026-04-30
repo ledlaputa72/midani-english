@@ -186,17 +186,32 @@ function normalizeItems(source: StudyItem[] | unknown): StudyItem[] {
       : 0,
     viewLog: (() => {
       const raw = (item as StudyItem).viewLog
+      const out: Record<string, number> = {}
       if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-        const out: Record<string, number> = {}
         for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
           const n = Number(v)
           if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(n) && n > 0) {
             out[k] = Math.floor(n)
           }
         }
-        return out
       }
-      return {}
+      // 백필: viewLog가 비어있는데 viewCount가 있으면 lastViewedAt 또는 createdAt에 몰아서 기록
+      const loggedSum = Object.values(out).reduce((a, b) => a + b, 0)
+      const rawCount =
+        typeof (item as StudyItem).viewCount === 'number'
+          ? Math.max(0, (item as StudyItem).viewCount as number)
+          : 0
+      if (loggedSum < rawCount) {
+        const missing = rawCount - loggedSum
+        const fallbackKey =
+          (item as StudyItem).lastViewedAt ||
+          (item as StudyItem).createdAt ||
+          new Date().toISOString().slice(0, 10)
+        if (/^\d{4}-\d{2}-\d{2}$/.test(fallbackKey)) {
+          out[fallbackKey] = (out[fallbackKey] ?? 0) + missing
+        }
+      }
+      return out
     })(),
     tags: Array.isArray((item as StudyItem).tags)
       ? (item as StudyItem).tags
@@ -3243,9 +3258,11 @@ function App() {
                 {authUser.displayName || authUser.email || 'Google 사용자'}
               </span>
             )}
-            <button className="primary" onClick={() => openCreateModal()}>
-              {page === 'list' || page === 'board' ? '+ 추가' : '단어 / 구문 추가'}
-            </button>
+            {page !== 'analytics' && (
+              <button className="primary" onClick={() => openCreateModal()}>
+                {page === 'list' || page === 'board' ? '+ 추가' : '단어 / 구문 추가'}
+              </button>
+            )}
           </div>
         </header>
         {syncError && <p className="sync-error-banner">동기화 오류: {syncError}</p>}
