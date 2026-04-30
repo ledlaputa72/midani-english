@@ -5000,35 +5000,29 @@ function App() {
                       <span className="det-view-count-icon" aria-hidden="true">👁</span>
                       <strong>{(detailItem.viewCount ?? 0).toLocaleString()}</strong>
                     </span>
-                    <div className="det-view-count-adjust" role="group" aria-label="횟수 분해">
+                    <div className="det-view-count-adjust" role="group" aria-label="횟수 구간">
                       {(() => {
                         const total = detailItem.viewCount ?? 0
-                        if (total <= 0) return null
-                        const chips: number[] = []
-                        let remaining = total
-                        for (const denom of [500, 200, 100]) {
-                          while (remaining >= denom && chips.length < 12) {
-                            chips.push(denom)
-                            remaining -= denom
-                          }
-                        }
-                        if (remaining > 0 && chips.length < 12) chips.push(remaining)
-                        return chips.map((value, idx) => (
+                        // 구간 라벨: 0~50→50, 51~100→100, 101~200→200, ... (100단위 올림)
+                        const bucket =
+                          total <= 50 ? 50 : Math.ceil(total / 100) * 100
+                        // 구간별 색상 티어
+                        const tier =
+                          bucket >= 1000
+                            ? 'tier-platinum'
+                            : bucket >= 500
+                              ? 'tier-gold'
+                              : bucket >= 200
+                                ? 'tier-silver'
+                                : 'tier-bronze'
+                        return (
                           <span
-                            key={`${idx}-${value}`}
-                            className={`det-view-count-chip ${
-                              value === 500
-                                ? 'is-500'
-                                : value === 200
-                                  ? 'is-200'
-                                  : value === 100
-                                    ? 'is-100'
-                                    : 'is-rest'
-                            }`}
+                            className={`det-view-count-chip det-view-count-bucket ${tier}`}
+                            title={`현재 ${total}회 — ${bucket} 구간`}
                           >
-                            {value}
+                            {bucket}
                           </span>
-                        ))
+                        )
                       })()}
                     </div>
                   </div>

@@ -2804,28 +2804,35 @@ button.danger {
   user-select: none;
 }
 
-.det-view-count-chip.is-500 {
-  background: linear-gradient(180deg, #4a2d6e 0%, #36204e 100%);
-  border-color: #b29bff;
-  color: #f3e9ff;
+.det-view-count-bucket {
+  padding: 4px 12px;
+  font-size: 12px;
+  letter-spacing: 0.3px;
 }
 
-.det-view-count-chip.is-200 {
-  background: linear-gradient(180deg, #2d5060 0%, #1f3a48 100%);
-  border-color: #7ad7ff;
-  color: #d6eeff;
-}
-
-.det-view-count-chip.is-100 {
+.det-view-count-chip.tier-bronze {
   background: linear-gradient(180deg, #2c3e2a 0%, #1f2c1e 100%);
   border-color: #87d986;
   color: #d8f5d3;
 }
 
-.det-view-count-chip.is-rest {
-  background: #2a2a40;
-  border-color: #4a4a6e;
-  color: #b9b9d2;
+.det-view-count-chip.tier-silver {
+  background: linear-gradient(180deg, #2d5060 0%, #1f3a48 100%);
+  border-color: #7ad7ff;
+  color: #d6eeff;
+}
+
+.det-view-count-chip.tier-gold {
+  background: linear-gradient(180deg, #4a3d20 0%, #332a16 100%);
+  border-color: #ffd56b;
+  color: #fff1c8;
+}
+
+.det-view-count-chip.tier-platinum {
+  background: linear-gradient(180deg, #4a2d6e 0%, #36204e 100%);
+  border-color: #b29bff;
+  color: #f3e9ff;
+  box-shadow: 0 0 0 1px rgba(178, 155, 255, 0.3);
 }
 
 .det-phrase-title {
