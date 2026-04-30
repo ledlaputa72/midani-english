@@ -2358,15 +2358,6 @@ function App() {
     if (isDetailOpen) setDetailId(id)
   }
 
-  const adjustViewCount = (id: string, delta: number) => {
-    const next = items.map((it) =>
-      it.id === id
-        ? { ...it, viewCount: Math.max(0, (it.viewCount ?? 0) + delta) }
-        : it,
-    )
-    void persist(next)
-  }
-
   const handleNoteBtnClick = (kind: 'study' | 'review', itemId: string) => {
     if (highlightedNoteBtn === kind) {
       // 두 번째 클릭 → 에디터 열기
@@ -5009,18 +5000,36 @@ function App() {
                       <span className="det-view-count-icon" aria-hidden="true">👁</span>
                       <strong>{(detailItem.viewCount ?? 0).toLocaleString()}</strong>
                     </span>
-                    <div className="det-view-count-adjust" role="group" aria-label="횟수 누적">
-                      {[100, 200, 500].map((delta) => (
-                        <button
-                          key={delta}
-                          type="button"
-                          className="det-view-count-chip is-plus"
-                          onClick={() => adjustViewCount(detailItem.id, delta)}
-                          aria-label={`접속 횟수 ${delta} 추가`}
-                        >
-                          {delta}
-                        </button>
-                      ))}
+                    <div className="det-view-count-adjust" role="group" aria-label="횟수 분해">
+                      {(() => {
+                        const total = detailItem.viewCount ?? 0
+                        if (total <= 0) return null
+                        const chips: number[] = []
+                        let remaining = total
+                        for (const denom of [500, 200, 100]) {
+                          while (remaining >= denom && chips.length < 12) {
+                            chips.push(denom)
+                            remaining -= denom
+                          }
+                        }
+                        if (remaining > 0 && chips.length < 12) chips.push(remaining)
+                        return chips.map((value, idx) => (
+                          <span
+                            key={`${idx}-${value}`}
+                            className={`det-view-count-chip ${
+                              value === 500
+                                ? 'is-500'
+                                : value === 200
+                                  ? 'is-200'
+                                  : value === 100
+                                    ? 'is-100'
+                                    : 'is-rest'
+                            }`}
+                          >
+                            {value}
+                          </span>
+                        ))
+                      })()}
                     </div>
                   </div>
                 </div>

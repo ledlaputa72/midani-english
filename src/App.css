@@ -2790,38 +2790,42 @@ button.danger {
 }
 
 .det-view-count-chip {
-  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid #3d3d5e;
   background: #1f1f33;
   color: #c8c8e0;
   border-radius: 999px;
-  padding: 3px 9px;
+  padding: 3px 10px;
   font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease, transform 0.08s ease;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+  user-select: none;
 }
 
-.det-view-count-chip:hover {
-  border-color: #7c6bff;
-  color: #fff;
+.det-view-count-chip.is-500 {
+  background: linear-gradient(180deg, #4a2d6e 0%, #36204e 100%);
+  border-color: #b29bff;
+  color: #f3e9ff;
 }
 
-.det-view-count-chip:active {
-  transform: scale(0.94);
-}
-
-.det-view-count-chip.is-plus:hover {
-  background: #2c3a52;
+.det-view-count-chip.is-200 {
+  background: linear-gradient(180deg, #2d5060 0%, #1f3a48 100%);
   border-color: #7ad7ff;
-  color: #cfeeff;
+  color: #d6eeff;
 }
 
-.det-view-count-chip.is-minus:hover {
-  background: #3a2230;
-  border-color: #ff8aa8;
-  color: #ffd2dd;
+.det-view-count-chip.is-100 {
+  background: linear-gradient(180deg, #2c3e2a 0%, #1f2c1e 100%);
+  border-color: #87d986;
+  color: #d8f5d3;
+}
+
+.det-view-count-chip.is-rest {
+  background: #2a2a40;
+  border-color: #4a4a6e;
+  color: #b9b9d2;
 }
 
 .det-phrase-title {
