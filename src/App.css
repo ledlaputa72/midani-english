@@ -3851,22 +3851,110 @@ button.danger {
   padding-bottom: 6px;
 }
 
+.analytics-heatmap-grid {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  /* 요일 라벨 폭 */
+  --dow-w: 18px;
+  --cell: 12px;
+  --gap: 3px;
+}
+
+.analytics-heatmap-months {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--cell);
+  gap: var(--gap);
+  margin-left: calc(var(--dow-w) + 4px);
+  color: #b29bff;
+  font-size: 11px;
+  font-weight: 600;
+  height: 14px;
+}
+
+.analytics-heatmap-month-cell {
+  white-space: nowrap;
+  text-align: left;
+  line-height: 1;
+}
+
+.analytics-heatmap-body {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.analytics-heatmap-dow {
+  display: inline-grid;
+  grid-template-rows: repeat(7, var(--cell));
+  gap: var(--gap);
+  width: var(--dow-w);
+  color: #ff8aa8;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.analytics-heatmap-dow-cell {
+  display: inline-flex;
+  align-items: center;
+  height: var(--cell);
+  line-height: 1;
+}
+
+.analytics-heatmap-dow-cell.is-hidden {
+  visibility: hidden;
+}
+
 .analytics-heatmap {
   display: inline-flex;
-  gap: 3px;
+  gap: var(--gap);
 }
 
 .analytics-heatmap-week {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--gap);
 }
 
 .analytics-heatmap-day {
-  width: 12px;
-  height: 12px;
+  width: var(--cell);
+  height: var(--cell);
   border-radius: 2px;
   background: #25253d;
+}
+
+/* 히트맵 통계 */
+.analytics-heatmap-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-top: 1px solid #2a2a3d;
+}
+
+.analytics-heatmap-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.analytics-heatmap-stat small {
+  color: #9ea2c3;
+  font-size: 11px;
+}
+
+.analytics-heatmap-stat strong {
+  color: #f3f3fa;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .analytics-heatmap-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .analytics-heatmap-day.is-future {

@@ -4535,6 +4535,78 @@ function App() {
             return 4
           }
 
+          // 월 라벨: 각 주 컬럼의 첫 셀이 새 달이면 라벨 표시
+          const MONTH_INITIALS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
+          const monthLabels: Array<{ weekIdx: number; label: string }> = []
+          let lastMonthShown = -1
+          heatmapWeeks.forEach((week, wi) => {
+            // 그 주의 첫 번째 유효(미래 아님) 셀의 월 확인
+            const firstReal = week.find((d) => !d.inFuture) ?? week[0]
+            const m = new Date(firstReal.key).getMonth()
+            if (m !== lastMonthShown && wi >= 0) {
+              // 같은 월 라벨이 인접해 중복되지 않도록 최소 1주 이상 떨어져야 표시
+              if (
+                monthLabels.length === 0 ||
+                wi - monthLabels[monthLabels.length - 1].weekIdx >= 2
+              ) {
+                monthLabels.push({ weekIdx: wi, label: MONTH_INITIALS[m] })
+                lastMonthShown = m
+              }
+            }
+          })
+
+          // 추가 통계: 최다 학습월 / 최다 학습일 / 최장 연속 / 현재 연속
+          const monthlyTotals: Record<string, number> = {}
+          for (const [k, v] of Object.entries(heatmapTotals)) {
+            const ym = k.slice(0, 7)
+            monthlyTotals[ym] = (monthlyTotals[ym] ?? 0) + v
+          }
+          let mostActiveMonth: { ym: string; count: number } | null = null
+          for (const [ym, c] of Object.entries(monthlyTotals)) {
+            if (!mostActiveMonth || c > mostActiveMonth.count) mostActiveMonth = { ym, count: c }
+          }
+          const formatMonth = (ym: string): string => {
+            const [y, m] = ym.split('-').map(Number)
+            const KOR_MONTHS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월']
+            return `${y}년 ${KOR_MONTHS[(m ?? 1) - 1]}`
+          }
+
+          // 연속일 계산: 오늘부터 거꾸로 활동 있는 날 카운트 → current streak
+          let currentStreak = 0
+          {
+            const cur = new Date(today)
+            cur.setHours(0, 0, 0, 0)
+            while (true) {
+              const k = cur.toISOString().slice(0, 10)
+              if ((heatmapTotals[k] ?? 0) > 0) {
+                currentStreak++
+                cur.setDate(cur.getDate() - 1)
+              } else {
+                break
+              }
+            }
+          }
+          // longest streak
+          let longestStreak = 0
+          {
+            const sortedKeys = Object.keys(heatmapTotals).sort()
+            let run = 0
+            let prev: Date | null = null
+            for (const k of sortedKeys) {
+              if ((heatmapTotals[k] ?? 0) <= 0) continue
+              const d = new Date(k)
+              if (prev) {
+                const diff = Math.round((d.getTime() - prev.getTime()) / 86400000)
+                if (diff === 1) run++
+                else run = 1
+              } else {
+                run = 1
+              }
+              if (run > longestStreak) longestStreak = run
+              prev = d
+            }
+          }
+
           // 일별 바 차트 (현재 range 기준)
           const dailyMax = Math.max(1, ...dateKeys.map((k) => dailyTotals[k] ?? 0))
 
@@ -4637,26 +4709,78 @@ function App() {
               <section className="analytics-section">
                 <h3>연간 활동 히트맵 (최근 1년)</h3>
                 <div className="analytics-heatmap-wrap">
-                  <div className="analytics-heatmap">
-                    {heatmapWeeks.map((week, wi) => (
-                      <div key={wi} className="analytics-heatmap-week">
-                        {week.map((d, di) => (
-                          <div
-                            key={`${wi}-${di}`}
-                            className={`analytics-heatmap-day level-${heatmapLevel(d.count)}${d.inFuture ? ' is-future' : ''}`}
-                            title={d.inFuture ? '' : `${d.key} — ${d.count}회`}
-                          />
+                  <div className="analytics-heatmap-grid">
+                    {/* 월 라벨 행 */}
+                    <div className="analytics-heatmap-months" aria-hidden="true">
+                      {heatmapWeeks.map((_, wi) => {
+                        const label = monthLabels.find((m) => m.weekIdx === wi)?.label
+                        return (
+                          <span key={wi} className="analytics-heatmap-month-cell">
+                            {label ?? ''}
+                          </span>
+                        )
+                      })}
+                    </div>
+                    {/* 요일 라벨 + 셀 */}
+                    <div className="analytics-heatmap-body">
+                      <div className="analytics-heatmap-dow" aria-hidden="true">
+                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                          <span
+                            key={i}
+                            className={`analytics-heatmap-dow-cell ${i % 2 === 1 ? 'is-shown' : 'is-hidden'}`}
+                          >
+                            {d}
+                          </span>
                         ))}
                       </div>
-                    ))}
+                      <div className="analytics-heatmap">
+                        {heatmapWeeks.map((week, wi) => (
+                          <div key={wi} className="analytics-heatmap-week">
+                            {week.map((d, di) => (
+                              <div
+                                key={`${wi}-${di}`}
+                                className={`analytics-heatmap-day level-${heatmapLevel(d.count)}${d.inFuture ? ' is-future' : ''}`}
+                                title={d.inFuture ? '' : `${d.key} — ${d.count}회`}
+                              />
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <div className="analytics-heatmap-legend">
-                    <small>적음</small>
-                    {[0, 1, 2, 3, 4].map((lv) => (
-                      <span key={lv} className={`analytics-heatmap-legend-cell level-${lv}`} />
-                    ))}
-                    <small>많음</small>
+                </div>
+
+                {/* 히트맵 통계 + 범례 */}
+                <div className="analytics-heatmap-stats">
+                  <div className="analytics-heatmap-stat">
+                    <small>최다 학습월</small>
+                    <strong>
+                      {mostActiveMonth ? formatMonth(mostActiveMonth.ym) : '—'}
+                    </strong>
                   </div>
+                  <div className="analytics-heatmap-stat">
+                    <small>최다 학습일</small>
+                    <strong>
+                      {mostActiveDay
+                        ? `${mostActiveDay.date} (${mostActiveDay.count.toLocaleString()}회)`
+                        : '—'}
+                    </strong>
+                  </div>
+                  <div className="analytics-heatmap-stat">
+                    <small>최장 연속</small>
+                    <strong>{longestStreak}일</strong>
+                  </div>
+                  <div className="analytics-heatmap-stat">
+                    <small>현재 연속</small>
+                    <strong>{currentStreak}일</strong>
+                  </div>
+                </div>
+                <div className="analytics-heatmap-legend">
+                  <small>적음</small>
+                  {[0, 1, 2, 3, 4].map((lv) => (
+                    <span key={lv} className={`analytics-heatmap-legend-cell level-${lv}`} />
+                  ))}
+                  <small>많음</small>
                 </div>
               </section>
 
