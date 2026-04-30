@@ -3821,28 +3821,142 @@ button.danger {
   font-style: italic;
 }
 
-/* 일별 막대 차트 */
-.analytics-bars {
-  display: grid;
-  align-items: end;
-  gap: 2px;
-  height: 110px;
-  padding: 4px 0;
-}
-
-.analytics-bar {
-  width: 100%;
-  height: 100%;
+/* 일별 차트 헤더 */
+.analytics-chart-header {
   display: flex;
-  align-items: flex-end;
-  border-radius: 3px;
-  background: #1f1f33;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
 }
 
-.analytics-bar-fill {
+.analytics-chart-header h3 {
+  margin: 0;
+}
+
+.analytics-chart-mode-tabs {
+  display: inline-flex;
+  gap: 4px;
+  background: #1f1f33;
+  border: 1px solid #3d3d5e;
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.analytics-chart-mode-tabs button {
+  background: transparent;
+  border: none;
+  color: #9ea2c3;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.analytics-chart-mode-tabs button:hover {
+  color: #e8e8f3;
+}
+
+.analytics-chart-mode-tabs button.active {
+  background: #4dccb5;
+  color: #1a1a2e;
+}
+
+/* SVG 차트 래퍼 */
+.analytics-chart-wrap {
+  position: relative;
   width: 100%;
-  background: linear-gradient(180deg, #4dccb5 0%, #2e7d6e 100%);
-  border-radius: 3px;
+}
+
+.analytics-chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  cursor: crosshair;
+}
+
+.analytics-chart-tooltip {
+  position: absolute;
+  top: 8px;
+  transform: translateX(-50%);
+  background: #1a1a2e;
+  border: 1px solid #4dccb5;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 5;
+}
+
+.analytics-chart-tooltip strong {
+  display: block;
+  font-size: 12px;
+  color: #f3f3fa;
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #cfcfe6;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.analytics-chart-tooltip-row b {
+  color: #4dccb5;
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
+
+.analytics-chart-tooltip-row .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4dccb5;
+  display: inline-block;
+}
+
+.analytics-chart-tooltip-row .dot.dot-cum {
+  background: #b29bff;
+}
+
+/* 차트 footer */
+.analytics-chart-footer {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #2a2a3d;
+}
+
+.analytics-chart-footer > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.analytics-chart-footer small {
+  color: #9ea2c3;
+  font-size: 11px;
+}
+
+.analytics-chart-footer strong {
+  color: #f3f3fa;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .analytics-chart-footer {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* 365일 히트맵 */

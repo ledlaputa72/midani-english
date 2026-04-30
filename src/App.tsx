@@ -1545,6 +1545,8 @@ function App() {
   const [analyticsRange, setAnalyticsRange] = useState<'1d' | '7d' | '30d' | '365d' | 'custom'>('30d')
   const [analyticsCustomFrom, setAnalyticsCustomFrom] = useState<string>('')
   const [analyticsCustomTo, setAnalyticsCustomTo] = useState<string>('')
+  const [analyticsChartMode, setAnalyticsChartMode] = useState<'daily' | 'cumulative'>('daily')
+  const [analyticsHoverIdx, setAnalyticsHoverIdx] = useState<number | null>(null)
   const [calendarMonth, setCalendarMonth] = useState(() => new Date())
   const [calendarSelectedKey, setCalendarSelectedKey] = useState<string | null>(null)
   const [calendarView, setCalendarView] = useState<'month' | 'week'>('month')
@@ -4607,8 +4609,6 @@ function App() {
             }
           }
 
-          // 일별 바 차트 (현재 range 기준)
-          const dailyMax = Math.max(1, ...dateKeys.map((k) => dailyTotals[k] ?? 0))
 
           return (
             <section className="analytics-page">
@@ -4682,28 +4682,274 @@ function App() {
                 </div>
               </div>
 
-              {/* 일별 막대 차트 */}
-              <section className="analytics-section">
-                <h3>일별 조회 추이</h3>
-                <div className="analytics-bars" style={{ gridTemplateColumns: `repeat(${dateKeys.length}, minmax(6px, 1fr))` }}>
-                  {dateKeys.map((k) => {
-                    const v = dailyTotals[k] ?? 0
-                    const ratio = dailyMax > 0 ? v / dailyMax : 0
-                    return (
-                      <div
-                        key={k}
-                        className="analytics-bar"
-                        title={`${k}: ${v}회`}
-                      >
-                        <div
-                          className="analytics-bar-fill"
-                          style={{ height: `${Math.max(2, ratio * 100)}%` }}
-                        />
+              {/* 일별 조회 추이 (SVG 차트) */}
+              {(() => {
+                const W = 1000
+                const H = 240
+                const padL = 52
+                const padR = 18
+                const padT = 18
+                const padB = 38
+                const innerW = W - padL - padR
+                const innerH = H - padT - padB
+
+                // 누적 / 일별 모드별 값 계산
+                let cumulative = 0
+                const series = dateKeys.map((k) => {
+                  const daily = dailyTotals[k] ?? 0
+                  cumulative += daily
+                  return { key: k, daily, cumulative }
+                })
+                const yMax =
+                  analyticsChartMode === 'cumulative'
+                    ? Math.max(1, ...series.map((s) => s.cumulative))
+                    : Math.max(1, ...series.map((s) => s.daily))
+
+                // X 좌표
+                const xAt = (idx: number): number =>
+                  series.length === 1
+                    ? padL + innerW / 2
+                    : padL + (idx / (series.length - 1)) * innerW
+                const yAt = (val: number): number =>
+                  padT + innerH - (val / yMax) * innerH
+
+                const valueOf = (s: { daily: number; cumulative: number }) =>
+                  analyticsChartMode === 'cumulative' ? s.cumulative : s.daily
+
+                // 라인 + 영역 path
+                const linePath = series
+                  .map((s, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(1)} ${yAt(valueOf(s)).toFixed(1)}`)
+                  .join(' ')
+                const areaPath =
+                  series.length > 0
+                    ? `${linePath} L ${xAt(series.length - 1).toFixed(1)} ${(padT + innerH).toFixed(1)} L ${xAt(0).toFixed(1)} ${(padT + innerH).toFixed(1)} Z`
+                    : ''
+
+                // Y축 눈금 (0, 25%, 50%, 75%, 100%)
+                const yTicks = [0, 0.25, 0.5, 0.75, 1].map((r) => ({
+                  ratio: r,
+                  value: Math.round(yMax * r),
+                  y: padT + innerH * (1 - r),
+                }))
+
+                // X축 눈금 (8개 정도로 균등 분포)
+                const tickCount = Math.min(series.length, 8)
+                const xTickIdxs: number[] = []
+                if (series.length > 0) {
+                  if (series.length <= tickCount) {
+                    for (let i = 0; i < series.length; i++) xTickIdxs.push(i)
+                  } else {
+                    for (let i = 0; i < tickCount; i++) {
+                      xTickIdxs.push(Math.round((i / (tickCount - 1)) * (series.length - 1)))
+                    }
+                  }
+                }
+                const formatXLabel = (key: string): string => {
+                  const d = new Date(key)
+                  return `${d.getMonth() + 1}/${d.getDate()}`
+                }
+
+                const hover =
+                  analyticsHoverIdx != null && series[analyticsHoverIdx]
+                    ? { idx: analyticsHoverIdx, point: series[analyticsHoverIdx] }
+                    : null
+
+                return (
+                  <section className="analytics-section">
+                    <div className="analytics-chart-header">
+                      <h3>일별 조회 추이</h3>
+                      <div className="analytics-chart-mode-tabs" role="tablist">
+                        <button
+                          type="button"
+                          className={analyticsChartMode === 'daily' ? 'active' : ''}
+                          onClick={() => setAnalyticsChartMode('daily')}
+                        >
+                          일별
+                        </button>
+                        <button
+                          type="button"
+                          className={analyticsChartMode === 'cumulative' ? 'active' : ''}
+                          onClick={() => setAnalyticsChartMode('cumulative')}
+                        >
+                          누적
+                        </button>
                       </div>
-                    )
-                  })}
-                </div>
-              </section>
+                    </div>
+
+                    <div className="analytics-chart-wrap">
+                      <svg
+                        viewBox={`0 0 ${W} ${H}`}
+                        className="analytics-chart-svg"
+                        role="img"
+                        aria-label="일별 조회 추이 차트"
+                        onMouseLeave={() => setAnalyticsHoverIdx(null)}
+                        onMouseMove={(event) => {
+                          if (series.length === 0) return
+                          const rect = (event.currentTarget as SVGSVGElement).getBoundingClientRect()
+                          const xPx = ((event.clientX - rect.left) / rect.width) * W
+                          if (xPx < padL || xPx > padL + innerW) {
+                            setAnalyticsHoverIdx(null)
+                            return
+                          }
+                          const ratio = (xPx - padL) / innerW
+                          const idx = Math.max(
+                            0,
+                            Math.min(
+                              series.length - 1,
+                              Math.round(ratio * (series.length - 1)),
+                            ),
+                          )
+                          setAnalyticsHoverIdx(idx)
+                        }}
+                      >
+                        <defs>
+                          <linearGradient id="analytics-area-grad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#4dccb5" stopOpacity="0.55" />
+                            <stop offset="100%" stopColor="#4dccb5" stopOpacity="0.05" />
+                          </linearGradient>
+                        </defs>
+
+                        {/* Y 그리드 + 라벨 */}
+                        {yTicks.map((t, i) => (
+                          <g key={`y-${i}`}>
+                            <line
+                              x1={padL}
+                              x2={padL + innerW}
+                              y1={t.y}
+                              y2={t.y}
+                              stroke="#2a2a3d"
+                              strokeWidth="1"
+                              strokeDasharray={i === 0 ? '0' : '3 3'}
+                            />
+                            <text
+                              x={padL - 8}
+                              y={t.y}
+                              textAnchor="end"
+                              dominantBaseline="middle"
+                              fontSize="10"
+                              fill="#9ea2c3"
+                            >
+                              {t.value.toLocaleString()}
+                            </text>
+                          </g>
+                        ))}
+
+                        {/* 영역 + 라인 */}
+                        {series.length > 0 && (
+                          <>
+                            <path d={areaPath} fill="url(#analytics-area-grad)" />
+                            <path
+                              d={linePath}
+                              fill="none"
+                              stroke="#4dccb5"
+                              strokeWidth="2"
+                              strokeLinejoin="round"
+                              strokeLinecap="round"
+                            />
+                          </>
+                        )}
+
+                        {/* X 눈금 */}
+                        {xTickIdxs.map((idx) => (
+                          <g key={`x-${idx}`}>
+                            <line
+                              x1={xAt(idx)}
+                              x2={xAt(idx)}
+                              y1={padT + innerH}
+                              y2={padT + innerH + 4}
+                              stroke="#3d3d5e"
+                              strokeWidth="1"
+                            />
+                            <text
+                              x={xAt(idx)}
+                              y={padT + innerH + 18}
+                              textAnchor="middle"
+                              fontSize="10"
+                              fill="#9ea2c3"
+                            >
+                              {formatXLabel(series[idx].key)}
+                            </text>
+                          </g>
+                        ))}
+
+                        {/* hover 표시 */}
+                        {hover && (
+                          <g>
+                            <line
+                              x1={xAt(hover.idx)}
+                              x2={xAt(hover.idx)}
+                              y1={padT}
+                              y2={padT + innerH}
+                              stroke="#b29bff"
+                              strokeWidth="1"
+                              strokeDasharray="3 3"
+                            />
+                            <circle
+                              cx={xAt(hover.idx)}
+                              cy={yAt(valueOf(hover.point))}
+                              r="4"
+                              fill="#fff"
+                              stroke="#4dccb5"
+                              strokeWidth="2"
+                            />
+                          </g>
+                        )}
+                      </svg>
+
+                      {hover && (
+                        <div
+                          className="analytics-chart-tooltip"
+                          style={{
+                            left: `${(xAt(hover.idx) / W) * 100}%`,
+                          }}
+                        >
+                          <strong>{hover.point.key}</strong>
+                          <div className="analytics-chart-tooltip-row">
+                            <span className="dot" />
+                            <span>일별</span>
+                            <b>{hover.point.daily.toLocaleString()}회</b>
+                          </div>
+                          <div className="analytics-chart-tooltip-row">
+                            <span className="dot dot-cum" />
+                            <span>누적</span>
+                            <b>{hover.point.cumulative.toLocaleString()}회</b>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 차트 요약 footer */}
+                    <div className="analytics-chart-footer">
+                      <div>
+                        <small>총 조회</small>
+                        <strong>{totalViews.toLocaleString()}회</strong>
+                      </div>
+                      <div>
+                        <small>일평균</small>
+                        <strong>
+                          {(rangeDays > 0 ? Math.round(totalViews / rangeDays) : 0).toLocaleString()}회
+                        </strong>
+                      </div>
+                      <div>
+                        <small>최고 일</small>
+                        <strong>
+                          {mostActiveDay
+                            ? `${mostActiveDay.date} (${mostActiveDay.count.toLocaleString()})`
+                            : '—'}
+                        </strong>
+                      </div>
+                      <div>
+                        <small>활성일 비율</small>
+                        <strong>
+                          {rangeDays > 0
+                            ? `${Math.round((activeDays / rangeDays) * 100)}% (${activeDays}/${rangeDays})`
+                            : '—'}
+                        </strong>
+                      </div>
+                    </div>
+                  </section>
+                )
+              })()}
 
               {/* 365일 히트맵 */}
               <section className="analytics-section">
