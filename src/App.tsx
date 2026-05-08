@@ -3950,21 +3950,34 @@ function App() {
                                 </span>
                               </div>
                             </div>
-                            {/* ── 뒷면: 번호별 뜻 목록 ── */}
+                            {/* ── 뒷면: 메인 뜻(크게) + 부 뜻 목록(작게) ── */}
                             <div className="flashcard-face flashcard-back">
-                              <span>뜻</span>
                               {(() => {
                                 const translationParts = splitTranslationParts(stackCard.translation)
                                 const allMeanings = [
                                   translationParts.primary || stackCard.translation,
                                   ...translationParts.secondary,
                                 ].filter(Boolean)
+                                if (allMeanings.length === 0) return null
                                 return (
                                   <div className="flashcard-meanings-list">
-                                    {allMeanings.map((meaning, idx) => (
-                                      <div key={idx} className="flashcard-meaning-row">
-                                        <span className="flashcard-meaning-badge">뜻 {idx + 1}</span>
-                                        <span className="flashcard-meaning-text">{meaning}</span>
+                                    {/* 뜻 1: 앞면과 같이 크고 굵게 (앞면의 60% 크기) */}
+                                    <div className="flashcard-meaning-row flashcard-meaning-row--primary">
+                                      <span className="flashcard-meaning-badge">뜻 1</span>
+                                      <span className="flashcard-meaning-text flashcard-meaning-text--primary">
+                                        {allMeanings[0]}
+                                      </span>
+                                    </div>
+                                    {/* 뜻 2 이상: 뜻 1의 50% 크기로 아래 정렬 */}
+                                    {allMeanings.slice(1).map((meaning, idx) => (
+                                      <div
+                                        key={idx + 1}
+                                        className="flashcard-meaning-row flashcard-meaning-row--secondary"
+                                      >
+                                        <span className="flashcard-meaning-badge">뜻 {idx + 2}</span>
+                                        <span className="flashcard-meaning-text flashcard-meaning-text--secondary">
+                                          {meaning}
+                                        </span>
                                       </div>
                                     ))}
                                   </div>
