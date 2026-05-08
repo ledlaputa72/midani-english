@@ -924,6 +924,50 @@ button.danger {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 14px;
+  align-items: center;
+}
+
+/* 카드 재생 순서 토글 (순서/셔플) */
+.card-play-mode {
+  display: inline-flex;
+  margin-left: auto;
+  background: #1d1f35;
+  border: 1px solid #373752;
+  border-radius: 20px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.card-play-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: #9ea4c8;
+  border-radius: 16px;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.card-play-mode-btn:hover {
+  color: #fff;
+  background: #2a2c46;
+}
+
+.card-play-mode-btn.active {
+  background: linear-gradient(180deg, #6f5dff 0%, #5443d3 100%);
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(178, 155, 255, 0.4);
+}
+
+@media (max-width: 720px) {
+  .card-play-mode {
+    margin-left: 0;
+  }
 }
 
 .item-type-filter-row button {

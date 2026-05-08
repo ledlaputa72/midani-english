@@ -1536,6 +1536,8 @@ function App() {
   }
 
   const [cardIndex, setCardIndex] = useState(0)
+  const [cardPlayMode, setCardPlayMode] = useState<'sequential' | 'shuffle'>('sequential')
+  const [cardShuffleSeed, setCardShuffleSeed] = useState<number>(() => Date.now())
   const [cardSlideTick, setCardSlideTick] = useState(0)
   const [cardTimerProgress, setCardTimerProgress] = useState(1)
   const [activeDeck, setActiveDeck] = useState<string>('all')
@@ -1890,14 +1892,31 @@ function App() {
   }, [items])
 
   const cardItems = useMemo(() => {
-    return items.filter((item) => {
+    const filtered = items.filter((item) => {
       const passDeck = activeDeck === 'all' ? true : item.deck === activeDeck
       const passLearning = item.status !== 'mastered' || item.reviewCount < 3
       const itemType = item.itemType ?? inferItemType(item.phrase)
       const passType = itemTypeFilter === 'all' ? true : itemType === itemTypeFilter
       return passDeck && passLearning && passType
     })
-  }, [items, activeDeck, itemTypeFilter])
+    if (cardPlayMode !== 'shuffle' || filtered.length <= 1) return filtered
+    // 시드 기반 결정적 셔플 (Fisher-Yates + xmur3 시드 PRNG)
+    const seed = cardShuffleSeed >>> 0
+    let s = seed === 0 ? 1 : seed
+    const rand = () => {
+      // xorshift32
+      s ^= s << 13
+      s ^= s >>> 17
+      s ^= s << 5
+      return ((s >>> 0) % 1_000_000) / 1_000_000
+    }
+    const arr = [...filtered]
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1))
+      ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+    return arr
+  }, [items, activeDeck, itemTypeFilter, cardPlayMode, cardShuffleSeed])
 
   const currentCard = cardItems[cardIndex] ?? null
   const detailItem = detailId ? items.find((item) => item.id === detailId) ?? null : null
@@ -3875,6 +3894,54 @@ function App() {
               >
                 Idiom
               </button>
+              <span className="card-play-mode" role="group" aria-label="카드 재생 순서">
+                <button
+                  type="button"
+                  className={`card-play-mode-btn${cardPlayMode === 'sequential' ? ' active' : ''}`}
+                  onClick={() => {
+                    setCardPlayMode('sequential')
+                    setCardIndex(0)
+                  }}
+                  title="순서대로 보기"
+                  aria-label="순서대로 보기"
+                  aria-pressed={cardPlayMode === 'sequential'}
+                >
+                  {/* 리스트(순서) 아이콘 */}
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path
+                      d="M4 6h16M4 12h16M4 18h10"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className={`card-play-mode-btn${cardPlayMode === 'shuffle' ? ' active' : ''}`}
+                  onClick={() => {
+                    setCardPlayMode('shuffle')
+                    setCardShuffleSeed(Date.now())
+                    setCardIndex(0)
+                  }}
+                  title={cardPlayMode === 'shuffle' ? '셔플 (다시 섞기)' : '셔플로 보기'}
+                  aria-label="셔플로 보기"
+                  aria-pressed={cardPlayMode === 'shuffle'}
+                >
+                  {/* 셔플 아이콘 */}
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path
+                      d="M16 4h4v4M20 4l-7 7M16 20h4v-4M20 20l-5-5M4 6h3l3 3M4 18h3l8-8"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  </svg>
+                </button>
+              </span>
             </section>
             <p className="card-counter">
               {cardItems.length === 0
