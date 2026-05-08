@@ -2942,6 +2942,11 @@ function App() {
       const elapsed = Date.now() - start
       setCardTimerProgress(Math.max(0, 1 - elapsed / CARD_AUTO_ADVANCE_MS))
     }, 32)
+    // 진행도 70% 시점에 자동으로 뒷면(뜻)으로 뒤집기
+    const flipAtMs = CARD_AUTO_ADVANCE_MS * 0.7
+    const flipTimeoutId = window.setTimeout(() => {
+      setCardFlipped((prev) => (prev ? prev : true))
+    }, flipAtMs)
     const timeoutId = window.setTimeout(() => {
       clearInterval(intervalId)
       nextCard()
@@ -2949,6 +2954,7 @@ function App() {
     return () => {
       clearInterval(intervalId)
       clearTimeout(timeoutId)
+      clearTimeout(flipTimeoutId)
     }
   }, [page, cardIndex, cardSlideTick, cardItems.length, isAddOpen, isDetailOpen, nextCard])
 
