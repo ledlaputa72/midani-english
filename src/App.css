@@ -1874,17 +1874,17 @@ button.danger {
   word-break: keep-all;
 }
 
-/* 뜻 1: 앞면 폰트(44px)의 ~60% = 26px, bold */
+/* 뜻 1: 30px bold */
 .flashcard-meaning-text--primary {
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 700;
   color: #f5f6fb;
   letter-spacing: -0.2px;
 }
 
-/* 뜻 2+: 뜻 1의 ~50% = 13px */
+/* 뜻 2+: 20px */
 .flashcard-meaning-text--secondary {
-  font-size: 13px;
+  font-size: 20px;
   font-weight: 500;
   color: #c8cae0;
   opacity: 0.92;
