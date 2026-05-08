@@ -938,27 +938,40 @@ button.danger {
   gap: 2px;
 }
 
-.card-play-mode-btn {
+/* .item-type-filter-row button 룰을 덮어쓰기 위해 스코프와 우선순위 강화 */
+.item-type-filter-row .card-play-mode-btn,
+.card-play-mode .card-play-mode-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 28px;
+  min-width: 0;
   border: none;
   background: transparent;
-  color: #9ea4c8;
+  color: #cfcfe6;
   border-radius: 16px;
   cursor: pointer;
   padding: 0;
+  font-size: 0;
+  line-height: 0;
+  box-shadow: none;
   transition: background 0.12s ease, color 0.12s ease;
 }
 
-.card-play-mode-btn:hover {
+.item-type-filter-row .card-play-mode-btn svg,
+.card-play-mode .card-play-mode-btn svg {
+  display: block;
+}
+
+.item-type-filter-row .card-play-mode-btn:hover,
+.card-play-mode .card-play-mode-btn:hover {
   color: #fff;
   background: #2a2c46;
 }
 
-.card-play-mode-btn.active {
+.item-type-filter-row .card-play-mode-btn.active,
+.card-play-mode .card-play-mode-btn.active {
   background: linear-gradient(180deg, #6f5dff 0%, #5443d3 100%);
   color: #fff;
   box-shadow: 0 0 0 1px rgba(178, 155, 255, 0.4);
