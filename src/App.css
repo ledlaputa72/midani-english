@@ -1934,14 +1934,21 @@ button.danger {
   opacity: 0.92;
 }
 
-/* 부 뜻 행은 행간 더 좁게 */
+/* 뜻 2+: 배지를 텍스트 앞 인라인으로 붙이고, 배지+텍스트 묶음을 중앙 정렬 */
 .flashcard-meaning-row--secondary {
-  gap: 3px;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
 }
 
 .flashcard-meaning-row--secondary .flashcard-meaning-badge {
   font-size: 10px;
   padding: 1px 7px;
+}
+
+.flashcard-meaning-row--secondary .flashcard-meaning-text {
+  text-align: left;
 }
 
 /* 뒷면 h3 (레거시 — 숨김) */
