@@ -5,12 +5,13 @@ import type { User } from 'firebase/auth'
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import { auth, db, firebaseReady } from './firebase'
+import SpeakingPage from './SpeakingPage'
 import './App.css'
 
 type Status = 'new' | 'learning' | 'mastered'
 type ItemType = 'vocabulary' | 'expression' | 'idiom'
 type AiProvider = 'default' | 'gemini'
-type Page = 'dashboard' | 'list' | 'board' | 'cards' | 'calendar' | 'analytics'
+type Page = 'dashboard' | 'list' | 'board' | 'cards' | 'calendar' | 'analytics' | 'speaking'
 type InputTab = 'text' | 'ocr'
 type ListSort = 'latest' | 'oldest' | 'phrase' | 'freq-high' | 'freq-low'
 type CardRating = 'again' | 'good' | 'easy' | 'skip'
@@ -106,6 +107,7 @@ const NAV_ITEMS: Array<{ id: Page; label: string }> = [
   { id: 'board', label: '보드' },
   { id: 'cards', label: '플래시카드' },
   { id: 'calendar', label: '캘린더' },
+  { id: 'speaking', label: '🎙️ 스피킹' },
 ]
 
 const EMPTY_FORM: FormState = {
@@ -5164,6 +5166,8 @@ function App() {
             </section>
           )
         })()}
+
+        {page === 'speaking' && <SpeakingPage />}
       </main>
 
       {createPortal(
