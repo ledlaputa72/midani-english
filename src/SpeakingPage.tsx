@@ -309,19 +309,20 @@ export default function SpeakingPage() {
         setTranscript('')
         sendToAI(text)
       } else {
-        setSessionState('listening')
-        startListeningRef.current()
+        setTranscript('')
+        setSessionState('ready')
+        setStatusText('말이 들리지 않았어요. 마이크 버튼을 눌러 다시 말해보세요.')
       }
     }
 
     recognition.onerror = (event: any) => {
       clearSilenceTimer()
-      if (event?.error === 'no-speech') {
-        startListeningRef.current()
-        return
-      }
       setSessionState('ready')
-      setStatusText('인식 오류. 다시 시도하세요.')
+      setStatusText(
+        event?.error === 'no-speech'
+          ? '말이 들리지 않았어요. 마이크 버튼을 눌러 다시 말해보세요.'
+          : '인식 오류. 마이크 버튼을 눌러 다시 시도하세요.',
+      )
     }
 
     recognition.start()
