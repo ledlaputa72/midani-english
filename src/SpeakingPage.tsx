@@ -266,6 +266,15 @@ export default function SpeakingPage() {
     }
 
     window.speechSynthesis.cancel()
+    if (recognitionRef.current) {
+      recognitionRef.current.onend = null
+      recognitionRef.current.onerror = null
+      try {
+        recognitionRef.current.abort()
+      } catch {
+        // 이미 정지된 인스턴스 — 무시
+      }
+    }
 
     const recognition = new SpeechRecognition()
     recognition.lang = 'en-US'
@@ -327,7 +336,12 @@ export default function SpeakingPage() {
       )
     }
 
-    recognition.start()
+    try {
+      recognition.start()
+    } catch {
+      // 직전 인식 인스턴스가 아직 정리되지 않은 경우 — 잠시 후 재시도
+      setTimeout(() => startListeningRef.current(), 300)
+    }
   }, [transcript, sendToAI, clearSilenceTimer])
 
   useEffect(() => {
