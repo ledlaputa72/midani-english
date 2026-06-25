@@ -23,8 +23,16 @@ const PATTERN_CATEGORIES = [
     label: 'A. 동의·반응',
     color: '#065f46',
     patterns: [
-      'You know', 'I mean', 'I think', 'I know', "That's right",
-      'Kind of / Sort of', 'I see', 'Exactly', 'That makes sense', 'Fair enough',
+      { en: 'You know', ko: '있잖아' },
+      { en: 'I mean', ko: '내 말은' },
+      { en: 'I think', ko: '내 생각엔' },
+      { en: 'I know', ko: '알아' },
+      { en: "That's right", ko: '맞아요' },
+      { en: 'Kind of / Sort of', ko: '어느 정도 / 그런 셈이지' },
+      { en: 'I see', ko: '그렇구나' },
+      { en: 'Exactly', ko: '정확해' },
+      { en: 'That makes sense', ko: '말이 되네' },
+      { en: 'Fair enough', ko: '그럴 만하네' },
     ],
   },
   {
@@ -32,9 +40,16 @@ const PATTERN_CATEGORIES = [
     label: 'B. 의견·생각',
     color: '#312e81',
     patterns: [
-      'I think that~', 'I feel like~', 'I guess~', "I'm not sure~",
-      'To be honest~', 'Actually~', 'Honestly~', 'The thing is~',
-      'I was thinking~', 'It seems like~',
+      { en: 'I think that~', ko: '~라고 생각해' },
+      { en: 'I feel like~', ko: '~인 것 같아' },
+      { en: 'I guess~', ko: '~인 것 같아 (추측)' },
+      { en: "I'm not sure~", ko: '잘 모르겠어~' },
+      { en: 'To be honest~', ko: '솔직히 말하면~' },
+      { en: 'Actually~', ko: '사실은~' },
+      { en: 'Honestly~', ko: '진짜로~' },
+      { en: 'The thing is~', ko: '문제는~' },
+      { en: 'I was thinking~', ko: '~할까 생각했어' },
+      { en: 'It seems like~', ko: '~인 것처럼 보여' },
     ],
   },
   {
@@ -42,10 +57,21 @@ const PATTERN_CATEGORIES = [
     label: 'C. 질문 패턴',
     color: '#92400e',
     patterns: [
-      'Do you~?', 'What do you~?', 'How do you~?', 'Did you~?',
-      'Are you~?', 'Can you~?', 'Could you~?', 'Have you ever~?',
-      'Would you~?', "Why don't we~?", "What's going on?",
-      'What happened?', 'What do you mean?', 'How was~?', 'What are you~?',
+      { en: 'Do you~?', ko: '~해?' },
+      { en: 'What do you~?', ko: '뭘 ~해?' },
+      { en: 'How do you~?', ko: '어떻게 ~해?' },
+      { en: 'Did you~?', ko: '~했어?' },
+      { en: 'Are you~?', ko: '~야?' },
+      { en: 'Can you~?', ko: '~할 수 있어?' },
+      { en: 'Could you~?', ko: '~해줄 수 있어요? (공손)' },
+      { en: 'Have you ever~?', ko: '~해본 적 있어?' },
+      { en: 'Would you~?', ko: '~할래요? (공손)' },
+      { en: "Why don't we~?", ko: '우리 ~할까?' },
+      { en: "What's going on?", ko: '무슨 일이야?' },
+      { en: 'What happened?', ko: '무슨 일 있었어?' },
+      { en: 'What do you mean?', ko: '그게 무슨 말이야?' },
+      { en: 'How was~?', ko: '~어땠어?' },
+      { en: 'What are you~?', ko: '뭐 ~해?' },
     ],
   },
   {
@@ -53,9 +79,16 @@ const PATTERN_CATEGORIES = [
     label: 'D. 부정·불확실',
     color: '#9f1239',
     patterns: [
-      "I don't~", "I don't know", "I can't~", "I don't think~",
-      "That's not~", "It's not like~", "I'm not really~", 'Not really',
-      "It doesn't matter", 'I have no idea',
+      { en: "I don't~", ko: '~안 해' },
+      { en: "I don't know", ko: '몰라' },
+      { en: "I can't~", ko: '~못해' },
+      { en: "I don't think~", ko: '~라고 생각 안 해' },
+      { en: "That's not~", ko: '그건 ~아니야' },
+      { en: "It's not like~", ko: '꼭 ~인 건 아니야' },
+      { en: "I'm not really~", ko: '별로 ~안 해' },
+      { en: 'Not really', ko: '별로' },
+      { en: "It doesn't matter", ko: '상관없어' },
+      { en: 'I have no idea', ko: '전혀 모르겠어' },
     ],
   },
   {
@@ -63,9 +96,16 @@ const PATTERN_CATEGORIES = [
     label: 'E. 제안·요청',
     color: '#155e75',
     patterns: [
-      "Let's~", 'I want to~', 'I need to~', 'I was wondering if~',
-      'Would you mind~?', 'Do you want to~?', 'How about~?',
-      'What if~?', 'You should~', "Why don't you~?",
+      { en: "Let's~", ko: '~하자' },
+      { en: 'I want to~', ko: '~하고 싶어' },
+      { en: 'I need to~', ko: '~해야 해' },
+      { en: 'I was wondering if~', ko: '혹시 ~할 수 있을까 해서' },
+      { en: 'Would you mind~?', ko: '~해도 괜찮을까요?' },
+      { en: 'Do you want to~?', ko: '~할래?' },
+      { en: 'How about~?', ko: '~는 어때?' },
+      { en: 'What if~?', ko: '만약 ~라면?' },
+      { en: 'You should~', ko: '~해야 해 (조언)' },
+      { en: "Why don't you~?", ko: '~해보는 건 어때?' },
     ],
   },
   {
@@ -73,9 +113,16 @@ const PATTERN_CATEGORIES = [
     label: 'F. 시간·상황',
     color: '#5b21b6',
     patterns: [
-      "I'm going to~", 'I was~ing', "I've been~ing", 'I used to~',
-      "I'm about to~", "I'll~", 'At the end of the day',
-      'By the way', 'Right now', 'All the time',
+      { en: "I'm going to~", ko: '~할 거야' },
+      { en: 'I was~ing', ko: '~하고 있었어' },
+      { en: "I've been~ing", ko: '계속 ~해왔어' },
+      { en: 'I used to~', ko: '예전에 ~했었어' },
+      { en: "I'm about to~", ko: '막 ~하려던 참이야' },
+      { en: "I'll~", ko: '~할게' },
+      { en: 'At the end of the day', ko: '결국에는' },
+      { en: 'By the way', ko: '그런데' },
+      { en: 'Right now', ko: '지금 당장' },
+      { en: 'All the time', ko: '항상' },
     ],
   },
   {
@@ -83,9 +130,16 @@ const PATTERN_CATEGORIES = [
     label: 'G. 감정·강조',
     color: '#9a3412',
     patterns: [
-      'Oh my God', "That's so~", "I'm so~", 'No way!',
-      'Are you serious?', "It's such a~", "That's crazy", "I'm sorry~",
-      "I can't believe~", 'What a~',
+      { en: 'Oh my God', ko: '어머나' },
+      { en: "That's so~", ko: '완전 ~하다' },
+      { en: "I'm so~", ko: '나 너무 ~해' },
+      { en: 'No way!', ko: '말도 안 돼!' },
+      { en: 'Are you serious?', ko: '진심이야?' },
+      { en: "It's such a~", ko: '완전 ~야' },
+      { en: "That's crazy", ko: '말도 안 돼 / 대단해' },
+      { en: "I'm sorry~", ko: '~라서 안타까워 / 미안해' },
+      { en: "I can't believe~", ko: '~라니 믿을 수가 없어' },
+      { en: 'What a~', ko: '완전 ~네' },
     ],
   },
   {
@@ -93,9 +147,16 @@ const PATTERN_CATEGORIES = [
     label: 'H. 대화 연결',
     color: '#1e293b',
     patterns: [
-      'So~', 'And then~', 'I mean~ (재확인)', 'Well~', 'Anyway~',
-      'Speaking of~', 'On top of that~', 'Either way~',
-      'I mean, honestly~', 'Let me know',
+      { en: 'So~', ko: '그래서~' },
+      { en: 'And then~', ko: '그리고 나서~' },
+      { en: 'I mean~ (재확인)', ko: '내 말은~ (다시 설명)' },
+      { en: 'Well~', ko: '음~' },
+      { en: 'Anyway~', ko: '아무튼~' },
+      { en: 'Speaking of~', ko: '~말이 나와서 말인데' },
+      { en: 'On top of that~', ko: '게다가~' },
+      { en: 'Either way~', ko: '어느 쪽이든~' },
+      { en: 'I mean, honestly~', ko: '솔직히 말해서~' },
+      { en: 'Let me know', ko: '알려줘' },
     ],
   },
   {
@@ -103,16 +164,38 @@ const PATTERN_CATEGORIES = [
     label: 'I. 구어체',
     color: '#166534',
     patterns: [
-      'I gotta~', 'Wanna~', 'Gonna~', 'I know, right?',
-      "That's what I'm saying", "What's up?", 'Hang on~', 'Come on~',
-      'Never mind', "Don't worry about it", "It's up to you",
-      'I totally~', 'You know what?', 'Go ahead', 'My bad',
+      { en: 'I gotta~', ko: '~해야 해 (구어)' },
+      { en: 'Wanna~', ko: '~하고 싶어? (구어)' },
+      { en: 'Gonna~', ko: '~할 거야 (구어)' },
+      { en: 'I know, right?', ko: '그렇지?' },
+      { en: "That's what I'm saying", ko: '내 말이 그 말이야' },
+      { en: "What's up?", ko: '요즘 어때? / 무슨 일이야?' },
+      { en: 'Hang on~', ko: '잠깐만~' },
+      { en: 'Come on~', ko: '왜 이래 / 어서' },
+      { en: 'Never mind', ko: '신경 쓰지 마' },
+      { en: "Don't worry about it", ko: '걱정하지 마' },
+      { en: "It's up to you", ko: '너한테 맡길게' },
+      { en: 'I totally~', ko: '완전 ~해' },
+      { en: 'You know what?', ko: '그거 알아?' },
+      { en: 'Go ahead', ko: '그렇게 해 / 먼저 해' },
+      { en: 'My bad', ko: '내 잘못이야' },
     ],
   },
 ]
 
+type PracticeMode = 'free' | 'correct'
+
 // ── 시스템 프롬프트 생성 ─────────────────────────────────────
-function buildSystemPrompt(categoryId: string, patterns: string[]): string {
+function buildSystemPrompt(categoryId: string, patterns: string[], mode: PracticeMode): string {
+  const modeRules =
+    mode === 'correct'
+      ? `- After EVERY one of my responses, silently check it for grammar or word-choice mistakes.
+- If I made a mistake: do NOT continue the topic this turn. Instead, reply with ONLY: a corrected, natural version of what I said (clearly marked, e.g. "More natural: \\"<corrected sentence>\\""), followed by a one-line question asking "Want to repeat it once, or move on to the next part?"
+- Wait for my reply. If I repeat the corrected sentence (shadowing) or say something close to it, briefly praise me and then continue the conversation topic with a new question. If I say "next", "move on", or "다음", continue the topic immediately without further correction practice.
+- If I made NO mistake: continue the conversation naturally, no correction needed.`
+      : `- Do NOT interrupt or correct mid-conversation. Wait until I say "feedback" to give corrections.
+- If I say "feedback", summarize: which patterns I used, which I missed, and one tip.`
+
   return `You are my American friend having a casual, natural conversation with me in English.
 
 Your goal is to naturally use and encourage these specific English patterns in our conversation:
@@ -123,12 +206,19 @@ Rules:
 - Speak like a real friend, not a teacher. Natural and casual.
 - Naturally weave the target patterns into your own sentences when appropriate.
 - When I use a pattern correctly, briefly acknowledge it or just continue naturally.
-- Do NOT interrupt or correct mid-conversation. Wait until I say "feedback" to give corrections.
-- If I say "feedback", summarize: which patterns I used, which I missed, and one tip.
+${modeRules}
 - If I say "next" or "다음", switch to a new conversation topic.
 - If I say "stop" or "그만", end the session warmly.
 - Start the conversation naturally — introduce a topic and invite me to respond.
 - Category focus: ${categoryId}`
+}
+
+// ── 영→한 번역 (대화 메시지용) ───────────────────────────────
+async function translateToKorean(text: string): Promise<string> {
+  return callGeminiChat(
+    'Translate the following English sentence into natural, concise Korean. Reply with ONLY the Korean translation — no quotes, no extra commentary.',
+    [{ role: 'user', parts: [{ text }] }],
+  )
 }
 
 // ── 음성 합성 유틸 ──────────────────────────────────────────
@@ -148,7 +238,7 @@ function speak(text: string, onEnd?: () => void) {
 }
 
 // ── 타입 ────────────────────────────────────────────────────
-type Message = { role: 'user' | 'model'; text: string }
+type Message = { role: 'user' | 'model'; text: string; ko?: string; showKo?: boolean }
 type SessionState = 'selecting' | 'idle' | 'ready' | 'listening' | 'thinking' | 'speaking'
 type Category = (typeof PATTERN_CATEGORIES)[0]
 
@@ -160,13 +250,20 @@ export default function SpeakingPage() {
   const [transcript, setTranscript] = useState('')
   const [statusText, setStatusText] = useState('카테고리를 선택하세요')
   const [isMuted, setIsMuted] = useState(false)
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>('free')
+  const [shownKoPatterns, setShownKoPatterns] = useState<Set<string>>(new Set())
 
   const recognitionRef = useRef<any>(null)
   const systemPromptRef = useRef<string>('')
   const historyRef = useRef<GeminiContent[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<Message[]>([])
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startListeningRef = useRef<() => void>(() => {})
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -220,8 +317,18 @@ export default function SpeakingPage() {
     setSelectedCat(cat)
     setMessages([])
     setTranscript('')
+    setShownKoPatterns(new Set())
     setSessionState('idle')
-    setStatusText('시작하기 버튼을 눌러 대화를 시작하세요')
+    setStatusText('진행 방식을 고르고 시작하기 버튼을 눌러 대화를 시작하세요')
+  }, [])
+
+  const togglePatternKo = useCallback((en: string) => {
+    setShownKoPatterns((prev) => {
+      const next = new Set(prev)
+      if (next.has(en)) next.delete(en)
+      else next.add(en)
+      return next
+    })
   }, [])
 
   // ── 세션 시작 (AI가 먼저 말 걸기) ───────────────────────────
@@ -232,7 +339,7 @@ export default function SpeakingPage() {
       setSessionState('thinking')
       setStatusText('대화를 시작하는 중...')
 
-      systemPromptRef.current = buildSystemPrompt(cat.id, cat.patterns)
+      systemPromptRef.current = buildSystemPrompt(cat.id, cat.patterns.map((p) => p.en), practiceMode)
       historyRef.current = [
         {
           role: 'user',
@@ -261,7 +368,7 @@ export default function SpeakingPage() {
         setSessionState('idle')
       }
     },
-    [isMuted],
+    [isMuted, practiceMode],
   )
 
   // ── 음성 인식 시작 ────────────────────────────────────────
@@ -355,6 +462,24 @@ export default function SpeakingPage() {
     startListeningRef.current = startListening
   }, [startListening])
 
+  // ── 메시지 한글 번역 토글 ────────────────────────────────────
+  const toggleTranslation = useCallback(async (index: number) => {
+    const current = messagesRef.current[index]
+    if (!current) return
+
+    if (current.ko !== undefined) {
+      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, showKo: !m.showKo } : m)))
+      return
+    }
+
+    try {
+      const ko = await translateToKorean(current.text)
+      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, ko, showKo: true } : m)))
+    } catch {
+      // 번역 실패 시 그대로 유지
+    }
+  }, [])
+
   // ── 세션 종료 ─────────────────────────────────────────────
   const endSession = () => {
     window.speechSynthesis.cancel()
@@ -432,9 +557,15 @@ export default function SpeakingPage() {
         <summary>연습 패턴 보기 ({selectedCat?.patterns.length}개)</summary>
         <div className="speaking-patterns-list">
           {selectedCat?.patterns.map((p) => (
-            <span key={p} className="speaking-pattern-chip">
-              {p}
-            </span>
+            <button
+              key={p.en}
+              type="button"
+              className="speaking-pattern-chip"
+              onClick={() => togglePatternKo(p.en)}
+              title="클릭하면 한글/영어 전환"
+            >
+              {shownKoPatterns.has(p.en) ? p.ko : p.en}
+            </button>
           ))}
         </div>
       </details>
@@ -442,9 +573,14 @@ export default function SpeakingPage() {
       {/* 메시지 영역 */}
       <div className="speaking-messages">
         {messages.map((msg, i) => (
-          <div key={i} className={`speaking-msg speaking-msg-${msg.role}`}>
+          <div
+            key={i}
+            className={`speaking-msg speaking-msg-${msg.role}`}
+            onClick={() => toggleTranslation(i)}
+            title="클릭하면 한글 번역 보기"
+          >
             <span className="speaking-msg-role">{msg.role === 'model' ? 'AI' : 'Me'}</span>
-            <p>{msg.text}</p>
+            <p>{msg.showKo && msg.ko ? msg.ko : msg.text}</p>
           </div>
         ))}
         {transcript && (
@@ -465,12 +601,32 @@ export default function SpeakingPage() {
       {/* 컨트롤 버튼 */}
       <div className="speaking-controls">
         {sessionState === 'idle' ? (
-          <button
-            className="speaking-mic-btn speaking-start-btn"
-            onClick={() => selectedCat && startSession(selectedCat)}
-          >
-            🚀 시작하기
-          </button>
+          <>
+            <div className="speaking-mode-select">
+              <button
+                type="button"
+                className={`speaking-mode-btn ${practiceMode === 'free' ? 'active' : ''}`}
+                onClick={() => setPracticeMode('free')}
+              >
+                💬 자유롭게 대화하기
+                <small>오류가 있어도 대화를 계속 이어가요</small>
+              </button>
+              <button
+                type="button"
+                className={`speaking-mode-btn ${practiceMode === 'correct' ? 'active' : ''}`}
+                onClick={() => setPracticeMode('correct')}
+              >
+                ✏️ 오류 교정 + 쉐도잉
+                <small>틀린 부분을 고쳐주고 따라 말해보게 해요</small>
+              </button>
+            </div>
+            <button
+              className="speaking-mic-btn speaking-start-btn"
+              onClick={() => selectedCat && startSession(selectedCat)}
+            >
+              🚀 시작하기
+            </button>
+          </>
         ) : (
           <button
             className={`speaking-mic-btn ${sessionState === 'listening' ? 'active' : ''}`}
