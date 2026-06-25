@@ -1,5 +1,20 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+
+// ── Gemini 서버리스 프록시 호출 ──────────────────────────────
+// 브라우저에서 @google/generative-ai로 직접 호출하면 API 키 제한으로 실패하므로,
+// OCR 기능과 동일하게 /api/gemini-chat 서버리스 함수를 통해 호출한다.
+type GeminiContent = { role: 'user' | 'model'; parts: { text: string }[] }
+
+async function callGeminiChat(systemInstruction: string, contents: GeminiContent[]): Promise<string> {
+  const res = await fetch('/api/gemini-chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ systemInstruction, contents }),
+  })
+  const data = await res.json()
+  if (!res.ok || !data.text) throw new Error(data.error || 'gemini-chat-failed')
+  return data.text as string
+}
 
 // ── 패턴 카테고리 정의 ──────────────────────────────────────
 const PATTERN_CATEGORIES = [
@@ -147,10 +162,9 @@ export default function SpeakingPage() {
   const [isMuted, setIsMuted] = useState(false)
 
   const recognitionRef = useRef<any>(null)
-  const chatRef = useRef<any>(null)
+  const systemPromptRef = useRef<string>('')
+  const historyRef = useRef<GeminiContent[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string
 
   // 메시지 자동 스크롤
   useEffect(() => {
@@ -166,13 +180,15 @@ export default function SpeakingPage() {
   // ── AI 응답 처리 ─────────────────────────────────────────
   const sendToAI = useCallback(
     async (userText: string) => {
-      if (!chatRef.current) return
+      if (!systemPromptRef.current) return
       setSessionState('thinking')
       setStatusText('AI가 생각 중...')
 
+      historyRef.current = [...historyRef.current, { role: 'user', parts: [{ text: userText }] }]
+
       try {
-        const result = await chatRef.current.sendMessage(userText)
-        const aiText: string = result.response.text()
+        const aiText = await callGeminiChat(systemPromptRef.current, historyRef.current)
+        historyRef.current = [...historyRef.current, { role: 'model', parts: [{ text: aiText }] }]
         setMessages((prev) => [...prev, { role: 'model', text: aiText }])
 
         if (!isMuted) {
@@ -203,19 +219,21 @@ export default function SpeakingPage() {
       setSessionState('thinking')
       setStatusText('대화를 시작하는 중...')
 
-      const genAI = new GoogleGenerativeAI(apiKey)
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
-      const chat = model.startChat({
-        systemInstruction: buildSystemPrompt(cat.id, cat.patterns),
-        history: [],
-      })
-      chatRef.current = chat
+      systemPromptRef.current = buildSystemPrompt(cat.id, cat.patterns)
+      historyRef.current = [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: 'Start the conversation now. Pick a casual daily-life topic and say something short to get me talking.',
+            },
+          ],
+        },
+      ]
 
       try {
-        const result = await chat.sendMessage(
-          'Start the conversation now. Pick a casual daily-life topic and say something short to get me talking.',
-        )
-        const aiText: string = result.response.text()
+        const aiText = await callGeminiChat(systemPromptRef.current, historyRef.current)
+        historyRef.current = [...historyRef.current, { role: 'model', parts: [{ text: aiText }] }]
         setMessages([{ role: 'model', text: aiText }])
 
         if (!isMuted) {
@@ -229,12 +247,12 @@ export default function SpeakingPage() {
           setSessionState('ready')
           setStatusText('마이크 버튼을 눌러 말하세요')
         }
-      } catch {
-        setStatusText('시작 오류. VITE_GEMINI_API_KEY를 확인하세요.')
+      } catch (err) {
+        setStatusText(`시작 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`)
         setSessionState('selecting')
       }
     },
-    [apiKey, isMuted],
+    [isMuted],
   )
 
   // ── 음성 인식 시작 ────────────────────────────────────────
@@ -297,7 +315,8 @@ export default function SpeakingPage() {
   const endSession = () => {
     window.speechSynthesis.cancel()
     recognitionRef.current?.stop()
-    chatRef.current = null
+    systemPromptRef.current = ''
+    historyRef.current = []
     setSessionState('selecting')
     setSelectedCat(null)
     setMessages([])
@@ -313,11 +332,6 @@ export default function SpeakingPage() {
           <h2>🎙️ Speaking Practice</h2>
           <p>연습할 패턴 카테고리를 선택하세요. AI가 먼저 말을 걸고, 마이크 버튼을 눌러 대답하세요.</p>
         </div>
-        {!apiKey && (
-          <p className="speaking-error">
-            ⚠️ VITE_GEMINI_API_KEY가 설정되지 않았습니다. Vercel 환경변수를 확인하세요.
-          </p>
-        )}
         {statusText !== '카테고리를 선택하세요' && (
           <p className={statusText.includes('오류') ? 'speaking-error' : 'speaking-tip'}>
             {statusText}
@@ -330,7 +344,6 @@ export default function SpeakingPage() {
               className="speaking-cat-btn"
               style={{ borderColor: cat.color, color: cat.color }}
               onClick={() => startSession(cat)}
-              disabled={!apiKey}
             >
               <span className="cat-id">{cat.id}</span>
               <span className="cat-label">{cat.label.replace(`${cat.id}. `, '')}</span>
