@@ -204,7 +204,7 @@ export default function SpeakingPage() {
       setStatusText('대화를 시작하는 중...')
 
       const genAI = new GoogleGenerativeAI(apiKey)
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
       const chat = model.startChat({
         systemInstruction: buildSystemPrompt(cat.id, cat.patterns),
         history: [],
@@ -313,6 +313,16 @@ export default function SpeakingPage() {
           <h2>🎙️ Speaking Practice</h2>
           <p>연습할 패턴 카테고리를 선택하세요. AI가 먼저 말을 걸고, 마이크 버튼을 눌러 대답하세요.</p>
         </div>
+        {!apiKey && (
+          <p className="speaking-error">
+            ⚠️ VITE_GEMINI_API_KEY가 설정되지 않았습니다. Vercel 환경변수를 확인하세요.
+          </p>
+        )}
+        {statusText !== '카테고리를 선택하세요' && (
+          <p className={statusText.includes('오류') ? 'speaking-error' : 'speaking-tip'}>
+            {statusText}
+          </p>
+        )}
         <div className="speaking-cat-grid">
           {PATTERN_CATEGORIES.map((cat) => (
             <button
@@ -320,6 +330,7 @@ export default function SpeakingPage() {
               className="speaking-cat-btn"
               style={{ borderColor: cat.color, color: cat.color }}
               onClick={() => startSession(cat)}
+              disabled={!apiKey}
             >
               <span className="cat-id">{cat.id}</span>
               <span className="cat-label">{cat.label.replace(`${cat.id}. `, '')}</span>

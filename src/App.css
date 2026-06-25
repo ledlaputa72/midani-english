@@ -4334,6 +4334,15 @@ button.danger {
   padding: 10px 14px;
   margin-top: 4px;
 }
+.speaking-error {
+  font-size: 0.82rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 4px;
+}
 
 /* 카테고리 그리드 */
 .speaking-cat-grid {
@@ -4357,6 +4366,12 @@ button.danger {
 .speaking-cat-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+.speaking-cat-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 .cat-id    { font-size: 1.25rem; font-weight: 900; line-height: 1; }
 .cat-label { font-size: 0.84rem; font-weight: 600; }
