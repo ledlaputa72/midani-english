@@ -3395,7 +3395,7 @@ button.danger {
 
   .mobile-bottom-nav {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 6px;
     position: fixed;
     left: 0;
@@ -4555,3 +4555,16 @@ button.danger {
   transition: background 0.1s;
 }
 .speaking-quick-btns button:hover { background: #f5f5f5; }
+
+/* 모바일 — Speaking Practice: 상단 상태바 / 하단 내비 겹침 방지 */
+@media (max-width: 768px) {
+  .content:has(.speaking-active) {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .speaking-active {
+    height: 100dvh;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 14px
+      calc(86px + env(safe-area-inset-bottom, 0px));
+  }
+}
