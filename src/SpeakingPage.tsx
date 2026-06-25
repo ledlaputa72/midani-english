@@ -203,7 +203,7 @@ export default function SpeakingPage() {
         if (!isMuted) {
           setSessionState('speaking')
           setStatusText('AI 말하는 중...')
-          speak(aiText, () => startListeningRef.current())
+          speak(aiText, () => setTimeout(() => startListeningRef.current(), 400))
         } else {
           startListeningRef.current()
         }
@@ -244,7 +244,7 @@ export default function SpeakingPage() {
         if (!isMuted) {
           setSessionState('speaking')
           setStatusText('AI 말하는 중...')
-          speak(aiText, () => startListeningRef.current())
+          speak(aiText, () => setTimeout(() => startListeningRef.current(), 400))
         } else {
           startListeningRef.current()
         }
@@ -275,17 +275,18 @@ export default function SpeakingPage() {
 
     let finalText = ''
 
-    const resetSilenceTimer = () => {
+    const resetSilenceTimer = (ms: number) => {
       clearSilenceTimer()
-      silenceTimerRef.current = setTimeout(() => recognition.stop(), 3000)
+      silenceTimerRef.current = setTimeout(() => recognition.stop(), ms)
     }
 
     recognition.onstart = () => {
       setSessionState('listening')
-      setStatusText('듣고 있어요... (3초간 조용하면 자동 종료)')
+      setStatusText('듣고 있어요... 말해보세요')
       setTranscript('')
       finalText = ''
-      resetSilenceTimer()
+      // 말을 시작하기 전까지는 넉넉히 기다리고, 말이 시작된 후엔 3초 침묵 시 종료
+      resetSilenceTimer(8000)
     }
 
     recognition.onresult = (event: any) => {
@@ -298,7 +299,8 @@ export default function SpeakingPage() {
       }
       if (final) finalText += final
       setTranscript(finalText || interim)
-      resetSilenceTimer()
+      setStatusText('듣고 있어요... (3초간 조용하면 자동 종료)')
+      resetSilenceTimer(3000)
     }
 
     recognition.onend = () => {
