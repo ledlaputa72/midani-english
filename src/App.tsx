@@ -1563,6 +1563,8 @@ function App() {
   })
   const googleProviderRef = useRef(new GoogleAuthProvider())
   const accountMenuRef = useRef<HTMLDivElement>(null)
+  const mobileMoreMenuRef = useRef<HTMLDivElement>(null)
+  const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false)
   const importFileRef = useRef<HTMLInputElement>(null)
   const swipeStartXRef = useRef<number | null>(null)
   const swipeStartYRef = useRef<number | null>(null)
@@ -2065,6 +2067,17 @@ function App() {
     window.addEventListener('mousedown', onPointerDown)
     return () => window.removeEventListener('mousedown', onPointerDown)
   }, [isAccountMenuOpen])
+
+  useEffect(() => {
+    if (!isMobileMoreOpen) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (!mobileMoreMenuRef.current?.contains(event.target as Node)) {
+        setIsMobileMoreOpen(false)
+      }
+    }
+    window.addEventListener('mousedown', onPointerDown)
+    return () => window.removeEventListener('mousedown', onPointerDown)
+  }, [isMobileMoreOpen])
 
   useEffect(() => {
     if (activeDeck === 'all') return
@@ -3313,6 +3326,77 @@ function App() {
                 {page === 'list' || page === 'board' ? '+ 추가' : '단어 / 구문 추가'}
               </button>
             )}
+            <div className="mobile-more-wrap" ref={mobileMoreMenuRef}>
+              <button
+                type="button"
+                className="mobile-more-trigger"
+                onClick={() => setIsMobileMoreOpen((prev) => !prev)}
+                aria-label="더 보기"
+              >
+                ⋯
+              </button>
+              {isMobileMoreOpen && (
+                <div className="account-menu mobile-more-menu">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPage('analytics')
+                      setIsMobileMoreOpen(false)
+                    }}
+                  >
+                    📊 학습 분석
+                  </button>
+                  {authUser ? (
+                    <>
+                      <div className="mobile-more-user">
+                        <strong>{authUser.displayName || 'Google 사용자'}</strong>
+                        <small>{authUser.email || '이메일 없음'}</small>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfilesOpen(true)
+                          resetProfileEditor()
+                          setSettingsMsg('')
+                          setIsMobileMoreOpen(false)
+                        }}
+                      >
+                        카드 정보 프로파일
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsSettingsOpen(true)
+                          setSettingsMsg('')
+                          setIsMobileMoreOpen(false)
+                        }}
+                      >
+                        설정
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          logout()
+                          setIsMobileMoreOpen(false)
+                        }}
+                      >
+                        로그아웃
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        loginWithGoogle()
+                        setIsMobileMoreOpen(false)
+                      }}
+                    >
+                      Google 로그인
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </header>
         {syncError && <p className="sync-error-banner">동기화 오류: {syncError}</p>}
