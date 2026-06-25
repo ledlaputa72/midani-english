@@ -4488,10 +4488,58 @@ button.danger {
 }
 .speaking-pattern-chip {
   background: #f0f0f0;
+  border: none;
   border-radius: 20px;
   padding: 3px 11px;
   font-size: 0.78rem;
   color: #333;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.speaking-pattern-chip:hover {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+/* 진행 방식 선택 */
+.speaking-mode-select {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 10px;
+}
+.speaking-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  background: #f7f7f8;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.speaking-mode-btn small {
+  font-size: 0.74rem;
+  font-weight: 400;
+  color: #888;
+}
+.speaking-mode-btn:hover {
+  background: #eef2ff;
+}
+.speaking-mode-btn.active {
+  background: #eef2ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+.speaking-mode-btn.active small {
+  color: #3b82f6;
 }
 
 /* 메시지 영역 */
@@ -4509,6 +4557,13 @@ button.danger {
   flex-direction: column;
   gap: 3px;
   max-width: 86%;
+  cursor: pointer;
+}
+.speaking-msg p {
+  transition: background 0.15s;
+}
+.speaking-msg:hover p {
+  filter: brightness(0.97);
 }
 .speaking-msg-model  { align-self: flex-start; }
 .speaking-msg-user   { align-self: flex-end; text-align: right; }
