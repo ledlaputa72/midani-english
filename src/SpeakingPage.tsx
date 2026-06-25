@@ -149,7 +149,7 @@ function speak(text: string, onEnd?: () => void) {
 
 // ── 타입 ────────────────────────────────────────────────────
 type Message = { role: 'user' | 'model'; text: string }
-type SessionState = 'selecting' | 'ready' | 'listening' | 'thinking' | 'speaking'
+type SessionState = 'selecting' | 'idle' | 'ready' | 'listening' | 'thinking' | 'speaking'
 type Category = (typeof PATTERN_CATEGORIES)[0]
 
 // ── 메인 컴포넌트 ───────────────────────────────────────────
@@ -215,10 +215,18 @@ export default function SpeakingPage() {
     [isMuted],
   )
 
-  // ── 카테고리 선택 & 세션 시작 ────────────────────────────
+  // ── 카테고리 선택 (대화는 아직 시작하지 않음) ──────────────
+  const selectCategory = useCallback((cat: Category) => {
+    setSelectedCat(cat)
+    setMessages([])
+    setTranscript('')
+    setSessionState('idle')
+    setStatusText('시작하기 버튼을 눌러 대화를 시작하세요')
+  }, [])
+
+  // ── 세션 시작 (AI가 먼저 말 걸기) ───────────────────────────
   const startSession = useCallback(
     async (cat: Category) => {
-      setSelectedCat(cat)
       setMessages([])
       setTranscript('')
       setSessionState('thinking')
@@ -250,7 +258,7 @@ export default function SpeakingPage() {
         }
       } catch (err) {
         setStatusText(`시작 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`)
-        setSessionState('selecting')
+        setSessionState('idle')
       }
     },
     [isMuted],
@@ -284,18 +292,17 @@ export default function SpeakingPage() {
 
     let finalText = ''
 
-    const resetSilenceTimer = (ms: number) => {
+    const resetSilenceTimer = () => {
       clearSilenceTimer()
-      silenceTimerRef.current = setTimeout(() => recognition.stop(), ms)
+      silenceTimerRef.current = setTimeout(() => recognition.stop(), 5000)
     }
 
     recognition.onstart = () => {
       setSessionState('listening')
-      setStatusText('듣고 있어요... 말해보세요')
+      setStatusText('듣는 중... 말해보세요')
       setTranscript('')
       finalText = ''
-      // 말을 시작하기 전까지는 넉넉히 기다리고, 말이 시작된 후엔 3초 침묵 시 종료
-      resetSilenceTimer(8000)
+      resetSilenceTimer()
     }
 
     recognition.onresult = (event: any) => {
@@ -308,8 +315,8 @@ export default function SpeakingPage() {
       }
       if (final) finalText += final
       setTranscript(finalText || interim)
-      setStatusText('듣고 있어요... (3초간 조용하면 자동 종료)')
-      resetSilenceTimer(3000)
+      setStatusText('듣는 중...')
+      resetSilenceTimer()
     }
 
     recognition.onend = () => {
@@ -382,7 +389,7 @@ export default function SpeakingPage() {
               key={cat.id}
               className="speaking-cat-btn"
               style={{ borderColor: cat.color, color: cat.color }}
-              onClick={() => startSession(cat)}
+              onClick={() => selectCategory(cat)}
             >
               <span className="cat-id">{cat.id}</span>
               <span className="cat-label">{cat.label.replace(`${cat.id}. `, '')}</span>
@@ -457,20 +464,33 @@ export default function SpeakingPage() {
 
       {/* 컨트롤 버튼 */}
       <div className="speaking-controls">
-        <button
-          className={`speaking-mic-btn ${sessionState === 'listening' ? 'active' : ''}`}
-          disabled={sessionState === 'thinking' || sessionState === 'speaking'}
-          onClick={
-            sessionState === 'listening'
-              ? () => recognitionRef.current?.stop()
-              : startListening
-          }
-        >
-          {sessionState === 'listening' ? '⏹ 완료' : '🎤 말하기'}
-        </button>
+        {sessionState === 'idle' ? (
+          <button
+            className="speaking-mic-btn speaking-start-btn"
+            onClick={() => selectedCat && startSession(selectedCat)}
+          >
+            🚀 시작하기
+          </button>
+        ) : (
+          <button
+            className={`speaking-mic-btn ${sessionState === 'listening' ? 'active' : ''}`}
+            disabled={sessionState === 'thinking' || sessionState === 'speaking'}
+            onClick={
+              sessionState === 'listening'
+                ? () => recognitionRef.current?.stop()
+                : startListening
+            }
+          >
+            {sessionState === 'listening' ? '🔴 듣는 중...' : '🎤 말하기'}
+          </button>
+        )}
         <div className="speaking-quick-btns">
-          <button onClick={() => sendToAI('feedback')}>📊 피드백</button>
-          <button onClick={() => sendToAI('next')}>➡️ 다음 주제</button>
+          <button disabled={sessionState === 'idle'} onClick={() => sendToAI('feedback')}>
+            📊 피드백
+          </button>
+          <button disabled={sessionState === 'idle'} onClick={() => sendToAI('next')}>
+            ➡️ 다음 주제
+          </button>
           <button onClick={endSession}>🔄 처음으로</button>
         </div>
       </div>
