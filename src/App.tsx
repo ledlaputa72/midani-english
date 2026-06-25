@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { DragEvent as ReactDragEvent, FormEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
+import { GoogleAuthProvider, getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import { auth, db, firebaseReady } from './firebase'
 import SpeakingPage from './SpeakingPage'
@@ -1600,6 +1600,9 @@ function App() {
       setAuthLoading(false)
       return
     }
+    getRedirectResult(auth).catch((error) => {
+      setAuthError(error instanceof Error ? error.message : '구글 로그인에 실패했습니다.')
+    })
     const unsub = onAuthStateChanged(auth, (nextUser) => {
       setAuthUser(nextUser)
       setAuthLoading(false)
@@ -3020,6 +3023,24 @@ function App() {
     try {
       await signInWithPopup(auth, googleProviderRef.current)
     } catch (error) {
+      const code = (error as { code?: string } | null)?.code ?? ''
+      // 모바일 브라우저(Safari, 인앱 브라우저 등)는 팝업이 막히거나 지원되지 않는 경우가
+      // 많으므로 리디렉션 방식으로 재시도한다.
+      if (
+        code === 'auth/popup-blocked' ||
+        code === 'auth/popup-closed-by-user' ||
+        code === 'auth/cancelled-popup-request' ||
+        code === 'auth/operation-not-supported-in-this-environment'
+      ) {
+        try {
+          await signInWithRedirect(auth, googleProviderRef.current)
+        } catch (redirectError) {
+          setAuthError(
+            redirectError instanceof Error ? redirectError.message : '구글 로그인에 실패했습니다.',
+          )
+        }
+        return
+      }
       setAuthError(error instanceof Error ? error.message : '구글 로그인에 실패했습니다.')
     }
   }
