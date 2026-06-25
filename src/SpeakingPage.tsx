@@ -165,6 +165,15 @@ export default function SpeakingPage() {
   const systemPromptRef = useRef<string>('')
   const historyRef = useRef<GeminiContent[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const startListeningRef = useRef<() => void>(() => {})
+
+  const clearSilenceTimer = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
+  }, [])
 
   // 메시지 자동 스크롤
   useEffect(() => {
@@ -194,13 +203,9 @@ export default function SpeakingPage() {
         if (!isMuted) {
           setSessionState('speaking')
           setStatusText('AI 말하는 중...')
-          speak(aiText, () => {
-            setSessionState('ready')
-            setStatusText('마이크 버튼을 눌러 말하세요')
-          })
+          speak(aiText, () => startListeningRef.current())
         } else {
-          setSessionState('ready')
-          setStatusText('마이크 버튼을 눌러 말하세요')
+          startListeningRef.current()
         }
       } catch {
         setStatusText('오류가 발생했습니다. 다시 시도하세요.')
@@ -239,13 +244,9 @@ export default function SpeakingPage() {
         if (!isMuted) {
           setSessionState('speaking')
           setStatusText('AI 말하는 중...')
-          speak(aiText, () => {
-            setSessionState('ready')
-            setStatusText('마이크 버튼을 눌러 말하세요')
-          })
+          speak(aiText, () => startListeningRef.current())
         } else {
-          setSessionState('ready')
-          setStatusText('마이크 버튼을 눌러 말하세요')
+          startListeningRef.current()
         }
       } catch (err) {
         setStatusText(`시작 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`)
@@ -264,6 +265,8 @@ export default function SpeakingPage() {
       return
     }
 
+    window.speechSynthesis.cancel()
+
     const recognition = new SpeechRecognition()
     recognition.lang = 'en-US'
     recognition.interimResults = true
@@ -272,11 +275,17 @@ export default function SpeakingPage() {
 
     let finalText = ''
 
+    const resetSilenceTimer = () => {
+      clearSilenceTimer()
+      silenceTimerRef.current = setTimeout(() => recognition.stop(), 3000)
+    }
+
     recognition.onstart = () => {
       setSessionState('listening')
-      setStatusText('듣고 있어요... 말하세요')
+      setStatusText('듣고 있어요... (3초간 조용하면 자동 종료)')
       setTranscript('')
       finalText = ''
+      resetSilenceTimer()
     }
 
     recognition.onresult = (event: any) => {
@@ -287,33 +296,46 @@ export default function SpeakingPage() {
         if (event.results[i].isFinal) final += t
         else interim += t
       }
-      if (final) finalText = final
-      setTranscript(final || interim)
+      if (final) finalText += final
+      setTranscript(finalText || interim)
+      resetSilenceTimer()
     }
 
     recognition.onend = () => {
-      const text = finalText || transcript
-      if (text.trim()) {
+      clearSilenceTimer()
+      const text = (finalText || transcript).trim()
+      if (text) {
         setMessages((prev) => [...prev, { role: 'user', text }])
         setTranscript('')
         sendToAI(text)
       } else {
-        setSessionState('ready')
-        setStatusText('마이크 버튼을 눌러 말하세요')
+        setSessionState('listening')
+        startListeningRef.current()
       }
     }
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: any) => {
+      clearSilenceTimer()
+      if (event?.error === 'no-speech') {
+        startListeningRef.current()
+        return
+      }
       setSessionState('ready')
       setStatusText('인식 오류. 다시 시도하세요.')
     }
 
     recognition.start()
-  }, [transcript, sendToAI])
+  }, [transcript, sendToAI, clearSilenceTimer])
+
+  useEffect(() => {
+    startListeningRef.current = startListening
+  }, [startListening])
 
   // ── 세션 종료 ─────────────────────────────────────────────
   const endSession = () => {
     window.speechSynthesis.cancel()
+    clearSilenceTimer()
+    if (recognitionRef.current) recognitionRef.current.onend = null
     recognitionRef.current?.stop()
     systemPromptRef.current = ''
     historyRef.current = []
