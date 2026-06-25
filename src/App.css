@@ -4299,3 +4299,244 @@ button.danger {
     display: none;
   }
 }
+
+/* ──────────────────────────────────────────────
+   Speaking Practice — App.css 맨 끝에 추가
+────────────────────────────────────────────── */
+
+.speaking-page {
+  padding: 24px;
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* 헤더 */
+.speaking-header h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.speaking-header p {
+  color: #666;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.speaking-tip {
+  font-size: 0.82rem;
+  color: #888;
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 4px;
+}
+
+/* 카테고리 그리드 */
+.speaking-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  gap: 12px;
+}
+.speaking-cat-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 2px solid;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+  text-align: left;
+}
+.speaking-cat-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+.cat-id    { font-size: 1.25rem; font-weight: 900; line-height: 1; }
+.cat-label { font-size: 0.84rem; font-weight: 600; }
+.cat-count { font-size: 0.75rem; color: #999; margin-top: 2px; }
+
+/* 대화 세션 레이아웃 */
+.speaking-active {
+  height: calc(100vh - 48px);
+  padding: 16px 24px 12px;
+}
+
+/* 세션 헤더 */
+.speaking-session-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.speaking-back-btn {
+  background: none;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 0;
+  white-space: nowrap;
+}
+.speaking-back-btn:hover { color: #222; }
+.speaking-cat-badge {
+  flex: 1;
+  text-align: center;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.speaking-mute-btn {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.speaking-mute-btn.muted { background: #f5f5f5; }
+
+/* 패턴 목록 */
+.speaking-patterns-detail {
+  flex-shrink: 0;
+}
+.speaking-patterns-detail summary {
+  cursor: pointer;
+  font-size: 0.84rem;
+  color: #666;
+  padding: 5px 0;
+  user-select: none;
+}
+.speaking-patterns-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0 4px;
+}
+.speaking-pattern-chip {
+  background: #f0f0f0;
+  border-radius: 20px;
+  padding: 3px 11px;
+  font-size: 0.78rem;
+  color: #333;
+}
+
+/* 메시지 영역 */
+.speaking-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+  min-height: 0;
+}
+.speaking-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 86%;
+}
+.speaking-msg-model  { align-self: flex-start; }
+.speaking-msg-user   { align-self: flex-end; text-align: right; }
+.speaking-msg-interim{ align-self: flex-end; opacity: 0.5; }
+
+.speaking-msg-role {
+  font-size: 0.72rem;
+  color: #aaa;
+  font-weight: 600;
+  padding: 0 4px;
+}
+.speaking-msg p {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.speaking-msg-model   p { background: #f1f1f1; color: #222; }
+.speaking-msg-user    p { background: #3b82f6; color: #fff; }
+.speaking-msg-interim p { background: #e0e7ff; color: #3730a3; }
+
+/* 상태 표시 */
+.speaking-status {
+  text-align: center;
+  font-size: 0.84rem;
+  color: #888;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 28px;
+}
+.speaking-status-listening { color: #ef4444; font-weight: 600; }
+.speaking-status-thinking  { color: #f59e0b; }
+.speaking-status-speaking  { color: #3b82f6; }
+
+.speaking-pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: spk-pulse 1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes spk-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.35; transform: scale(0.65); }
+}
+
+/* 컨트롤 버튼 영역 */
+.speaking-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 4px;
+  flex-shrink: 0;
+}
+.speaking-mic-btn {
+  width: 100%;
+  max-width: 300px;
+  padding: 15px;
+  border-radius: 50px;
+  font-size: 1rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  background: #3b82f6;
+  color: #fff;
+  transition: background 0.15s, transform 0.1s;
+}
+.speaking-mic-btn.active          { background: #ef4444; }
+.speaking-mic-btn:disabled        { background: #c0c0c0; cursor: not-allowed; }
+.speaking-mic-btn:not(:disabled):hover { transform: scale(1.02); }
+
+.speaking-quick-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.speaking-quick-btns button {
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font-size: 0.82rem;
+  cursor: pointer;
+  color: #555;
+  transition: background 0.1s;
+}
+.speaking-quick-btns button:hover { background: #f5f5f5; }
