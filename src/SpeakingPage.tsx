@@ -294,7 +294,7 @@ export default function SpeakingPage() {
 
     const resetSilenceTimer = () => {
       clearSilenceTimer()
-      silenceTimerRef.current = setTimeout(() => recognition.stop(), 5000)
+      silenceTimerRef.current = setTimeout(() => recognition.stop(), 10000)
     }
 
     recognition.onstart = () => {
