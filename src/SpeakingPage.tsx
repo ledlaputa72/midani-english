@@ -189,10 +189,10 @@ type PracticeMode = 'free' | 'correct'
 function buildSystemPrompt(categoryId: string, patterns: string[], mode: PracticeMode): string {
   const modeRules =
     mode === 'correct'
-      ? `- After EVERY one of my responses, silently check it for grammar or word-choice mistakes.
-- If I made a mistake: do NOT continue the topic this turn. Instead, reply with ONLY: a corrected, natural version of what I said (clearly marked, e.g. "More natural: \\"<corrected sentence>\\""), followed by a one-line question asking "Want to repeat it once, or move on to the next part?"
-- Wait for my reply. If I repeat the corrected sentence (shadowing) or say something close to it, briefly praise me and then continue the conversation topic with a new question. If I say "next", "move on", or "다음", continue the topic immediately without further correction practice.
-- If I made NO mistake: continue the conversation naturally, no correction needed.`
+      ? `- After EVERY one of my responses, check it for grammar or word-choice mistakes, but be lenient — only flag something if it would sound clearly unnatural to a native speaker. Minor, harmless differences are NOT mistakes.
+- If I made a real mistake: do NOT continue the topic this turn. Instead, reply with ONLY: a corrected, natural version of what I said (clearly marked, e.g. "More natural: \\"<corrected sentence>\\""), followed by a one-line question asking "Want to repeat it once, or move on to the next part?"
+- Wait for my reply. Grade my repeat leniently — accept it as a successful shadow if it captures most of the key words and meaning, even with small differences in word order, articles, or pronunciation (don't require a perfect word-for-word match). Briefly praise me and continue the conversation topic with a new question. If I say "next", "move on", or "다음", continue the topic immediately without further correction practice.
+- If I made NO real mistake: continue the conversation naturally, no correction needed.`
       : `- Do NOT interrupt or correct mid-conversation. Wait until I say "feedback" to give corrections.
 - If I say "feedback", summarize: which patterns I used, which I missed, and one tip.`
 
@@ -219,6 +219,47 @@ async function translateToKorean(text: string): Promise<string> {
     'Translate the following English sentence into natural, concise Korean. Reply with ONLY the Korean translation — no quotes, no extra commentary.',
     [{ role: 'user', parts: [{ text }] }],
   )
+}
+
+// ── 교정 모드: AI 응답에서 "More natural: ..." 추천 문장 추출 ────
+function extractCorrection(aiText: string): string | null {
+  const m = aiText.match(/More natural:\s*"([^"]+)"/i)
+  return m ? m[1].trim() : null
+}
+
+// ── 단어 단위 diff (LCS 기반) — 내가 말한 문장에서 틀린 단어 표시용 ──
+function normalizeWord(w: string): string {
+  return w.toLowerCase().replace(/[^a-z0-9']/g, '')
+}
+
+function diffWords(target: string, attempt: string): { word: string; ok: boolean }[] {
+  const t = target.split(/\s+/).filter(Boolean).map(normalizeWord)
+  const a = attempt.split(/\s+/).filter(Boolean)
+  const aNorm = a.map(normalizeWord)
+  const n = t.length
+  const m = aNorm.length
+  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0))
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      dp[i][j] =
+        t[i - 1] && t[i - 1] === aNorm[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1])
+    }
+  }
+  const matched = new Array(m).fill(false)
+  let i = n
+  let j = m
+  while (i > 0 && j > 0) {
+    if (t[i - 1] && t[i - 1] === aNorm[j - 1]) {
+      matched[j - 1] = true
+      i--
+      j--
+    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+      i--
+    } else {
+      j--
+    }
+  }
+  return a.map((word, idx) => ({ word, ok: matched[idx] }))
 }
 
 // ── 음성 합성 유틸 ──────────────────────────────────────────
@@ -252,6 +293,13 @@ export default function SpeakingPage() {
   const [isMuted, setIsMuted] = useState(false)
   const [practiceMode, setPracticeMode] = useState<PracticeMode>('free')
   const [shownKoPatterns, setShownKoPatterns] = useState<Set<string>>(new Set())
+  const [fontScale, setFontScale] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('speaking-font-scale'))
+    return saved && saved >= 0.8 && saved <= 1.8 ? saved : 1
+  })
+  const [lastCorrection, setLastCorrection] = useState<string | null>(null)
+  const [lastUserAttempt, setLastUserAttempt] = useState('')
+  const [shadowBoxVisible, setShadowBoxVisible] = useState(true)
 
   const recognitionRef = useRef<any>(null)
   const systemPromptRef = useRef<string>('')
@@ -264,6 +312,14 @@ export default function SpeakingPage() {
   useEffect(() => {
     messagesRef.current = messages
   }, [messages])
+
+  useEffect(() => {
+    localStorage.setItem('speaking-font-scale', String(fontScale))
+  }, [fontScale])
+
+  const adjustFontScale = useCallback((delta: number) => {
+    setFontScale((prev) => Math.min(1.8, Math.max(0.8, Math.round((prev + delta) * 10) / 10)))
+  }, [])
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -297,6 +353,12 @@ export default function SpeakingPage() {
         historyRef.current = [...historyRef.current, { role: 'model', parts: [{ text: aiText }] }]
         setMessages((prev) => [...prev, { role: 'model', text: aiText }])
 
+        const correction = extractCorrection(aiText)
+        if (correction) {
+          setLastCorrection(correction)
+          setLastUserAttempt('')
+        }
+
         if (!isMuted) {
           setSessionState('speaking')
           setStatusText('AI 말하는 중...')
@@ -318,6 +380,8 @@ export default function SpeakingPage() {
     setMessages([])
     setTranscript('')
     setShownKoPatterns(new Set())
+    setLastCorrection(null)
+    setLastUserAttempt('')
     setSessionState('idle')
     setStatusText('진행 방식을 고르고 시작하기 버튼을 눌러 대화를 시작하세요')
   }, [])
@@ -355,6 +419,8 @@ export default function SpeakingPage() {
         const aiText = await callGeminiChat(systemPromptRef.current, historyRef.current)
         historyRef.current = [...historyRef.current, { role: 'model', parts: [{ text: aiText }] }]
         setMessages([{ role: 'model', text: aiText }])
+        setLastCorrection(null)
+        setLastUserAttempt('')
 
         if (!isMuted) {
           setSessionState('speaking')
@@ -431,6 +497,7 @@ export default function SpeakingPage() {
       const text = (finalText || transcript).trim()
       if (text) {
         setMessages((prev) => [...prev, { role: 'user', text }])
+        setLastUserAttempt(text)
         setTranscript('')
         sendToAI(text)
       } else {
@@ -492,6 +559,8 @@ export default function SpeakingPage() {
     setSelectedCat(null)
     setMessages([])
     setTranscript('')
+    setLastCorrection(null)
+    setLastUserAttempt('')
     setStatusText('카테고리를 선택하세요')
   }
 
@@ -531,7 +600,10 @@ export default function SpeakingPage() {
 
   // ── 대화 화면 ─────────────────────────────────────────────
   return (
-    <section className="speaking-page speaking-active">
+    <section
+      className="speaking-page speaking-active"
+      style={{ '--speaking-font-scale': fontScale } as React.CSSProperties}
+    >
       {/* 상단 헤더 */}
       <div className="speaking-session-header">
         <button className="speaking-back-btn" onClick={endSession}>
@@ -539,6 +611,24 @@ export default function SpeakingPage() {
         </button>
         <div className="speaking-cat-badge" style={{ background: selectedCat?.color }}>
           {selectedCat?.label}
+        </div>
+        <div className="speaking-font-ctrl">
+          <button
+            type="button"
+            onClick={() => adjustFontScale(-0.1)}
+            title="글자 작게"
+            disabled={fontScale <= 0.8}
+          >
+            A-
+          </button>
+          <button
+            type="button"
+            onClick={() => adjustFontScale(0.1)}
+            title="글자 크게"
+            disabled={fontScale >= 1.8}
+          >
+            A+
+          </button>
         </div>
         <button
           className={`speaking-mute-btn ${isMuted ? 'muted' : ''}`}
@@ -569,6 +659,49 @@ export default function SpeakingPage() {
           ))}
         </div>
       </details>
+
+      {/* 쉐도잉 비교 박스 (교정 모드) */}
+      {practiceMode === 'correct' && lastCorrection && (
+        <div className="speaking-shadow-box">
+          {shadowBoxVisible ? (
+            <>
+              <button
+                type="button"
+                className="speaking-shadow-toggle"
+                onClick={() => setShadowBoxVisible(false)}
+              >
+                숨기기 ▲
+              </button>
+              <div className="speaking-shadow-row">
+                <span className="speaking-shadow-label">✅ AI 추천 문장</span>
+                <p className="speaking-shadow-target">{lastCorrection}</p>
+              </div>
+              <div className="speaking-shadow-row">
+                <span className="speaking-shadow-label">🎤 내가 말한 문장</span>
+                <p className="speaking-shadow-attempt">
+                  {lastUserAttempt ? (
+                    diffWords(lastCorrection, lastUserAttempt).map((w, i) => (
+                      <span key={i} className={w.ok ? '' : 'speaking-shadow-wrong'}>
+                        {w.word}{' '}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="speaking-shadow-waiting">따라 말해보세요...</span>
+                  )}
+                </p>
+              </div>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="speaking-shadow-toggle"
+              onClick={() => setShadowBoxVisible(true)}
+            >
+              쉐도잉 비교 보기 ▼
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 메시지 영역 */}
       <div className="speaking-messages">
