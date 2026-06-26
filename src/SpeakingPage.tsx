@@ -335,17 +335,26 @@ function diffWords(target: string, attempt: string): { word: string; ok: boolean
 }
 
 // ── 음성 합성 유틸 ──────────────────────────────────────────
+type VoiceGender = 'male' | 'female'
+
 // 브라우저 내장 TTS (폴백용) — 기계적인 발음이지만 항상 사용 가능
-function speakBrowserTts(text: string, onEnd?: () => void) {
+function speakBrowserTts(text: string, onEnd?: () => void, gender: VoiceGender = 'male') {
   window.speechSynthesis.cancel()
   const utt = new SpeechSynthesisUtterance(text)
   utt.lang = 'en-US'
   utt.rate = 0.92
-  utt.pitch = 1.0
+  utt.pitch = gender === 'female' ? 1.25 : 1.0
   const voices = window.speechSynthesis.getVoices()
+  const enVoices = voices.filter((v) => v.lang.startsWith('en'))
+  const genderMatch = enVoices.find((v) =>
+    gender === 'female'
+      ? /female|woman|samantha|victoria|karen|zira|susan/i.test(v.name)
+      : /male|man|daniel|david|alex|fred/i.test(v.name),
+  )
   const enVoice =
-    voices.find((v) => v.lang.startsWith('en') && v.localService) ||
-    voices.find((v) => v.lang.startsWith('en'))
+    genderMatch ||
+    enVoices.find((v) => v.localService) ||
+    enVoices[0]
   if (enVoice) utt.voice = enVoice
   if (onEnd) {
     utt.onend = onEnd
@@ -389,7 +398,12 @@ function stopTts() {
 // Gemini TTS(신경망 음성, 훨씬 자연스러운 발음) 우선 사용, 실패 시 브라우저 TTS로 폴백.
 // 어떤 경로로도 onEnd가 호출되지 않는 상황(자동재생 차단 등)에 대비해 워치독 타이머로
 // 항상 대화가 이어지도록 보장한다.
-async function speak(text: string, onEnd?: () => void) {
+function ttsVoiceFor(gender: VoiceGender): string {
+  // Gemini TTS 프리셋 음성 — Charon(남성), Kore(여성)
+  return gender === 'female' ? 'Kore' : 'Charon'
+}
+
+async function speak(text: string, onEnd?: () => void, gender: VoiceGender = 'male') {
   stopTts()
 
   let finished = false
@@ -406,7 +420,7 @@ async function speak(text: string, onEnd?: () => void) {
     const res = await fetch('/api/gemini-tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voice: 'Charon' }),
+      body: JSON.stringify({ text, voice: ttsVoiceFor(gender) }),
     })
     const data = await res.json()
     if (!res.ok || !data.audio) throw new Error(data.error || 'tts-failed')
@@ -415,7 +429,7 @@ async function speak(text: string, onEnd?: () => void) {
     el.muted = false
     el.src = `data:${data.mime};base64,${data.audio}`
     el.onended = finish
-    el.onerror = () => speakBrowserTts(text, finish)
+    el.onerror = () => speakBrowserTts(text, finish, gender)
     await el.play()
 
     // 모바일에서 play()가 resolve돼도 실제로는 소리 없이 멈춰있는 경우가 있다.
@@ -426,11 +440,11 @@ async function speak(text: string, onEnd?: () => void) {
         el.onended = null
         el.onerror = null
         el.pause()
-        speakBrowserTts(text, finish)
+        speakBrowserTts(text, finish, gender)
       }
     }, 2000)
   } catch {
-    speakBrowserTts(text, finish)
+    speakBrowserTts(text, finish, gender)
   }
 }
 
@@ -591,12 +605,20 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       if (!autoModeRef.current) return // 생성 도중 Auto 대화가 꺼졌으면 중단
       setMessages((prev) => [...prev, { role: 'user', text: autoUserText, auto: true }])
       setLastUserAttempt(autoUserText)
-      sendToAI(autoUserText)
+
+      // 나를 대신하는 AI 대사도 들려준다. AI 캐릭터(남성 음성)와 구분되도록 여성 음성을 사용한다.
+      if (!isMuted) {
+        setSessionState('speaking')
+        setStatusText('Auto 대화 읽는 중...')
+        speak(autoUserText, () => sendToAI(autoUserText), 'female')
+      } else {
+        sendToAI(autoUserText)
+      }
     } catch {
       setStatusText('Auto 대화 생성 중 오류가 발생했습니다.')
       setSessionState('ready')
     }
-  }, [sendToAI])
+  }, [sendToAI, isMuted])
 
   useEffect(() => {
     runAutoTurnRef.current = runAutoTurn
