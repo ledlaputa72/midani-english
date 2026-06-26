@@ -949,13 +949,6 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
         >
           {isMuted ? '🔇' : '🔊'}
         </button>
-        <button
-          className={`speaking-auto-btn ${autoMode ? 'active' : ''}`}
-          onClick={() => setAutoMode((v) => !v)}
-          title={autoMode ? 'Auto 대화 끄기 (다시 내가 말하기)' : 'Auto 대화 켜기 (AI가 내 대신 대화 이어가기)'}
-        >
-          🤖 Auto 대화 {autoMode ? 'ON' : 'OFF'}
-        </button>
       </div>
 
       {/* 패턴 목록 (접기/펼치기) */}
@@ -1106,6 +1099,13 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
             ➡️ 다음 주제
           </button>
           <button onClick={endSession}>🔄 처음으로</button>
+          <button
+            className={`speaking-auto-btn ${autoMode ? 'active' : ''}`}
+            onClick={() => setAutoMode((v) => !v)}
+            title={autoMode ? 'Auto 대화 끄기 (다시 내가 말하기)' : 'Auto 대화 켜기 (AI가 내 대신 대화 이어가기)'}
+          >
+            🤖 Auto 대화 {autoMode ? 'ON' : 'OFF'}
+          </button>
         </div>
       </div>
     </section>
