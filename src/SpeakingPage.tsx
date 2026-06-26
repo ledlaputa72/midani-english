@@ -597,30 +597,40 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   )
 
   // ── 음성 인식 시작 ────────────────────────────────────────
-  const startListening = useCallback(() => {
+  // Android Chrome 등 일부 모바일 브라우저는 매 턴마다 새 SpeechRecognition 인스턴스를
+  // 만들었다가 버리면 몇 차례 후부터 onstart는 정상 발생하지만 실제 인식 파이프라인이
+  // 조용히 동작하지 않는 경우가 있다. 세션 동안 인스턴스를 하나만 만들어 재사용하고,
+  // 매 턴마다 이벤트 핸들러만 새로 연결한다.
+  const getRecognitionInstance = useCallback(() => {
+    if (recognitionRef.current) return recognitionRef.current
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) {
-      alert('음성 인식은 Chrome 브라우저에서만 지원됩니다.')
-      return
-    }
-
-    stopTts()
-    if (recognitionRef.current) {
-      recognitionRef.current.onend = null
-      recognitionRef.current.onerror = null
-      try {
-        recognitionRef.current.abort()
-      } catch {
-        // 이미 정지된 인스턴스 — 무시
-      }
-    }
-
+    if (!SpeechRecognition) return null
     const recognition = new SpeechRecognition()
     recognition.lang = 'en-US'
     recognition.interimResults = true
     recognition.maxAlternatives = 1
     recognitionRef.current = recognition
+    return recognition
+  }, [])
+
+  const startListening = useCallback(() => {
+    const recognition = getRecognitionInstance()
+    if (!recognition) {
+      alert('음성 인식은 Chrome 브라우저에서만 지원됩니다.')
+      return
+    }
+
+    stopTts()
+    recognition.onresult = null
+    recognition.onend = null
+    recognition.onerror = null
+    recognition.onstart = null
+    try {
+      recognition.abort()
+    } catch {
+      // 이미 정지된 인스턴스 — 무시
+    }
 
     let finalText = ''
 
@@ -682,7 +692,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       // 직전 인식 인스턴스가 아직 정리되지 않은 경우 — 잠시 후 재시도
       setTimeout(() => startListeningRef.current(), 300)
     }
-  }, [transcript, sendToAI, clearSilenceTimer])
+  }, [transcript, sendToAI, clearSilenceTimer, getRecognitionInstance])
 
   useEffect(() => {
     startListeningRef.current = startListening
