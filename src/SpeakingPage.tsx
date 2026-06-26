@@ -322,7 +322,8 @@ function diffWords(target: string, attempt: string): { word: string; ok: boolean
 }
 
 // ── 음성 합성 유틸 ──────────────────────────────────────────
-function speak(text: string, onEnd?: () => void) {
+// 브라우저 내장 TTS (폴백용) — 기계적인 발음이지만 항상 사용 가능
+function speakBrowserTts(text: string, onEnd?: () => void) {
   window.speechSynthesis.cancel()
   const utt = new SpeechSynthesisUtterance(text)
   utt.lang = 'en-US'
@@ -335,6 +336,45 @@ function speak(text: string, onEnd?: () => void) {
   if (enVoice) utt.voice = enVoice
   if (onEnd) utt.onend = onEnd
   window.speechSynthesis.speak(utt)
+}
+
+let currentTtsAudio: HTMLAudioElement | null = null
+
+function stopTts() {
+  window.speechSynthesis.cancel()
+  if (currentTtsAudio) {
+    currentTtsAudio.pause()
+    currentTtsAudio = null
+  }
+}
+
+// Gemini TTS(신경망 음성, 훨씬 자연스러운 발음) 우선 사용, 실패 시 브라우저 TTS로 폴백
+async function speak(text: string, onEnd?: () => void) {
+  stopTts()
+
+  try {
+    const res = await fetch('/api/gemini-tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice: 'Charon' }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.audio) throw new Error(data.error || 'tts-failed')
+
+    const audio = new Audio(`data:${data.mime};base64,${data.audio}`)
+    currentTtsAudio = audio
+    audio.onended = () => {
+      currentTtsAudio = null
+      onEnd?.()
+    }
+    audio.onerror = () => {
+      currentTtsAudio = null
+      speakBrowserTts(text, onEnd)
+    }
+    await audio.play()
+  } catch {
+    speakBrowserTts(text, onEnd)
+  }
 }
 
 // ── 타입 ────────────────────────────────────────────────────
@@ -520,7 +560,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       return
     }
 
-    window.speechSynthesis.cancel()
+    stopTts()
     if (recognitionRef.current) {
       recognitionRef.current.onend = null
       recognitionRef.current.onerror = null
@@ -623,7 +663,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
 
   // ── 세션 종료 ─────────────────────────────────────────────
   const endSession = () => {
-    window.speechSynthesis.cancel()
+    stopTts()
     clearSilenceTimer()
     if (recognitionRef.current) recognitionRef.current.onend = null
     recognitionRef.current?.stop()
@@ -728,7 +768,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
           className={`speaking-mute-btn ${isMuted ? 'muted' : ''}`}
           onClick={() => {
             setIsMuted((v) => !v)
-            window.speechSynthesis.cancel()
+            stopTts()
           }}
           title={isMuted ? '음성 켜기' : '음성 끄기'}
         >
