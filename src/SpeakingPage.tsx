@@ -185,6 +185,82 @@ const PATTERN_CATEGORIES = [
 
 type PracticeMode = 'free' | 'correct'
 
+// ── 대화 주제 그룹 (분류별 다중 선택) ───────────────────────────
+// 시작 시 학습자가 직접 주제를 고르게 해서 AI가 매번 "주말" 질문으로 시작하는
+// 반복 패턴을 줄이고, 다양한 상황 기반 대화가 나오도록 한다.
+const TOPIC_GROUPS: { id: string; label: string; topics: { en: string; ko: string }[] }[] = [
+  {
+    id: 'travel',
+    label: '✈️ 여행',
+    topics: [
+      { en: 'planning a trip', ko: '여행 계획' },
+      { en: 'airport and flights', ko: '공항/비행기' },
+      { en: 'hotel and accommodation', ko: '숙소' },
+      { en: 'packing for a trip', ko: '짐 싸기' },
+    ],
+  },
+  {
+    id: 'food',
+    label: '🍜 음식·식당',
+    topics: [
+      { en: 'ordering food at a restaurant', ko: '식당에서 주문하기' },
+      { en: 'cooking at home', ko: '집에서 요리하기' },
+      { en: 'trying a new dish', ko: '새로운 음식 시도하기' },
+      { en: 'favorite restaurant', ko: '좋아하는 식당' },
+    ],
+  },
+  {
+    id: 'work',
+    label: '💼 비즈니스·일',
+    topics: [
+      { en: 'a meeting at work', ko: '회사 회의' },
+      { en: 'job interview', ko: '면접' },
+      { en: 'work-life balance', ko: '워라밸' },
+      { en: 'a deadline or project', ko: '마감/프로젝트' },
+    ],
+  },
+  {
+    id: 'daily',
+    label: '🏠 일상생활',
+    topics: [
+      { en: 'morning routine', ko: '아침 루틴' },
+      { en: 'shopping', ko: '쇼핑' },
+      { en: 'weather', ko: '날씨' },
+      { en: 'weekend plans', ko: '주말 계획' },
+    ],
+  },
+  {
+    id: 'health',
+    label: '💪 건강·운동',
+    topics: [
+      { en: 'exercise routine', ko: '운동 루틴' },
+      { en: 'diet and eating habits', ko: '식습관' },
+      { en: 'sleep habits', ko: '수면 습관' },
+      { en: 'stress and relaxation', ko: '스트레스 해소' },
+    ],
+  },
+  {
+    id: 'entertainment',
+    label: '🎬 영화·취미',
+    topics: [
+      { en: 'a movie or show', ko: '영화/드라마' },
+      { en: 'music', ko: '음악' },
+      { en: 'a hobby', ko: '취미' },
+      { en: 'books', ko: '책' },
+    ],
+  },
+  {
+    id: 'relationships',
+    label: '👨‍👩‍👧 인간관계',
+    topics: [
+      { en: 'family', ko: '가족' },
+      { en: 'friends', ko: '친구' },
+      { en: 'dating', ko: '연애' },
+      { en: 'a disagreement or conflict', ko: '갈등 상황' },
+    ],
+  },
+]
+
 // ── 단어장 연동 카테고리 (Vocabulary / Expression / Idiom) ─────────
 type StudyKind = 'vocab' | 'expression' | 'idiom'
 
@@ -242,6 +318,7 @@ function buildSystemPrompt(
   patterns: string[],
   mode: PracticeMode,
   kind?: StudyKind,
+  topics?: string[],
 ): string {
   const modeRules =
     mode === 'correct'
@@ -271,6 +348,11 @@ ${patterns.map((p, i) => `${i + 1}. "${p}"`).join('\n')}
 - Gently encourage me to try using one of these idioms when the topic fits, without forcing it.`,
   }
 
+  const topicGuidance =
+    topics && topics.length > 0
+      ? `\n- Conversation topics to draw from (pick a DIFFERENT one each time the topic changes — do NOT default to talking about weekends every time):\n${topics.map((t, i) => `  ${i + 1}. ${t}`).join('\n')}`
+      : '\n- Vary the conversation topic naturally each time — avoid defaulting to "weekend plans" every session.'
+
   return `You are my American friend having a casual, natural conversation with me in English.
 
 ${goalByKind[kind ?? 'pattern']}
@@ -280,7 +362,7 @@ Rules:
 - Speak like a real friend, not a teacher. Natural and casual.
 - Plain text only — do NOT use markdown formatting like **bold**, *italics*, or bullet lists.
 ${modeRules}
-- If I say "next" or "다음", switch to a new conversation topic.
+- If I say "next" or "다음", switch to a new conversation topic.${topicGuidance}
 - If I say "stop" or "그만", end the session warmly.
 - Start the conversation naturally — introduce a topic and invite me to respond.
 - Category focus: ${categoryId}`
@@ -492,6 +574,8 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   const [isMuted, setIsMuted] = useState(false)
   const [practiceMode, setPracticeMode] = useState<PracticeMode>('free')
   const [shownKoPatterns, setShownKoPatterns] = useState<Set<string>>(new Set())
+  const [selectedPatternKeys, setSelectedPatternKeys] = useState<Set<string>>(new Set())
+  const [selectedTopicKeys, setSelectedTopicKeys] = useState<Set<string>>(new Set())
   const [fontScale, setFontScale] = useState<number>(() => {
     const saved = Number(localStorage.getItem('speaking-font-scale'))
     return saved && saved >= 0.8 && saved <= 1.8 ? saved : 1
@@ -651,14 +735,34 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
     setMessages([])
     setTranscript('')
     setShownKoPatterns(new Set())
+    setSelectedPatternKeys(new Set(cat.patterns.map((p) => p.en)))
+    setSelectedTopicKeys(new Set())
     setLastCorrection(null)
     setLastUserAttempt('')
     setSessionState('idle')
-    setStatusText('진행 방식을 고르고 시작하기 버튼을 눌러 대화를 시작하세요')
+    setStatusText('연습 패턴·주제·대화 방식을 고르고 시작하기 버튼을 눌러 대화를 시작하세요')
   }, [])
 
   const togglePatternKo = useCallback((en: string) => {
     setShownKoPatterns((prev) => {
+      const next = new Set(prev)
+      if (next.has(en)) next.delete(en)
+      else next.add(en)
+      return next
+    })
+  }, [])
+
+  const togglePatternSelect = useCallback((en: string) => {
+    setSelectedPatternKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(en)) next.delete(en)
+      else next.add(en)
+      return next
+    })
+  }, [])
+
+  const toggleTopicSelect = useCallback((en: string) => {
+    setSelectedTopicKeys((prev) => {
       const next = new Set(prev)
       if (next.has(en)) next.delete(en)
       else next.add(en)
@@ -674,20 +778,27 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       setSessionState('thinking')
       setStatusText('대화를 시작하는 중...')
 
+      const activePatterns = cat.patterns.filter((p) => selectedPatternKeys.has(p.en))
+      const patternsForPrompt = (activePatterns.length > 0 ? activePatterns : cat.patterns).map((p) => p.en)
+      const topicsForPrompt = Array.from(selectedTopicKeys)
+
       systemPromptRef.current = buildSystemPrompt(
         cat.id,
-        cat.patterns.map((p) => p.en),
+        patternsForPrompt,
         practiceMode,
         isStudyCategory(cat) ? cat.kind : undefined,
+        topicsForPrompt,
       )
+
+      const kickoffText =
+        topicsForPrompt.length > 0
+          ? `Start the conversation now. Pick ONE of these topics: ${topicsForPrompt.join(', ')}. Say something short about it to get me talking.`
+          : "Start the conversation now. Pick a casual daily-life topic (vary it — don't default to talking about weekends) and say something short to get me talking."
+
       historyRef.current = [
         {
           role: 'user',
-          parts: [
-            {
-              text: 'Start the conversation now. Pick a casual daily-life topic and say something short to get me talking.',
-            },
-          ],
+          parts: [{ text: kickoffText }],
         },
       ]
 
@@ -710,7 +821,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
         setSessionState('idle')
       }
     },
-    [isMuted, practiceMode, proceedAfterAi],
+    [isMuted, practiceMode, proceedAfterAi, selectedPatternKeys, selectedTopicKeys],
   )
 
   // ── 음성 인식 시작 ────────────────────────────────────────
@@ -1089,26 +1200,70 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       <div className="speaking-controls">
         {sessionState === 'idle' ? (
           <>
-            <div className="speaking-mode-select">
-              <button
-                type="button"
-                className={`speaking-mode-btn ${practiceMode === 'free' ? 'active' : ''}`}
-                onClick={() => setPracticeMode('free')}
-              >
-                💬 자유롭게 대화하기
-                <small>오류가 있어도 대화를 계속 이어가요</small>
-              </button>
-              <button
-                type="button"
-                className={`speaking-mode-btn ${practiceMode === 'correct' ? 'active' : ''}`}
-                onClick={() => setPracticeMode('correct')}
-              >
-                ✏️ 오류 교정 + 쉐도잉
-                <small>틀린 부분을 고쳐주고 따라 말해보게 해요</small>
-              </button>
+            <div className="speaking-config-section">
+              <h4>1. 연습 패턴 선택 (다중 선택)</h4>
+              <div className="speaking-pattern-multiselect">
+                {selectedCat?.patterns.map((p) => (
+                  <button
+                    key={p.en}
+                    type="button"
+                    className={`speaking-pattern-chip-select ${selectedPatternKeys.has(p.en) ? 'selected' : ''}`}
+                    onClick={() => togglePatternSelect(p.en)}
+                  >
+                    {selectedPatternKeys.has(p.en) ? '✅ ' : ''}
+                    {p.en}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            <div className="speaking-config-section">
+              <h4>2. 대화 주제 선택 (다중 선택, 안 고르면 AI가 다양하게 골라요)</h4>
+              {TOPIC_GROUPS.map((group) => (
+                <div key={group.id} className="speaking-topic-group">
+                  <span className="speaking-topic-group-label">{group.label}</span>
+                  <div className="speaking-topic-list">
+                    {group.topics.map((t) => (
+                      <button
+                        key={t.en}
+                        type="button"
+                        className={`speaking-topic-chip ${selectedTopicKeys.has(t.en) ? 'selected' : ''}`}
+                        onClick={() => toggleTopicSelect(t.en)}
+                      >
+                        {selectedTopicKeys.has(t.en) ? '✅ ' : ''}
+                        {t.ko}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="speaking-config-section">
+              <h4>3. 대화 방식</h4>
+              <div className="speaking-mode-select">
+                <button
+                  type="button"
+                  className={`speaking-mode-btn ${practiceMode === 'free' ? 'active' : ''}`}
+                  onClick={() => setPracticeMode('free')}
+                >
+                  💬 자유롭게 대화하기
+                  <small>오류가 있어도 대화를 계속 이어가요</small>
+                </button>
+                <button
+                  type="button"
+                  className={`speaking-mode-btn ${practiceMode === 'correct' ? 'active' : ''}`}
+                  onClick={() => setPracticeMode('correct')}
+                >
+                  ✏️ 오류 교정 + 쉐도잉
+                  <small>틀린 부분을 고쳐주고 따라 말해보게 해요</small>
+                </button>
+              </div>
+            </div>
+
             <button
               className="speaking-mic-btn speaking-start-btn"
+              disabled={selectedPatternKeys.size === 0}
               onClick={() => {
                 unlockTtsAudio()
                 if (selectedCat) startSession(selectedCat)
