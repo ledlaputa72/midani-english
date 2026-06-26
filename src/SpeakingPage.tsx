@@ -347,23 +347,60 @@ function speakBrowserTts(text: string, onEnd?: () => void) {
     voices.find((v) => v.lang.startsWith('en') && v.localService) ||
     voices.find((v) => v.lang.startsWith('en'))
   if (enVoice) utt.voice = enVoice
-  if (onEnd) utt.onend = onEnd
+  if (onEnd) {
+    utt.onend = onEnd
+    utt.onerror = onEnd
+  }
   window.speechSynthesis.speak(utt)
 }
 
-let currentTtsAudio: HTMLAudioElement | null = null
+// 모바일 브라우저는 사용자 제스처 없이 호출된 audio.play()를 자동재생 정책으로 막는 경우가 많다.
+// <audio> 엘리먼트를 매번 새로 만들지 않고 하나만 재사용하면서, "시작하기" 같은 실제 탭 이벤트
+// 안에서 한 번 재생/정지시켜 "unlock"해두면 이후 비동기 콜백 안에서의 재생도 허용된다.
+let sharedTtsAudioEl: HTMLAudioElement | null = null
+
+function getTtsAudioEl(): HTMLAudioElement {
+  if (!sharedTtsAudioEl) {
+    sharedTtsAudioEl = new Audio()
+    sharedTtsAudioEl.preload = 'auto'
+  }
+  return sharedTtsAudioEl
+}
+
+// 사용자가 직접 누른 버튼의 onClick 안에서 동기적으로 호출해 모바일 자동재생 잠금을 해제한다.
+function unlockTtsAudio() {
+  const el = getTtsAudioEl()
+  el.muted = true
+  el.play()
+    .then(() => {
+      el.pause()
+      el.muted = false
+    })
+    .catch(() => {
+      el.muted = false
+    })
+}
 
 function stopTts() {
   window.speechSynthesis.cancel()
-  if (currentTtsAudio) {
-    currentTtsAudio.pause()
-    currentTtsAudio = null
-  }
+  sharedTtsAudioEl?.pause()
 }
 
-// Gemini TTS(신경망 음성, 훨씬 자연스러운 발음) 우선 사용, 실패 시 브라우저 TTS로 폴백
+// Gemini TTS(신경망 음성, 훨씬 자연스러운 발음) 우선 사용, 실패 시 브라우저 TTS로 폴백.
+// 어떤 경로로도 onEnd가 호출되지 않는 상황(자동재생 차단 등)에 대비해 워치독 타이머로
+// 항상 대화가 이어지도록 보장한다.
 async function speak(text: string, onEnd?: () => void) {
   stopTts()
+
+  let finished = false
+  let watchdog: ReturnType<typeof setTimeout>
+  const finish = () => {
+    if (finished) return
+    finished = true
+    clearTimeout(watchdog)
+    onEnd?.()
+  }
+  watchdog = setTimeout(finish, 15000)
 
   try {
     const res = await fetch('/api/gemini-tts', {
@@ -374,19 +411,14 @@ async function speak(text: string, onEnd?: () => void) {
     const data = await res.json()
     if (!res.ok || !data.audio) throw new Error(data.error || 'tts-failed')
 
-    const audio = new Audio(`data:${data.mime};base64,${data.audio}`)
-    currentTtsAudio = audio
-    audio.onended = () => {
-      currentTtsAudio = null
-      onEnd?.()
-    }
-    audio.onerror = () => {
-      currentTtsAudio = null
-      speakBrowserTts(text, onEnd)
-    }
-    await audio.play()
+    const el = getTtsAudioEl()
+    el.muted = false
+    el.src = `data:${data.mime};base64,${data.audio}`
+    el.onended = finish
+    el.onerror = () => speakBrowserTts(text, finish)
+    await el.play()
   } catch {
-    speakBrowserTts(text, onEnd)
+    speakBrowserTts(text, finish)
   }
 }
 
@@ -904,7 +936,10 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
             </div>
             <button
               className="speaking-mic-btn speaking-start-btn"
-              onClick={() => selectedCat && startSession(selectedCat)}
+              onClick={() => {
+                unlockTtsAudio()
+                if (selectedCat) startSession(selectedCat)
+              }}
             >
               🚀 시작하기
             </button>
