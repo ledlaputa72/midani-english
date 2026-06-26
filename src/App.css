@@ -4489,19 +4489,19 @@ button.danger {
 
 .speaking-msg-auto { opacity: 0.75; border-style: dashed; }
 
-.speaking-auto-btn {
-  background: none;
+.speaking-quick-btns button.speaking-auto-btn {
+  background: #fff;
   border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 6px 10px;
+  border-radius: 20px;
+  padding: 7px 14px;
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  color: #555;
+  color: #222;
   flex-shrink: 0;
   white-space: nowrap;
 }
-.speaking-auto-btn.active {
+.speaking-quick-btns button.speaking-auto-btn.active {
   background: #7c3aed;
   border-color: #7c3aed;
   color: #fff;
