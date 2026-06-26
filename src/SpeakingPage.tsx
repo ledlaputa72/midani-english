@@ -417,6 +417,18 @@ async function speak(text: string, onEnd?: () => void) {
     el.onended = finish
     el.onerror = () => speakBrowserTts(text, finish)
     await el.play()
+
+    // 모바일에서 play()가 resolve돼도 실제로는 소리 없이 멈춰있는 경우가 있다.
+    // 재생 시작 후 currentTime이 전혀 움직이지 않으면 무음 재생으로 간주하고 폴백한다.
+    setTimeout(() => {
+      if (finished) return
+      if (el.paused || el.currentTime === 0) {
+        el.onended = null
+        el.onerror = null
+        el.pause()
+        speakBrowserTts(text, finish)
+      }
+    }, 2000)
   } catch {
     speakBrowserTts(text, finish)
   }
@@ -633,6 +645,34 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
     }
 
     let finalText = ''
+    let settled = false // onend/onerror 중 하나라도 호출되면 true
+
+    // 일부 Android Chrome 환경에서는 start()가 호출되어 onstart까지는 정상 발생하지만
+    // 내부 인식 파이프라인이 멈춰버려 onresult/onend/onerror가 전혀 발생하지 않는
+    // 경우가 있다. 이때는 stop()/abort()조차 반응이 없을 수 있으므로, 일정 시간 동안
+    // settled 되지 않으면 인스턴스 자체를 버리고 다음 시도 때 새로 만들도록 강제 복구한다.
+    let hardWatchdog: ReturnType<typeof setTimeout> | null = null
+    const armHardWatchdog = () => {
+      if (hardWatchdog) clearTimeout(hardWatchdog)
+      hardWatchdog = setTimeout(() => {
+        if (settled) return
+        settled = true
+        clearSilenceTimer()
+        recognition.onresult = null
+        recognition.onend = null
+        recognition.onerror = null
+        recognition.onstart = null
+        try {
+          recognition.abort()
+        } catch {
+          // 무시
+        }
+        recognitionRef.current = null // 손상된 인스턴스로 추정 — 다음 시도 때 새로 생성
+        setTranscript('')
+        setSessionState('ready')
+        setStatusText('인식이 응답하지 않아요. 마이크 버튼을 눌러 다시 시도하세요.')
+      }, 13000)
+    }
 
     const resetSilenceTimer = () => {
       clearSilenceTimer()
@@ -645,6 +685,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       setTranscript('')
       finalText = ''
       resetSilenceTimer()
+      armHardWatchdog()
     }
 
     recognition.onresult = (event: any) => {
@@ -659,9 +700,13 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       setTranscript(finalText || interim)
       setStatusText('듣는 중...')
       resetSilenceTimer()
+      armHardWatchdog()
     }
 
     recognition.onend = () => {
+      if (settled) return
+      settled = true
+      if (hardWatchdog) clearTimeout(hardWatchdog)
       clearSilenceTimer()
       const text = (finalText || transcript).trim()
       if (text) {
@@ -677,7 +722,14 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
     }
 
     recognition.onerror = (event: any) => {
+      if (settled) return
+      settled = true
+      if (hardWatchdog) clearTimeout(hardWatchdog)
       clearSilenceTimer()
+      // no-speech/aborted 외의 오류는 인식기가 손상되었을 가능성이 있으므로 다음번엔 새로 생성
+      if (event?.error && event.error !== 'no-speech' && event.error !== 'aborted') {
+        recognitionRef.current = null
+      }
       setSessionState('ready')
       setStatusText(
         event?.error === 'no-speech'
@@ -686,10 +738,13 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       )
     }
 
+    armHardWatchdog()
+
     try {
       recognition.start()
     } catch {
-      // 직전 인식 인스턴스가 아직 정리되지 않은 경우 — 잠시 후 재시도
+      // 직전 인식 인스턴스가 아직 정리되지 않은 경우 — 손상된 것으로 보고 새로 생성해 재시도
+      recognitionRef.current = null
       setTimeout(() => startListeningRef.current(), 300)
     }
   }, [transcript, sendToAI, clearSilenceTimer, getRecognitionInstance])
