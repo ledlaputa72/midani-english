@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 
 // ── Gemini 서버리스 프록시 호출 ──────────────────────────────
 // 브라우저에서 @google/generative-ai로 직접 호출하면 API 키 제한으로 실패하므로,
@@ -185,8 +185,51 @@ const PATTERN_CATEGORIES = [
 
 type PracticeMode = 'free' | 'correct'
 
+// ── 단어장 연동 카테고리 (Vocabulary / Expression / Idiom) ─────────
+type StudyKind = 'vocab' | 'expression' | 'idiom'
+
+type StudyListItem = {
+  phrase: string
+  translation: string
+  itemType: 'vocabulary' | 'expression' | 'idiom'
+}
+
+type StudyCategory = {
+  id: string
+  label: string
+  color: string
+  kind: StudyKind
+  patterns: { en: string; ko: string }[]
+}
+
+const STUDY_KIND_META: Record<StudyKind, { id: string; label: string; color: string; itemType: StudyListItem['itemType'] }> = {
+  vocab: { id: 'V', label: 'V. 내 단어장 (Vocabulary)', color: '#0e7490', itemType: 'vocabulary' },
+  expression: { id: 'X', label: 'X. 내 표현 (Expression)', color: '#a21caf', itemType: 'expression' },
+  idiom: { id: 'Y', label: 'Y. 내 숙어 (Idiom)', color: '#b91c1c', itemType: 'idiom' },
+}
+
+function buildStudyCategories(studyItems: StudyListItem[]): StudyCategory[] {
+  return (Object.keys(STUDY_KIND_META) as StudyKind[]).map((kind) => {
+    const meta = STUDY_KIND_META[kind]
+    const matched = studyItems.filter((item) => item.itemType === meta.itemType)
+    const sample = [...matched].sort(() => Math.random() - 0.5).slice(0, 12)
+    return {
+      id: meta.id,
+      label: meta.label,
+      color: meta.color,
+      kind,
+      patterns: sample.map((item) => ({ en: item.phrase, ko: item.translation })),
+    }
+  })
+}
+
 // ── 시스템 프롬프트 생성 ─────────────────────────────────────
-function buildSystemPrompt(categoryId: string, patterns: string[], mode: PracticeMode): string {
+function buildSystemPrompt(
+  categoryId: string,
+  patterns: string[],
+  mode: PracticeMode,
+  kind?: StudyKind,
+): string {
   const modeRules =
     mode === 'correct'
       ? `- After EVERY one of my responses, check it for grammar or word-choice mistakes, but be lenient — only flag something if it would sound clearly unnatural to a native speaker. Minor, harmless differences are NOT mistakes.
@@ -196,16 +239,32 @@ function buildSystemPrompt(categoryId: string, patterns: string[], mode: Practic
       : `- Do NOT interrupt or correct mid-conversation. Wait until I say "feedback" to give corrections.
 - If I say "feedback", summarize: which patterns I used, which I missed, and one tip.`
 
+  const goalByKind: Record<StudyKind | 'pattern', string> = {
+    pattern: `Your goal is to naturally use and encourage these specific English patterns in our conversation:
+${patterns.map((p, i) => `${i + 1}. "${p}"`).join('\n')}
+- Naturally weave the target patterns into your own sentences when appropriate.
+- When I use a pattern correctly, briefly acknowledge it or just continue naturally.`,
+    vocab: `These are words from my personal vocabulary list:
+${patterns.map((p, i) => `${i + 1}. "${p}"`).join('\n')}
+- Pick conversation TOPICS that relate to the MEANING of these words (e.g. if the word is "budget", talk about money/spending). You don't need me to literally say the word — the goal is exposure through topical conversation.
+- When natural, you can use the word yourself in context so I hear it used correctly.`,
+    expression: `These are expressions from my personal study list:
+${patterns.map((p, i) => `${i + 1}. "${p}"`).join('\n')}
+- Try to create situations in the conversation where I would naturally want to use one of these expressions (as-is or slightly modified/conjugated).
+- You can also use these expressions yourself in context so I hear them used naturally, and gently invite me to try one.`,
+    idiom: `These are idioms from my personal study list:
+${patterns.map((p, i) => `${i + 1}. "${p}"`).join('\n')}
+- Bring up everyday topics/situations where one of these idioms would fit naturally, and use it yourself in context so I hear it used correctly.
+- Gently encourage me to try using one of these idioms when the topic fits, without forcing it.`,
+  }
+
   return `You are my American friend having a casual, natural conversation with me in English.
 
-Your goal is to naturally use and encourage these specific English patterns in our conversation:
-${patterns.map((p, i) => `${i + 1}. "${p}"`).join('\n')}
+${goalByKind[kind ?? 'pattern']}
 
 Rules:
 - Keep each response SHORT — 2 to 3 sentences max. I need to respond quickly.
 - Speak like a real friend, not a teacher. Natural and casual.
-- Naturally weave the target patterns into your own sentences when appropriate.
-- When I use a pattern correctly, briefly acknowledge it or just continue naturally.
 ${modeRules}
 - If I say "next" or "다음", switch to a new conversation topic.
 - If I say "stop" or "그만", end the session warmly.
@@ -281,10 +340,18 @@ function speak(text: string, onEnd?: () => void) {
 // ── 타입 ────────────────────────────────────────────────────
 type Message = { role: 'user' | 'model'; text: string; ko?: string; showKo?: boolean }
 type SessionState = 'selecting' | 'idle' | 'ready' | 'listening' | 'thinking' | 'speaking'
-type Category = (typeof PATTERN_CATEGORIES)[0]
+type Category = (typeof PATTERN_CATEGORIES)[number] | StudyCategory
+
+function isStudyCategory(cat: Category): cat is StudyCategory {
+  return 'kind' in cat
+}
+
+type SpeakingPageProps = {
+  studyItems?: StudyListItem[]
+}
 
 // ── 메인 컴포넌트 ───────────────────────────────────────────
-export default function SpeakingPage() {
+export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   const [sessionState, setSessionState] = useState<SessionState>('selecting')
   const [selectedCat, setSelectedCat] = useState<Category | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -320,6 +387,8 @@ export default function SpeakingPage() {
   const adjustFontScale = useCallback((delta: number) => {
     setFontScale((prev) => Math.min(1.8, Math.max(0.8, Math.round((prev + delta) * 10) / 10)))
   }, [])
+
+  const studyCategories = useMemo(() => buildStudyCategories(studyItems), [studyItems])
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -403,7 +472,12 @@ export default function SpeakingPage() {
       setSessionState('thinking')
       setStatusText('대화를 시작하는 중...')
 
-      systemPromptRef.current = buildSystemPrompt(cat.id, cat.patterns.map((p) => p.en), practiceMode)
+      systemPromptRef.current = buildSystemPrompt(
+        cat.id,
+        cat.patterns.map((p) => p.en),
+        practiceMode,
+        isStudyCategory(cat) ? cat.kind : undefined,
+      )
       historyRef.current = [
         {
           role: 'user',
@@ -591,6 +665,26 @@ export default function SpeakingPage() {
             </button>
           ))}
         </div>
+
+        <h3 className="speaking-section-title">📒 내 단어장으로 연습하기</h3>
+        <div className="speaking-cat-grid speaking-cat-grid-study">
+          {studyCategories.map((cat) => (
+            <button
+              key={cat.id}
+              className="speaking-cat-btn speaking-cat-btn-study"
+              style={{ borderColor: cat.color, color: cat.color }}
+              onClick={() => cat.patterns.length > 0 && selectCategory(cat)}
+              disabled={cat.patterns.length === 0}
+            >
+              <span className="cat-id">{cat.id}</span>
+              <span className="cat-label">{cat.label.replace(`${cat.id}. `, '')}</span>
+              <span className="cat-count">
+                {cat.patterns.length > 0 ? `${cat.patterns.length}개 항목` : '등록된 항목 없음'}
+              </span>
+            </button>
+          ))}
+        </div>
+
         <p className="speaking-tip">
           💡 운전·운동 중엔 🔊 음성 모드로, 조용한 환경에선 🔇 음소거 후 텍스트로 연습하세요.
         </p>

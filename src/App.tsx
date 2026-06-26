@@ -5272,7 +5272,15 @@ function App() {
           )
         })()}
 
-        {page === 'speaking' && <SpeakingPage />}
+        {page === 'speaking' && (
+          <SpeakingPage
+            studyItems={items.map((item) => ({
+              phrase: item.phrase,
+              translation: item.translation,
+              itemType: item.itemType ?? inferItemType(item.phrase),
+            }))}
+          />
+        )}
       </main>
 
       {createPortal(

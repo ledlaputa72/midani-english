@@ -4422,6 +4422,24 @@ button.danger {
   transform: none;
   box-shadow: none;
 }
+
+/* 단어장 연동 카테고리 (Vocabulary/Expression/Idiom) — 기존 패턴 카테고리와 구분되는 스타일 */
+.speaking-section-title {
+  margin: 22px 0 4px;
+  font-size: 0.95rem;
+  color: #444;
+}
+.speaking-cat-grid-study {
+  margin-bottom: 4px;
+}
+.speaking-cat-btn-study {
+  background: linear-gradient(135deg, #fdfcff 0%, #f5f3ff 100%);
+  border-style: dashed;
+  border-width: 2px;
+}
+.speaking-cat-btn-study:hover {
+  box-shadow: 0 4px 14px rgba(99, 32, 200, 0.12);
+}
 .cat-id    { font-size: 1.25rem; font-weight: 900; line-height: 1; }
 .cat-label { font-size: 0.84rem; font-weight: 600; }
 .cat-count { font-size: 0.75rem; color: #999; margin-top: 2px; }
