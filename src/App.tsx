@@ -5278,6 +5278,7 @@ function App() {
               phrase: item.phrase,
               translation: item.translation,
               itemType: item.itemType ?? inferItemType(item.phrase),
+              frequency: item.difficulty,
             }))}
           />
         )}

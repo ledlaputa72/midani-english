@@ -192,6 +192,7 @@ type StudyListItem = {
   phrase: string
   translation: string
   itemType: 'vocabulary' | 'expression' | 'idiom'
+  frequency?: 1 | 2 | 3 | 4 | 5 // 1=드묾 ~ 5=매우 빈번
 }
 
 type StudyCategory = {
@@ -200,7 +201,10 @@ type StudyCategory = {
   color: string
   kind: StudyKind
   patterns: { en: string; ko: string }[]
+  totalCount: number
 }
+
+const STUDY_SAMPLE_SIZE = 12
 
 const STUDY_KIND_META: Record<StudyKind, { id: string; label: string; color: string; itemType: StudyListItem['itemType'] }> = {
   vocab: { id: 'V', label: 'V. 내 단어장 (Vocabulary)', color: '#0e7490', itemType: 'vocabulary' },
@@ -208,17 +212,26 @@ const STUDY_KIND_META: Record<StudyKind, { id: string; label: string; color: str
   idiom: { id: 'Y', label: 'Y. 내 숙어 (Idiom)', color: '#b91c1c', itemType: 'idiom' },
 }
 
+// 사용빈도(frequency) 높은 순으로 정렬 후 상위 N개를 선택한다.
+// frequency 미설정 항목은 중간값(3)으로 취급해 너무 뒤로 밀리지 않게 한다.
+function pickByFrequency(items: StudyListItem[], count: number): StudyListItem[] {
+  return [...items]
+    .sort((a, b) => (b.frequency ?? 3) - (a.frequency ?? 3))
+    .slice(0, count)
+}
+
 function buildStudyCategories(studyItems: StudyListItem[]): StudyCategory[] {
   return (Object.keys(STUDY_KIND_META) as StudyKind[]).map((kind) => {
     const meta = STUDY_KIND_META[kind]
     const matched = studyItems.filter((item) => item.itemType === meta.itemType)
-    const sample = [...matched].sort(() => Math.random() - 0.5).slice(0, 12)
+    const sample = pickByFrequency(matched, STUDY_SAMPLE_SIZE)
     return {
       id: meta.id,
       label: meta.label,
       color: meta.color,
       kind,
       patterns: sample.map((item) => ({ en: item.phrase, ko: item.translation })),
+      totalCount: matched.length,
     }
   })
 }
@@ -719,7 +732,9 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
               <span className="cat-id">{cat.id}</span>
               <span className="cat-label">{cat.label.replace(`${cat.id}. `, '')}</span>
               <span className="cat-count">
-                {cat.patterns.length > 0 ? `${cat.patterns.length}개 항목` : '등록된 항목 없음'}
+                {cat.patterns.length > 0
+                  ? `전체 ${cat.totalCount}개 중 빈도 높은 ${cat.patterns.length}개`
+                  : '등록된 항목 없음'}
               </span>
             </button>
           ))}
