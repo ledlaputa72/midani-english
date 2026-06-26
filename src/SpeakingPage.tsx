@@ -278,6 +278,7 @@ ${goalByKind[kind ?? 'pattern']}
 Rules:
 - Keep each response SHORT — 2 to 3 sentences max. I need to respond quickly.
 - Speak like a real friend, not a teacher. Natural and casual.
+- Plain text only — do NOT use markdown formatting like **bold**, *italics*, or bullet lists.
 ${modeRules}
 - If I say "next" or "다음", switch to a new conversation topic.
 - If I say "stop" or "그만", end the session warmly.
@@ -291,6 +292,16 @@ async function translateToKorean(text: string): Promise<string> {
     'Translate the following English sentence into natural, concise Korean. Reply with ONLY the Korean translation — no quotes, no extra commentary.',
     [{ role: 'user', parts: [{ text }] }],
   )
+}
+
+// ── AI 응답에 섞여 나오는 마크다운 강조 기호(**, *, _) 제거 ────
+// 모바일 화면/TTS에 "**Why don't we**" 같은 원본 마크업이 그대로 노출되는 것을 막는다.
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/(?<![A-Za-z0-9])_(.+?)_(?![A-Za-z0-9])/g, '$1')
 }
 
 // ── 교정 모드: AI 응답에서 "More natural: ..." 추천 문장 추출 ────
@@ -414,7 +425,12 @@ async function speak(text: string, onEnd?: () => void, gender: VoiceGender = 'ma
     clearTimeout(watchdog)
     onEnd?.()
   }
-  watchdog = setTimeout(finish, 15000)
+  // 대화가 길어지면 실제 음성 길이도 길어지는데, 워치독이 고정된 15초로 끊어버리면
+  // 아직 다 읽지 않은 긴 문장의 재생이 중간에 끊기게 된다(다음 턴으로 넘어가면서
+  // stopTts()가 호출되어 재생 중인 오디오를 멈추기 때문). 글자 수 기반으로 최소 길이를
+  // 넉넉하게 추정해두고, 실제 오디오 길이를 알게 되면(loadedmetadata) 그에 맞춰 다시 잡는다.
+  const estimatedMs = Math.min(60000, Math.max(15000, text.length * 110))
+  watchdog = setTimeout(finish, estimatedMs)
 
   try {
     const res = await fetch('/api/gemini-tts', {
@@ -430,6 +446,11 @@ async function speak(text: string, onEnd?: () => void, gender: VoiceGender = 'ma
     el.src = `data:${data.mime};base64,${data.audio}`
     el.onended = finish
     el.onerror = () => speakBrowserTts(text, finish, gender)
+    el.onloadedmetadata = () => {
+      if (finished || !Number.isFinite(el.duration)) return
+      clearTimeout(watchdog)
+      watchdog = setTimeout(finish, el.duration * 1000 + 4000)
+    }
     await el.play()
 
     // 모바일에서 play()가 resolve돼도 실제로는 소리 없이 멈춰있는 경우가 있다.
@@ -555,7 +576,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       historyRef.current = [...historyRef.current, { role: 'user', parts: [{ text: userText }] }]
 
       try {
-        const aiText = await callGeminiChat(systemPromptRef.current, historyRef.current)
+        const aiText = stripMarkdown(await callGeminiChat(systemPromptRef.current, historyRef.current))
         historyRef.current = [...historyRef.current, { role: 'model', parts: [{ text: aiText }] }]
         setMessages((prev) => [...prev, { role: 'model', text: aiText }])
 
@@ -601,7 +622,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       'Output just the sentence(s) themselves — no labels, no quotes, no explanation.'
 
     try {
-      const autoUserText = await callGeminiChat(autoSystemPrompt, swappedHistory)
+      const autoUserText = stripMarkdown(await callGeminiChat(autoSystemPrompt, swappedHistory))
       if (!autoModeRef.current) return // 생성 도중 Auto 대화가 꺼졌으면 중단
       setMessages((prev) => [...prev, { role: 'user', text: autoUserText, auto: true }])
       setLastUserAttempt(autoUserText)
@@ -671,7 +692,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       ]
 
       try {
-        const aiText = await callGeminiChat(systemPromptRef.current, historyRef.current)
+        const aiText = stripMarkdown(await callGeminiChat(systemPromptRef.current, historyRef.current))
         historyRef.current = [...historyRef.current, { role: 'model', parts: [{ text: aiText }] }]
         setMessages([{ role: 'model', text: aiText }])
         setLastCorrection(null)
