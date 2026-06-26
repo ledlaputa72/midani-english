@@ -4614,6 +4614,77 @@ button.danger {
   color: #3730a3;
 }
 
+/* 시작 전 설정 섹션 (패턴/주제/방식 선택) */
+.speaking-config-section {
+  width: 100%;
+  margin-bottom: 14px;
+  text-align: left;
+}
+.speaking-config-section h4 {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: #555;
+}
+.speaking-pattern-multiselect {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.speaking-pattern-chip-select {
+  background: #f0f0f0;
+  border: 2px solid transparent;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.speaking-pattern-chip-select:hover {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+.speaking-pattern-chip-select.selected {
+  background: #ede9fe;
+  border-color: #7c3aed;
+  color: #5b21b6;
+  font-weight: 600;
+}
+.speaking-topic-group {
+  margin-bottom: 8px;
+}
+.speaking-topic-group-label {
+  display: block;
+  font-size: 0.78rem;
+  color: #888;
+  margin-bottom: 4px;
+}
+.speaking-topic-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.speaking-topic-chip {
+  background: #f7f7f8;
+  border: 2px solid transparent;
+  border-radius: 20px;
+  padding: 4px 11px;
+  font-size: 0.78rem;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.speaking-topic-chip:hover {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+.speaking-topic-chip.selected {
+  background: #dbeafe;
+  border-color: #2563eb;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
 /* 진행 방식 선택 */
 .speaking-mode-select {
   display: flex;
