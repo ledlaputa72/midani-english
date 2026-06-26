@@ -4487,6 +4487,26 @@ button.danger {
 }
 .speaking-mute-btn.muted { background: #f5f5f5; }
 
+.speaking-msg-auto { opacity: 0.75; border-style: dashed; }
+
+.speaking-auto-btn {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #555;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.speaking-auto-btn.active {
+  background: #7c3aed;
+  border-color: #7c3aed;
+  color: #fff;
+}
+
 .speaking-font-ctrl {
   display: flex;
   gap: 4px;

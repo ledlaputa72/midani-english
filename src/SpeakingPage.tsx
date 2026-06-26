@@ -435,7 +435,7 @@ async function speak(text: string, onEnd?: () => void) {
 }
 
 // ── 타입 ────────────────────────────────────────────────────
-type Message = { role: 'user' | 'model'; text: string; ko?: string; showKo?: boolean }
+type Message = { role: 'user' | 'model'; text: string; ko?: string; showKo?: boolean; auto?: boolean }
 type SessionState = 'selecting' | 'idle' | 'ready' | 'listening' | 'thinking' | 'speaking'
 type Category = (typeof PATTERN_CATEGORIES)[number] | StudyCategory
 
@@ -464,6 +464,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   const [lastCorrection, setLastCorrection] = useState<string | null>(null)
   const [lastUserAttempt, setLastUserAttempt] = useState('')
   const [shadowBoxVisible, setShadowBoxVisible] = useState(true)
+  const [autoMode, setAutoMode] = useState(false)
 
   const recognitionRef = useRef<any>(null)
   const systemPromptRef = useRef<string>('')
@@ -472,10 +473,25 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   const messagesRef = useRef<Message[]>([])
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startListeningRef = useRef<() => void>(() => {})
+  const autoModeRef = useRef(false)
+  const runAutoTurnRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     messagesRef.current = messages
   }, [messages])
+
+  useEffect(() => {
+    autoModeRef.current = autoMode
+    // Auto 대화를 켰을 때 AI 응답을 기다리는 상태(ready)라면 바로 자동 대화를 이어간다.
+    if (autoMode && sessionState === 'ready') {
+      runAutoTurnRef.current()
+    }
+    // Auto 대화를 끄면 듣고 있던 인식은 정리하고 사용자가 직접 마이크를 누르도록 한다.
+    if (!autoMode && sessionState === 'listening') {
+      recognitionRef.current?.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoMode])
 
   useEffect(() => {
     localStorage.setItem('speaking-font-scale', String(fontScale))
@@ -505,6 +521,16 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
     window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices()
   }, [])
 
+  // AI가 말을 마친 뒤 다음 턴으로 넘어가는 공통 분기.
+  // Auto 대화가 켜져 있으면 사용자 마이크 입력을 기다리지 않고 AI가 스스로 다음 발화를 만들어 이어간다.
+  const proceedAfterAi = useCallback(() => {
+    if (autoModeRef.current) {
+      runAutoTurnRef.current()
+    } else {
+      startListeningRef.current()
+    }
+  }, [])
+
   // ── AI 응답 처리 ─────────────────────────────────────────
   const sendToAI = useCallback(
     async (userText: string) => {
@@ -528,17 +554,53 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
         if (!isMuted) {
           setSessionState('speaking')
           setStatusText('AI 말하는 중...')
-          speak(aiText, () => setTimeout(() => startListeningRef.current(), 400))
+          speak(aiText, () => setTimeout(() => proceedAfterAi(), 400))
         } else {
-          startListeningRef.current()
+          proceedAfterAi()
         }
       } catch {
         setStatusText('오류가 발생했습니다. 다시 시도하세요.')
         setSessionState('ready')
       }
     },
-    [isMuted],
+    [isMuted, proceedAfterAi],
   )
+
+  // ── Auto 대화: 사용자 대신 AI가 학습자 역할의 다음 발화를 만들어 대화를 이어간다 ──
+  const runAutoTurn = useCallback(async () => {
+    if (!autoModeRef.current || !systemPromptRef.current) return
+    setSessionState('thinking')
+    setStatusText('Auto 대화 진행 중...')
+
+    // 학습자 역할을 시뮬레이션하기 위해 user/model 역할을 뒤바꿔서 호출한다.
+    // (Gemini는 항상 마지막이 'user'여야 다음 'model' 응답을 만들어주므로,
+    //  지금까지의 AI 발화를 'user'로, 사용자 발화를 'model'로 바꿔 넣으면
+    //  "다음 모델 응답"이 곧 학습자의 다음 발화가 된다.)
+    const swappedHistory: GeminiContent[] = historyRef.current.map((h) => ({
+      role: h.role === 'user' ? 'model' : 'user',
+      parts: h.parts,
+    }))
+    const autoSystemPrompt =
+      'You are simulating the LEARNER side of an English speaking-practice conversation. ' +
+      'Based on the conversation so far, write ONLY the learner\'s next reply: 1-2 short, ' +
+      'natural, casual English sentences that continue the conversation naturally. ' +
+      'Output just the sentence(s) themselves — no labels, no quotes, no explanation.'
+
+    try {
+      const autoUserText = await callGeminiChat(autoSystemPrompt, swappedHistory)
+      if (!autoModeRef.current) return // 생성 도중 Auto 대화가 꺼졌으면 중단
+      setMessages((prev) => [...prev, { role: 'user', text: autoUserText, auto: true }])
+      setLastUserAttempt(autoUserText)
+      sendToAI(autoUserText)
+    } catch {
+      setStatusText('Auto 대화 생성 중 오류가 발생했습니다.')
+      setSessionState('ready')
+    }
+  }, [sendToAI])
+
+  useEffect(() => {
+    runAutoTurnRef.current = runAutoTurn
+  }, [runAutoTurn])
 
   // ── 카테고리 선택 (대화는 아직 시작하지 않음) ──────────────
   const selectCategory = useCallback((cat: Category) => {
@@ -596,16 +658,16 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
         if (!isMuted) {
           setSessionState('speaking')
           setStatusText('AI 말하는 중...')
-          speak(aiText, () => setTimeout(() => startListeningRef.current(), 400))
+          speak(aiText, () => setTimeout(() => proceedAfterAi(), 400))
         } else {
-          startListeningRef.current()
+          proceedAfterAi()
         }
       } catch (err) {
         setStatusText(`시작 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`)
         setSessionState('idle')
       }
     },
-    [isMuted, practiceMode],
+    [isMuted, practiceMode, proceedAfterAi],
   )
 
   // ── 음성 인식 시작 ────────────────────────────────────────
@@ -785,6 +847,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
     setTranscript('')
     setLastCorrection(null)
     setLastUserAttempt('')
+    setAutoMode(false)
     setStatusText('카테고리를 선택하세요')
   }
 
@@ -886,6 +949,13 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
         >
           {isMuted ? '🔇' : '🔊'}
         </button>
+        <button
+          className={`speaking-auto-btn ${autoMode ? 'active' : ''}`}
+          onClick={() => setAutoMode((v) => !v)}
+          title={autoMode ? 'Auto 대화 끄기 (다시 내가 말하기)' : 'Auto 대화 켜기 (AI가 내 대신 대화 이어가기)'}
+        >
+          🤖 Auto 대화 {autoMode ? 'ON' : 'OFF'}
+        </button>
       </div>
 
       {/* 패턴 목록 (접기/펼치기) */}
@@ -954,11 +1024,13 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
         {messages.map((msg, i) => (
           <div
             key={i}
-            className={`speaking-msg speaking-msg-${msg.role}`}
+            className={`speaking-msg speaking-msg-${msg.role} ${msg.auto ? 'speaking-msg-auto' : ''}`}
             onClick={() => toggleTranslation(i)}
             title="클릭하면 한글 번역 보기"
           >
-            <span className="speaking-msg-role">{msg.role === 'model' ? 'AI' : 'Me'}</span>
+            <span className="speaking-msg-role">
+              {msg.role === 'model' ? 'AI' : msg.auto ? 'Me (Auto)' : 'Me'}
+            </span>
             <p>{msg.showKo && msg.ko ? msg.ko : msg.text}</p>
           </div>
         ))}
@@ -1012,14 +1084,18 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
         ) : (
           <button
             className={`speaking-mic-btn ${sessionState === 'listening' ? 'active' : ''}`}
-            disabled={sessionState === 'thinking' || sessionState === 'speaking'}
+            disabled={autoMode || sessionState === 'thinking' || sessionState === 'speaking'}
             onClick={
               sessionState === 'listening'
                 ? () => recognitionRef.current?.stop()
                 : startListening
             }
           >
-            {sessionState === 'listening' ? '🔴 듣는 중...' : '🎤 말하기'}
+            {autoMode
+              ? '🤖 Auto 대화 중...'
+              : sessionState === 'listening'
+                ? '🔴 듣는 중...'
+                : '🎤 말하기'}
           </button>
         )}
         <div className="speaking-quick-btns">
