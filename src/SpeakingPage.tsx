@@ -592,6 +592,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   const messagesRef = useRef<Message[]>([])
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startListeningRef = useRef<() => void>(() => {})
+  const recognitionRetryCountRef = useRef(0)
   const autoModeRef = useRef(false)
   const runAutoTurnRef = useRef<() => void>(() => {})
 
@@ -917,6 +918,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       setStatusText('듣는 중...')
       resetSilenceTimer()
       armHardWatchdog()
+      recognitionRetryCountRef.current = 0
     }
 
     recognition.onend = () => {
@@ -942,6 +944,25 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       settled = true
       if (hardWatchdog) clearTimeout(hardWatchdog)
       clearSilenceTimer()
+
+      // iOS의 "오디오 녹음을 중단하시겠습니까?" 같은 시스템 다이얼로그나 일시적인
+      // 오디오 세션 충돌로 인식이 중단되면 'aborted'/'audio-capture' 류 오류가 난다.
+      // 이런 일시적 중단은 사용자가 손으로 다시 누르게 하지 않고 자동으로 재시도한다.
+      const transientErrors = new Set(['aborted', 'audio-capture', 'network'])
+      if (
+        event?.error &&
+        transientErrors.has(event.error) &&
+        recognitionRetryCountRef.current < 2 &&
+        !autoModeRef.current
+      ) {
+        recognitionRetryCountRef.current += 1
+        recognitionRef.current = null // 새 인스턴스로 재시도
+        setStatusText('마이크가 잠시 끊겼어요. 다시 듣는 중...')
+        setTimeout(() => startListeningRef.current(), 500)
+        return
+      }
+      recognitionRetryCountRef.current = 0
+
       // no-speech/aborted 외의 오류는 인식기가 손상되었을 가능성이 있으므로 다음번엔 새로 생성
       if (event?.error && event.error !== 'no-speech' && event.error !== 'aborted') {
         recognitionRef.current = null
