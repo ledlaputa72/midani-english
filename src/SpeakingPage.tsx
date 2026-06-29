@@ -485,7 +485,15 @@ function unlockTtsAudio() {
 
 function stopTts() {
   window.speechSynthesis.cancel()
-  sharedTtsAudioEl?.pause()
+  // 일시정지만 하면 모바일에서 오디오 세션의 "재생" 라우트가 그대로 점유된 채 남아있어
+  // 바로 이어지는 마이크 녹음(SpeechRecognition)이 오디오 세션을 제대로 가져오지 못하고
+  // 무음 재생/녹음 실패로 이어지는 경우가 있다. src를 완전히 비우고 load()로 리셋해
+  // 재생 세션을 확실히 해제한 뒤 다음 인식이 시작되게 한다.
+  if (sharedTtsAudioEl) {
+    sharedTtsAudioEl.pause()
+    sharedTtsAudioEl.removeAttribute('src')
+    sharedTtsAudioEl.load()
+  }
 }
 
 // Gemini TTS(신경망 음성, 훨씬 자연스러운 발음) 우선 사용, 실패 시 브라우저 TTS로 폴백.
