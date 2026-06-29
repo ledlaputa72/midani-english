@@ -392,6 +392,43 @@ function extractCorrection(aiText: string): string | null {
   return m ? m[1].trim() : null
 }
 
+// ── 대화 메시지 안에서 연습 패턴이 등장하면 굵은 파란색으로 강조 ──────────
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// 패턴 목록의 "~"는 자유롭게 들어갈 내용을 나타내는 자리표시자다(예: "I think that~").
+// 실제 문장에서는 그 자리에 다른 단어들이 오므로, 매칭 시 느슨한 와일드카드로 바꿔준다.
+function patternToRegexSource(p: string): string {
+  return escapeRegExp(p.replace(/\?$/, '')).replace(/~/g, "[\\w\\s',.!]*")
+}
+
+function highlightPatterns(text: string, patterns: string[]): React.ReactNode {
+  const cleaned = Array.from(new Set(patterns.map((p) => p.trim()).filter(Boolean)))
+  if (cleaned.length === 0) return text
+
+  const sources = [...cleaned].sort((a, b) => b.length - a.length).map(patternToRegexSource)
+  let regex: RegExp
+  try {
+    regex = new RegExp(`(${sources.join('|')})`, 'gi')
+  } catch {
+    return text
+  }
+
+  const parts = text.split(regex)
+  if (parts.length === 1) return text
+
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <strong key={i} className="speaking-pattern-highlight">
+        {part}
+      </strong>
+    ) : (
+      part
+    ),
+  )
+}
+
 // ── 단어 단위 diff (LCS 기반) — 내가 말한 문장에서 틀린 단어 표시용 ──
 function normalizeWord(w: string): string {
   return w.toLowerCase().replace(/[^a-z0-9']/g, '')
@@ -630,6 +667,13 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   }, [])
 
   const studyCategories = useMemo(() => buildStudyCategories(studyItems), [studyItems])
+
+  // 대화 메시지 안에서 강조 표시할 연습 패턴 — 이번 세션에서 선택한 패턴(없으면 전체)
+  const highlightPatternList = useMemo(() => {
+    if (!selectedCat) return []
+    const active = selectedCat.patterns.filter((p) => selectedPatternKeys.has(p.en))
+    return (active.length > 0 ? active : selectedCat.patterns).map((p) => p.en)
+  }, [selectedCat, selectedPatternKeys])
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -1232,7 +1276,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
             <span className="speaking-msg-role">
               {msg.role === 'model' ? 'AI' : msg.auto ? 'Me (Auto)' : 'Me'}
             </span>
-            <p>{msg.showKo && msg.ko ? msg.ko : msg.text}</p>
+            <p>{highlightPatterns(msg.showKo && msg.ko ? msg.ko : msg.text, highlightPatternList)}</p>
           </div>
         ))}
         {transcript && (
