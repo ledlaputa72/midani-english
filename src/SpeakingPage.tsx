@@ -542,7 +542,12 @@ function ttsVoiceFor(gender: VoiceGender): string {
 }
 
 async function speak(text: string, onEnd?: () => void, gender: VoiceGender = 'male') {
-  stopTts()
+  // 여기서는 stopTts()의 removeAttribute('src')+load()까지 가는 "완전 해제"를 쓰지 않는다.
+  // 곧바로 새 src를 할당하고 play()를 호출하는데, 그 직전에 load()로 미디어 리소스를
+  // 리셋해버리면 모바일 Safari에서 두 작업이 겹쳐 play()가 AbortError로 즉시 실패하고
+  // (브라우저 TTS로) 조용히 폴백되어버린다 — 매번 Gemini TTS가 실패한 것처럼 보이는 원인.
+  window.speechSynthesis.cancel()
+  getTtsAudioEl().pause()
 
   let finished = false
   let watchdog: ReturnType<typeof setTimeout>
