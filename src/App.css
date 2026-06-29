@@ -4770,6 +4770,13 @@ button.danger {
 .speaking-msg-user    p { background: #3b82f6; color: #fff; }
 .speaking-msg-interim p { background: #e0e7ff; color: #3730a3; }
 
+/* 연습 패턴이 대화 중에 등장하면 굵은 파란색으로 강조 */
+.speaking-pattern-highlight {
+  font-weight: 700;
+}
+.speaking-msg-model p .speaking-pattern-highlight { color: #1d4ed8; }
+.speaking-msg-user  p .speaking-pattern-highlight { color: #dbeafe; }
+
 /* 상태 표시 */
 .speaking-status {
   text-align: center;
