@@ -503,6 +503,8 @@ function speakBrowserTts(text: string, onEnd?: () => void, gender: VoiceGender =
 // 별개의 메커니즘이라 녹음 세션 전환에 영향을 받지 않으므로, 이를 통해 재생한다.
 let sharedAudioCtx: AudioContext | null = null
 let currentSourceNode: AudioBufferSourceNode | null = null
+// Web Audio API가 막히는 기기(예: iOS의 decodeAudioData 비호환 등)에 대비한 2차 경로.
+let sharedTtsAudioEl: HTMLAudioElement | null = null
 
 function getAudioCtx(): AudioContext {
   if (!sharedAudioCtx) {
@@ -512,10 +514,30 @@ function getAudioCtx(): AudioContext {
   return sharedAudioCtx
 }
 
-// 사용자가 직접 누른 버튼의 onClick 안에서 동기적으로 호출해 AudioContext를 resume()해둔다.
+function getTtsAudioEl(): HTMLAudioElement {
+  if (!sharedTtsAudioEl) {
+    sharedTtsAudioEl = new Audio()
+    sharedTtsAudioEl.preload = 'auto'
+    ;(sharedTtsAudioEl as any).playsInline = true
+  }
+  return sharedTtsAudioEl
+}
+
+// 사용자가 직접 누른 버튼의 onClick 안에서 동기적으로 호출해 자동재생 잠금을 미리 풀어둔다.
 function unlockTtsAudio() {
   const ctx = getAudioCtx()
   if (ctx.state !== 'running') ctx.resume().catch(() => {})
+
+  const el = getTtsAudioEl()
+  el.muted = true
+  el.play()
+    .then(() => {
+      el.pause()
+      el.muted = false
+    })
+    .catch(() => {
+      el.muted = false
+    })
 }
 
 function stopTts() {
@@ -528,6 +550,14 @@ function stopTts() {
       // 이미 정지된 소스 노드를 다시 멈추면 예외가 날 수 있다 — 무시해도 안전.
     }
     currentSourceNode = null
+  }
+  if (sharedTtsAudioEl) {
+    sharedTtsAudioEl.pause()
+    try {
+      sharedTtsAudioEl.currentTime = 0
+    } catch {
+      // src가 아직 없는 초기 상태에서는 currentTime 설정이 실패할 수 있다 — 무시해도 안전.
+    }
   }
 }
 
@@ -574,30 +604,63 @@ async function speak(text: string, onEnd?: () => void, gender: VoiceGender = 'ma
     const data = await res.json()
     if (!res.ok || !data.audio) throw new Error(data.error || 'tts-failed')
 
-    const ctx = getAudioCtx()
-    if (ctx.state !== 'running') {
-      await ctx.resume().catch(() => {})
+    try {
+      const ctx = getAudioCtx()
+      if (ctx.state !== 'running') {
+        await ctx.resume().catch(() => {})
+      }
+      if (ctx.state !== 'running') throw new Error('audiocontext-not-running')
+
+      const binary = atob(data.audio)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+      const audioBuffer = await ctx.decodeAudioData(bytes.buffer)
+
+      const source = ctx.createBufferSource()
+      source.buffer = audioBuffer
+      source.connect(ctx.destination)
+      source.onended = () => {
+        if (currentSourceNode === source) currentSourceNode = null
+        finish()
+      }
+      clearTimeout(watchdog)
+      watchdog = setTimeout(finish, audioBuffer.duration * 1000 + 4000)
+
+      currentSourceNode = source
+      source.start()
+      return
+    } catch (webAudioErr) {
+      // Web Audio API 경로가 막힌 기기(일부 iOS Safari 버전 등)를 위한 2차 경로.
+      console.error('Web Audio TTS playback failed, trying <audio> element fallback:', webAudioErr)
     }
 
-    const binary = atob(data.audio)
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-    const audioBuffer = await ctx.decodeAudioData(bytes.buffer)
-
-    const source = ctx.createBufferSource()
-    source.buffer = audioBuffer
-    source.connect(ctx.destination)
-    source.onended = () => {
-      if (currentSourceNode === source) currentSourceNode = null
-      finish()
+    const el = getTtsAudioEl()
+    el.muted = false
+    el.src = `data:${data.mime};base64,${data.audio}`
+    el.onended = finish
+    el.onerror = () => {
+      console.error('Gemini TTS <audio> fallback playback error, falling back to browser TTS')
+      speakBrowserTts(text, finish, gender)
     }
-    clearTimeout(watchdog)
-    watchdog = setTimeout(finish, audioBuffer.duration * 1000 + 4000)
+    el.onloadedmetadata = () => {
+      if (finished || !Number.isFinite(el.duration)) return
+      clearTimeout(watchdog)
+      watchdog = setTimeout(finish, el.duration * 1000 + 4000)
+    }
+    await el.play()
 
-    currentSourceNode = source
-    source.start()
+    setTimeout(() => {
+      if (finished) return
+      if (el.paused || el.currentTime === 0) {
+        el.onended = null
+        el.onerror = null
+        el.pause()
+        console.error('Gemini TTS <audio> fallback produced no sound, falling back to browser TTS')
+        speakBrowserTts(text, finish, gender)
+      }
+    }, 2000)
   } catch (err) {
-    console.error('Gemini TTS failed, falling back to browser TTS:', err)
+    console.error('Gemini TTS failed entirely, falling back to browser TTS:', err)
     speakBrowserTts(text, finish, gender)
   }
 }
