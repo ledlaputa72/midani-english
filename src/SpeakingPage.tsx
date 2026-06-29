@@ -493,47 +493,39 @@ function speakBrowserTts(text: string, onEnd?: () => void, gender: VoiceGender =
   window.speechSynthesis.speak(utt)
 }
 
-// 모바일 브라우저는 사용자 제스처 없이 호출된 audio.play()를 자동재생 정책으로 막는 경우가 많다.
-// <audio> 엘리먼트를 매번 새로 만들지 않고 하나만 재사용하면서, "시작하기" 같은 실제 탭 이벤트
-// 안에서 한 번 재생/정지시켜 "unlock"해두면 이후 비동기 콜백 안에서의 재생도 허용된다.
-let sharedTtsAudioEl: HTMLAudioElement | null = null
+// 모바일(특히 iOS Safari)에서는 SpeechRecognition으로 마이크를 사용하는 순간 오디오 세션이
+// "녹음" 카테고리로 전환되면서, 그 전에 재생 제스처로 풀어뒀던 <audio> 엘리먼트의 자동재생
+// 허용 상태가 함께 날아간다. 그래서 1번째 AI 대사(시작 버튼 제스처와 가까움)는 들리지만,
+// 한 번이라도 마이크로 듣고 난 뒤의 2번째 AI 대사부터는 <audio>.play()가 조용히 막혀
+// 내장 TTS로 폴백된다. Web Audio API의 AudioContext는 getUserMedia/SpeechRecognition과
+// 별개의 메커니즘이라 녹음 세션 전환에 영향을 받지 않으므로, 이를 통해 재생한다.
+let sharedAudioCtx: AudioContext | null = null
+let currentSourceNode: AudioBufferSourceNode | null = null
 
-function getTtsAudioEl(): HTMLAudioElement {
-  if (!sharedTtsAudioEl) {
-    sharedTtsAudioEl = new Audio()
-    sharedTtsAudioEl.preload = 'auto'
+function getAudioCtx(): AudioContext {
+  if (!sharedAudioCtx) {
+    const Ctor = window.AudioContext || (window as any).webkitAudioContext
+    sharedAudioCtx = new Ctor()
   }
-  return sharedTtsAudioEl
+  return sharedAudioCtx
 }
 
-// 사용자가 직접 누른 버튼의 onClick 안에서 동기적으로 호출해 모바일 자동재생 잠금을 해제한다.
+// 사용자가 직접 누른 버튼의 onClick 안에서 동기적으로 호출해 AudioContext를 resume()해둔다.
 function unlockTtsAudio() {
-  const el = getTtsAudioEl()
-  el.muted = true
-  el.play()
-    .then(() => {
-      el.pause()
-      el.muted = false
-    })
-    .catch(() => {
-      el.muted = false
-    })
+  const ctx = getAudioCtx()
+  if (ctx.state !== 'running') ctx.resume().catch(() => {})
 }
 
 function stopTts() {
   window.speechSynthesis.cancel()
-  // pause()만으로도 모바일에서 마이크 녹음이 오디오 세션을 가져갈 수 있다. removeAttribute('src')
-  // + load()까지 호출해 미디어 엘리먼트를 완전히 리셋하면, iOS Safari에서는 그 리셋이 사용자
-  // 제스처 밖에서 일어났기 때문에 "자동재생 잠금 해제" 상태가 같이 풀려버려, 그 다음 비동기
-  // 콜백(AI 응답) 안에서 호출하는 play()가 조용히 막힌다 — 2번째 AI 대사부터 TTS가 안 들리는 원인.
-  // 그래서 src는 유지한 채 재생만 멈추고 처음으로 되돌린다.
-  if (sharedTtsAudioEl) {
-    sharedTtsAudioEl.pause()
+  if (currentSourceNode) {
     try {
-      sharedTtsAudioEl.currentTime = 0
+      currentSourceNode.onended = null
+      currentSourceNode.stop()
     } catch {
-      // src가 아직 없는 초기 상태에서는 currentTime 설정이 실패할 수 있다 — 무시해도 안전.
+      // 이미 정지된 소스 노드를 다시 멈추면 예외가 날 수 있다 — 무시해도 안전.
     }
+    currentSourceNode = null
   }
 }
 
@@ -546,12 +538,16 @@ function ttsVoiceFor(gender: VoiceGender): string {
 }
 
 async function speak(text: string, onEnd?: () => void, gender: VoiceGender = 'male') {
-  // 여기서는 stopTts()의 removeAttribute('src')+load()까지 가는 "완전 해제"를 쓰지 않는다.
-  // 곧바로 새 src를 할당하고 play()를 호출하는데, 그 직전에 load()로 미디어 리소스를
-  // 리셋해버리면 모바일 Safari에서 두 작업이 겹쳐 play()가 AbortError로 즉시 실패하고
-  // (브라우저 TTS로) 조용히 폴백되어버린다 — 매번 Gemini TTS가 실패한 것처럼 보이는 원인.
   window.speechSynthesis.cancel()
-  getTtsAudioEl().pause()
+  if (currentSourceNode) {
+    try {
+      currentSourceNode.onended = null
+      currentSourceNode.stop()
+    } catch {
+      // 이미 정지된 소스 노드 — 무시해도 안전.
+    }
+    currentSourceNode = null
+  }
 
   let finished = false
   let watchdog: ReturnType<typeof setTimeout>
@@ -562,9 +558,8 @@ async function speak(text: string, onEnd?: () => void, gender: VoiceGender = 'ma
     onEnd?.()
   }
   // 대화가 길어지면 실제 음성 길이도 길어지는데, 워치독이 고정된 15초로 끊어버리면
-  // 아직 다 읽지 않은 긴 문장의 재생이 중간에 끊기게 된다(다음 턴으로 넘어가면서
-  // stopTts()가 호출되어 재생 중인 오디오를 멈추기 때문). 글자 수 기반으로 최소 길이를
-  // 넉넉하게 추정해두고, 실제 오디오 길이를 알게 되면(loadedmetadata) 그에 맞춰 다시 잡는다.
+  // 아직 다 읽지 않은 긴 문장의 재생이 중간에 끊기게 된다. 글자 수 기반으로 최소 길이를
+  // 넉넉하게 추정해두고, 실제 오디오 길이를 알게 되면 그에 맞춰 다시 잡는다.
   const estimatedMs = Math.min(60000, Math.max(15000, text.length * 110))
   watchdog = setTimeout(finish, estimatedMs)
 
@@ -577,32 +572,28 @@ async function speak(text: string, onEnd?: () => void, gender: VoiceGender = 'ma
     const data = await res.json()
     if (!res.ok || !data.audio) throw new Error(data.error || 'tts-failed')
 
-    const el = getTtsAudioEl()
-    el.muted = false
-    el.src = `data:${data.mime};base64,${data.audio}`
-    el.onended = finish
-    el.onerror = () => {
-      console.error('Gemini TTS audio playback error, falling back to browser TTS')
-      speakBrowserTts(text, finish, gender)
+    const ctx = getAudioCtx()
+    if (ctx.state !== 'running') {
+      await ctx.resume().catch(() => {})
     }
-    el.onloadedmetadata = () => {
-      if (finished || !Number.isFinite(el.duration)) return
-      clearTimeout(watchdog)
-      watchdog = setTimeout(finish, el.duration * 1000 + 4000)
-    }
-    await el.play()
 
-    // 모바일에서 play()가 resolve돼도 실제로는 소리 없이 멈춰있는 경우가 있다.
-    // 재생 시작 후 currentTime이 전혀 움직이지 않으면 무음 재생으로 간주하고 폴백한다.
-    setTimeout(() => {
-      if (finished) return
-      if (el.paused || el.currentTime === 0) {
-        el.onended = null
-        el.onerror = null
-        el.pause()
-        speakBrowserTts(text, finish, gender)
-      }
-    }, 2000)
+    const binary = atob(data.audio)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    const audioBuffer = await ctx.decodeAudioData(bytes.buffer)
+
+    const source = ctx.createBufferSource()
+    source.buffer = audioBuffer
+    source.connect(ctx.destination)
+    source.onended = () => {
+      if (currentSourceNode === source) currentSourceNode = null
+      finish()
+    }
+    clearTimeout(watchdog)
+    watchdog = setTimeout(finish, audioBuffer.duration * 1000 + 4000)
+
+    currentSourceNode = source
+    source.start()
   } catch (err) {
     console.error('Gemini TTS failed, falling back to browser TTS:', err)
     speakBrowserTts(text, finish, gender)
