@@ -616,7 +616,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
     }
     // Auto 대화를 끄면 듣고 있던 인식은 정리하고 사용자가 직접 마이크를 누르도록 한다.
     if (!autoMode && sessionState === 'listening') {
-      recognitionRef.current?.abort()
+      abortListeningSilently()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoMode])
@@ -637,6 +637,20 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       silenceTimerRef.current = null
     }
   }, [])
+
+  // 진행 중인 인식을 "조용히" 중단한다. 핸들러를 먼저 떼지 않고 abort()만 부르면
+  // onerror('aborted')가 그대로 발동해 자동 재시도 로직이 다시 듣기를 시작시켜버린다
+  // (피드백/다음 주제처럼 의도적으로 턴을 끊고 다음 동작으로 넘어가야 할 때 문제가 됨).
+  const abortListeningSilently = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.onresult = null
+      recognitionRef.current.onend = null
+      recognitionRef.current.onerror = null
+      recognitionRef.current.onstart = null
+      recognitionRef.current.abort()
+    }
+    clearSilenceTimer()
+  }, [clearSilenceTimer])
 
   // 메시지 자동 스크롤
   useEffect(() => {
@@ -660,9 +674,15 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   }, [])
 
   // ── AI 응답 처리 ─────────────────────────────────────────
+  // 피드백/다음 주제 버튼이나 인식 종료가 겹쳐서 동시에 두 번 호출되면 두 개의 응답이
+  // 동시에 진행되며 서로의 speak()/listen() 사이클이 경합해 "빠르게 스킵되는" 현상이
+  // 생긴다. 한 번에 하나의 턴만 진행되도록 막는다.
+  const isProcessingRef = useRef(false)
+
   const sendToAI = useCallback(
     async (userText: string) => {
-      if (!systemPromptRef.current) return
+      if (!systemPromptRef.current || isProcessingRef.current) return
+      isProcessingRef.current = true
       setSessionState('thinking')
       setStatusText('AI가 생각 중...')
 
@@ -682,11 +702,16 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
         if (!isMuted) {
           setSessionState('speaking')
           setStatusText('AI 말하는 중...')
-          speak(aiText, () => setTimeout(() => proceedAfterAi(), 400))
+          speak(aiText, () => {
+            isProcessingRef.current = false
+            setTimeout(() => proceedAfterAi(), 400)
+          })
         } else {
+          isProcessingRef.current = false
           proceedAfterAi()
         }
       } catch {
+        isProcessingRef.current = false
         setStatusText('오류가 발생했습니다. 다시 시도하세요.')
         setSessionState('ready')
       }
@@ -1319,10 +1344,24 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
           </button>
         )}
         <div className="speaking-quick-btns">
-          <button disabled={sessionState === 'idle'} onClick={() => sendToAI('feedback')}>
+          <button
+            disabled={sessionState === 'idle' || sessionState === 'thinking' || sessionState === 'speaking'}
+            onClick={() => {
+              abortListeningSilently()
+              stopTts()
+              sendToAI('feedback')
+            }}
+          >
             📊 피드백
           </button>
-          <button disabled={sessionState === 'idle'} onClick={() => sendToAI('next')}>
+          <button
+            disabled={sessionState === 'idle' || sessionState === 'thinking' || sessionState === 'speaking'}
+            onClick={() => {
+              abortListeningSilently()
+              stopTts()
+              sendToAI('next')
+            }}
+          >
             ➡️ 다음 주제
           </button>
           <button onClick={endSession}>🔄 처음으로</button>
