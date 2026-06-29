@@ -400,7 +400,9 @@ function escapeRegExp(s: string): string {
 // 패턴 목록의 "~"는 자유롭게 들어갈 내용을 나타내는 자리표시자다(예: "I think that~").
 // 실제 문장에서는 그 자리에 다른 단어들이 오므로, 매칭 시 느슨한 와일드카드로 바꿔준다.
 function patternToRegexSource(p: string): string {
-  return escapeRegExp(p.replace(/\?$/, '')).replace(/~/g, "[\\w\\s',.!]*")
+  // .!?는 문장 끝을 나타내므로 와일드카드 문자 집합에서 제외해, 다음 문장까지
+  // 통째로 매칭되어버리는 것을 막는다(최대 길이도 60자로 한 번 더 제한).
+  return escapeRegExp(p.replace(/\?$/, '')).replace(/~/g, "[\\w\\s',]{0,60}")
 }
 
 function highlightPatterns(text: string, patterns: string[]): React.ReactNode {
@@ -648,6 +650,16 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   useEffect(() => {
     messagesRef.current = messages
   }, [messages])
+
+  // 대화가 시작된 뒤 마이크 권한을 처음 물어보면 사용자가 당황할 수 있다.
+  // 스피킹 화면에 들어오는 즉시 권한을 미리 요청해두고, 받은 스트림은 바로 정리한다
+  // (SpeechRecognition은 별도로 마이크를 다시 잡으므로 스트림을 들고 있을 필요는 없다).
+  useEffect(() => {
+    navigator.mediaDevices
+      ?.getUserMedia({ audio: true })
+      .then((stream) => stream.getTracks().forEach((track) => track.stop()))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     autoModeRef.current = autoMode
