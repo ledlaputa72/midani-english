@@ -46,11 +46,38 @@ export default async function handler(req, res) {
     },
   })
 
-  const candidates = [
+  // 하드코딩한 모델명이 이 API 키/프로젝트에서 실제로 활성화돼 있지 않으면 매번 조용히
+  // 실패한다. 먼저 계정에서 실제로 쓸 수 있는 모델 목록을 조회해 이름에 "tts"가 들어간
+  // 모델을 우선 후보로 넣고, 혹시 그 목록 조회마저 실패하면 알려진 이름들로 폴백한다.
+  const fallbackCandidates = [
     { version: 'v1beta', model: 'gemini-2.5-flash-preview-tts' },
     { version: 'v1beta', model: 'gemini-2.5-pro-preview-tts' },
     { version: 'v1beta', model: 'gemini-2.0-flash-preview-tts' },
   ]
+
+  const discovered = []
+  try {
+    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`)
+    if (listRes.ok) {
+      const listData = await listRes.json()
+      for (const m of listData.models ?? []) {
+        const name = m.name?.replace(/^models\//, '')
+        if (name && /tts/i.test(name) && (m.supportedGenerationMethods ?? []).includes('generateContent')) {
+          discovered.push({ version: 'v1beta', model: name })
+        }
+      }
+    }
+  } catch {
+    // 목록 조회 실패는 무시하고 아래 폴백 후보로 진행한다.
+  }
+
+  const seen = new Set()
+  const candidates = [...discovered, ...fallbackCandidates].filter(({ version, model }) => {
+    const key = `${version}/${model}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 
   const errors = []
 
