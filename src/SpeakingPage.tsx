@@ -577,7 +577,10 @@ async function speak(text: string, onEnd?: () => void, gender: VoiceGender = 'ma
     el.muted = false
     el.src = `data:${data.mime};base64,${data.audio}`
     el.onended = finish
-    el.onerror = () => speakBrowserTts(text, finish, gender)
+    el.onerror = () => {
+      console.error('Gemini TTS audio playback error, falling back to browser TTS')
+      speakBrowserTts(text, finish, gender)
+    }
     el.onloadedmetadata = () => {
       if (finished || !Number.isFinite(el.duration)) return
       clearTimeout(watchdog)
@@ -596,7 +599,8 @@ async function speak(text: string, onEnd?: () => void, gender: VoiceGender = 'ma
         speakBrowserTts(text, finish, gender)
       }
     }, 2000)
-  } catch {
+  } catch (err) {
+    console.error('Gemini TTS failed, falling back to browser TTS:', err)
     speakBrowserTts(text, finish, gender)
   }
 }

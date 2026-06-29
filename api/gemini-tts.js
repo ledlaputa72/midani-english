@@ -49,6 +49,7 @@ export default async function handler(req, res) {
   const candidates = [
     { version: 'v1beta', model: 'gemini-2.5-flash-preview-tts' },
     { version: 'v1beta', model: 'gemini-2.5-pro-preview-tts' },
+    { version: 'v1beta', model: 'gemini-2.0-flash-preview-tts' },
   ]
 
   const errors = []
@@ -90,5 +91,6 @@ export default async function handler(req, res) {
     }
   }
 
+  console.error('gemini-tts all candidates failed:', errors.join(' | '))
   return res.status(500).json({ error: errors.join(' | ') })
 }
