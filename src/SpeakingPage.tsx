@@ -522,14 +522,18 @@ function unlockTtsAudio() {
 
 function stopTts() {
   window.speechSynthesis.cancel()
-  // 일시정지만 하면 모바일에서 오디오 세션의 "재생" 라우트가 그대로 점유된 채 남아있어
-  // 바로 이어지는 마이크 녹음(SpeechRecognition)이 오디오 세션을 제대로 가져오지 못하고
-  // 무음 재생/녹음 실패로 이어지는 경우가 있다. src를 완전히 비우고 load()로 리셋해
-  // 재생 세션을 확실히 해제한 뒤 다음 인식이 시작되게 한다.
+  // pause()만으로도 모바일에서 마이크 녹음이 오디오 세션을 가져갈 수 있다. removeAttribute('src')
+  // + load()까지 호출해 미디어 엘리먼트를 완전히 리셋하면, iOS Safari에서는 그 리셋이 사용자
+  // 제스처 밖에서 일어났기 때문에 "자동재생 잠금 해제" 상태가 같이 풀려버려, 그 다음 비동기
+  // 콜백(AI 응답) 안에서 호출하는 play()가 조용히 막힌다 — 2번째 AI 대사부터 TTS가 안 들리는 원인.
+  // 그래서 src는 유지한 채 재생만 멈추고 처음으로 되돌린다.
   if (sharedTtsAudioEl) {
     sharedTtsAudioEl.pause()
-    sharedTtsAudioEl.removeAttribute('src')
-    sharedTtsAudioEl.load()
+    try {
+      sharedTtsAudioEl.currentTime = 0
+    } catch {
+      // src가 아직 없는 초기 상태에서는 currentTime 설정이 실패할 수 있다 — 무시해도 안전.
+    }
   }
 }
 
