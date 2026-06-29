@@ -786,9 +786,22 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
     window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices()
   }, [])
 
+  // AI가 스스로 대화를 끝내려고 할 때 쓰는 문구들. Auto 대화 중에는 사용자가 끼어들 수 없으므로
+  // AI가 "이제 그만하자"는 신호를 보내면 거기서 멈추지 않으면 같은 인사가 무한히 반복된다.
+  const isSessionEndSignal = (text: string) =>
+    /session concluded|end (our|this) (chat|conversation)|that'?s a wrap|i'?m going to (go ahead and )?(end|wrap up)/i.test(
+      text,
+    )
+
   // AI가 말을 마친 뒤 다음 턴으로 넘어가는 공통 분기.
   // Auto 대화가 켜져 있으면 사용자 마이크 입력을 기다리지 않고 AI가 스스로 다음 발화를 만들어 이어간다.
-  const proceedAfterAi = useCallback(() => {
+  const proceedAfterAi = useCallback((lastAiText?: string) => {
+    if (autoModeRef.current && lastAiText && isSessionEndSignal(lastAiText)) {
+      setAutoMode(false)
+      setSessionState('ready')
+      setStatusText('AI가 대화를 마무리했어요. 마이크 버튼을 눌러 새 대화를 이어가 보세요.')
+      return
+    }
     if (autoModeRef.current) {
       runAutoTurnRef.current()
     } else {
@@ -827,11 +840,11 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
           setStatusText('AI 말하는 중...')
           speak(aiText, () => {
             isProcessingRef.current = false
-            setTimeout(() => proceedAfterAi(), 400)
+            setTimeout(() => proceedAfterAi(aiText), 400)
           })
         } else {
           isProcessingRef.current = false
-          proceedAfterAi()
+          proceedAfterAi(aiText)
         }
       } catch {
         isProcessingRef.current = false
@@ -969,9 +982,9 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
         if (!isMuted) {
           setSessionState('speaking')
           setStatusText('AI 말하는 중...')
-          speak(aiText, () => setTimeout(() => proceedAfterAi(), 400))
+          speak(aiText, () => setTimeout(() => proceedAfterAi(aiText), 400))
         } else {
-          proceedAfterAi()
+          proceedAfterAi(aiText)
         }
       } catch (err) {
         setStatusText(`시작 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`)
