@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useLang } from './LangContext'
 
 // ── Gemini 서버리스 프록시 호출 ──────────────────────────────
 // 브라우저에서 @google/generative-ai로 직접 호출하면 API 키 제한으로 실패하므로,
@@ -680,11 +681,13 @@ type SpeakingPageProps = {
 
 // ── 메인 컴포넌트 ───────────────────────────────────────────
 export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
+  const { t, lang } = useLang()
+
   const [sessionState, setSessionState] = useState<SessionState>('selecting')
   const [selectedCat, setSelectedCat] = useState<Category | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [transcript, setTranscript] = useState('')
-  const [statusText, setStatusText] = useState('카테고리를 선택하세요')
+  const [statusText, setStatusText] = useState(() => t('sp.status.selectCat'))
   const [isMuted, setIsMuted] = useState(false)
   const [practiceMode, setPracticeMode] = useState<PracticeMode>('free')
   const [shownKoPatterns, setShownKoPatterns] = useState<Set<string>>(new Set())
@@ -745,7 +748,35 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
     setFontScale((prev) => Math.min(1.8, Math.max(0.8, Math.round((prev + delta) * 10) / 10)))
   }, [])
 
-  const studyCategories = useMemo(() => buildStudyCategories(studyItems), [studyItems])
+  const studyCategories = useMemo(() => {
+    const cats = buildStudyCategories(studyItems)
+    const kindLabelKeys: Record<string, Parameters<typeof t>[0]> = {
+      V: 'sp.study.vocab',
+      X: 'sp.study.expression',
+      Y: 'sp.study.idiom',
+    }
+    return cats.map((cat) => ({
+      ...cat,
+      label: kindLabelKeys[cat.id] ? t(kindLabelKeys[cat.id]) : cat.label,
+    }))
+  }, [studyItems, t])
+
+  // Translated category / topic labels
+  const translatedCats = useMemo(
+    () => PATTERN_CATEGORIES.map((cat) => ({
+      ...cat,
+      label: t(`sp.cat.${cat.id}` as Parameters<typeof t>[0]),
+    })),
+    [t],
+  )
+
+  const translatedTopicGroups = useMemo(
+    () => TOPIC_GROUPS.map((group) => ({
+      ...group,
+      label: t(`sp.topic.${group.id}` as Parameters<typeof t>[0]),
+    })),
+    [t],
+  )
 
   // 대화 메시지 안에서 강조 표시할 연습 패턴 — 이번 세션에서 선택한 패턴(없으면 전체)
   const highlightPatternList = useMemo(() => {
@@ -799,7 +830,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
     if (autoModeRef.current && lastAiText && isSessionEndSignal(lastAiText)) {
       setAutoMode(false)
       setSessionState('ready')
-      setStatusText('AI가 대화를 마무리했어요. 마이크 버튼을 눌러 새 대화를 이어가 보세요.')
+      setStatusText(t('sp.status.aiDone'))
       return
     }
     if (autoModeRef.current) {
@@ -820,7 +851,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       if (!systemPromptRef.current || isProcessingRef.current) return
       isProcessingRef.current = true
       setSessionState('thinking')
-      setStatusText('AI가 생각 중...')
+      setStatusText(t('sp.status.aiThinking'))
 
       historyRef.current = [...historyRef.current, { role: 'user', parts: [{ text: userText }] }]
 
@@ -837,7 +868,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
 
         if (!isMuted) {
           setSessionState('speaking')
-          setStatusText('AI 말하는 중...')
+          setStatusText(t('sp.status.aiSpeaking'))
           speak(aiText, () => {
             isProcessingRef.current = false
             setTimeout(() => proceedAfterAi(aiText), 400)
@@ -848,7 +879,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
         }
       } catch {
         isProcessingRef.current = false
-        setStatusText('오류가 발생했습니다. 다시 시도하세요.')
+        setStatusText(t('sp.status.error'))
         setSessionState('ready')
       }
     },
@@ -859,7 +890,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   const runAutoTurn = useCallback(async () => {
     if (!autoModeRef.current || !systemPromptRef.current) return
     setSessionState('thinking')
-    setStatusText('Auto 대화 진행 중...')
+    setStatusText(t('sp.status.autoRunning'))
 
     // 학습자 역할을 시뮬레이션하기 위해 user/model 역할을 뒤바꿔서 호출한다.
     // (Gemini는 항상 마지막이 'user'여야 다음 'model' 응답을 만들어주므로,
@@ -884,13 +915,13 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       // 나를 대신하는 AI 대사도 들려준다. AI 캐릭터(남성 음성)와 구분되도록 여성 음성을 사용한다.
       if (!isMuted) {
         setSessionState('speaking')
-        setStatusText('Auto 대화 읽는 중...')
+        setStatusText(t('sp.status.autoReading'))
         speak(autoUserText, () => sendToAI(autoUserText), 'female')
       } else {
         sendToAI(autoUserText)
       }
     } catch {
-      setStatusText('Auto 대화 생성 중 오류가 발생했습니다.')
+      setStatusText(t('sp.status.autoError'))
       setSessionState('ready')
     }
   }, [sendToAI, isMuted])
@@ -910,7 +941,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
     setLastCorrection(null)
     setLastUserAttempt('')
     setSessionState('idle')
-    setStatusText('연습 패턴·주제·대화 방식을 고르고 시작하기 버튼을 눌러 대화를 시작하세요')
+    setStatusText(t('sp.status.selectStart'))
   }, [])
 
   const togglePatternKo = useCallback((en: string) => {
@@ -946,7 +977,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       setMessages([])
       setTranscript('')
       setSessionState('thinking')
-      setStatusText('대화를 시작하는 중...')
+      setStatusText(t('sp.status.starting'))
 
       const activePatterns = cat.patterns.filter((p) => selectedPatternKeys.has(p.en))
       const patternsForPrompt = (activePatterns.length > 0 ? activePatterns : cat.patterns).map((p) => p.en)
@@ -981,13 +1012,13 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
 
         if (!isMuted) {
           setSessionState('speaking')
-          setStatusText('AI 말하는 중...')
+          setStatusText(t('sp.status.aiSpeaking'))
           speak(aiText, () => setTimeout(() => proceedAfterAi(aiText), 400))
         } else {
           proceedAfterAi(aiText)
         }
       } catch (err) {
-        setStatusText(`시작 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`)
+        setStatusText(t('sp.status.startError', { msg: err instanceof Error ? err.message : t('common.unknown') }))
         setSessionState('idle')
       }
     },
@@ -1056,7 +1087,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
         recognitionRef.current = null // 손상된 인스턴스로 추정 — 다음 시도 때 새로 생성
         setTranscript('')
         setSessionState('ready')
-        setStatusText('인식이 응답하지 않아요. 마이크 버튼을 눌러 다시 시도하세요.')
+        setStatusText(t('sp.status.noResponse'))
       }, 13000)
     }
 
@@ -1067,7 +1098,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
 
     recognition.onstart = () => {
       setSessionState('listening')
-      setStatusText('듣는 중... 말해보세요')
+      setStatusText(t('sp.status.listening'))
       setTranscript('')
       finalText = ''
       resetSilenceTimer()
@@ -1084,7 +1115,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       }
       if (final) finalText += final
       setTranscript(finalText || interim)
-      setStatusText('듣는 중...')
+      setStatusText(t('sp.status.listeningBr'))
       resetSilenceTimer()
       armHardWatchdog()
       recognitionRetryCountRef.current = 0
@@ -1104,7 +1135,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       } else {
         setTranscript('')
         setSessionState('ready')
-        setStatusText('말이 들리지 않았어요. 마이크 버튼을 눌러 다시 말해보세요.')
+        setStatusText(t('sp.status.noSpeech'))
       }
     }
 
@@ -1126,7 +1157,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       ) {
         recognitionRetryCountRef.current += 1
         recognitionRef.current = null // 새 인스턴스로 재시도
-        setStatusText('마이크가 잠시 끊겼어요. 다시 듣는 중...')
+        setStatusText(t('sp.status.reconnecting'))
         setTimeout(() => startListeningRef.current(), 500)
         return
       }
@@ -1139,8 +1170,8 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       setSessionState('ready')
       setStatusText(
         event?.error === 'no-speech'
-          ? '말이 들리지 않았어요. 마이크 버튼을 눌러 다시 말해보세요.'
-          : '인식 오류. 마이크 버튼을 눌러 다시 시도하세요.',
+          ? t('sp.status.noSpeech')
+          : t('sp.status.recogError'),
       )
     }
 
@@ -1192,7 +1223,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
     setLastCorrection(null)
     setLastUserAttempt('')
     setAutoMode(false)
-    setStatusText('카테고리를 선택하세요')
+    setStatusText(t('sp.status.selectCat'))
   }
 
   // ── 카테고리 선택 화면 ────────────────────────────────────
@@ -1200,16 +1231,16 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
     return (
       <section className="speaking-page">
         <div className="speaking-header">
-          <h2>🎙️ Speaking Practice</h2>
-          <p>연습할 패턴 카테고리를 선택하세요. AI가 먼저 말을 걸고, 마이크 버튼을 눌러 대답하세요.</p>
+          <h2>{t('sp.ui.title')}</h2>
+          <p>{t('sp.ui.desc')}</p>
         </div>
-        {statusText !== '카테고리를 선택하세요' && (
-          <p className={statusText.includes('오류') ? 'speaking-error' : 'speaking-tip'}>
+        {statusText !== t('sp.status.selectCat') && (
+          <p className={statusText.toLowerCase().includes('error') || statusText.includes('오류') ? 'speaking-error' : 'speaking-tip'}>
             {statusText}
           </p>
         )}
         <div className="speaking-cat-grid">
-          {PATTERN_CATEGORIES.map((cat) => (
+          {translatedCats.map((cat) => (
             <button
               key={cat.id}
               className="speaking-cat-btn"
@@ -1218,12 +1249,12 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
             >
               <span className="cat-id">{cat.id}</span>
               <span className="cat-label">{cat.label.replace(`${cat.id}. `, '')}</span>
-              <span className="cat-count">{cat.patterns.length}개 패턴</span>
+              <span className="cat-count">{t('sp.ui.patternCount', { n: cat.patterns.length })}</span>
             </button>
           ))}
         </div>
 
-        <h3 className="speaking-section-title">📒 내 단어장으로 연습하기</h3>
+        <h3 className="speaking-section-title">{t('sp.ui.myVocab')}</h3>
         <div className="speaking-cat-grid speaking-cat-grid-study">
           {studyCategories.map((cat) => (
             <button
@@ -1237,15 +1268,15 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
               <span className="cat-label">{cat.label.replace(`${cat.id}. `, '')}</span>
               <span className="cat-count">
                 {cat.patterns.length > 0
-                  ? `전체 ${cat.totalCount}개 중 빈도 높은 ${cat.patterns.length}개`
-                  : '등록된 항목 없음'}
+                  ? t('sp.ui.vocabCount', { n: cat.patterns.length, total: cat.totalCount })
+                  : t('sp.ui.vocabEmpty')}
               </span>
             </button>
           ))}
         </div>
 
         <p className="speaking-tip">
-          💡 운전·운동 중엔 🔊 음성 모드로, 조용한 환경에선 🔇 음소거 후 텍스트로 연습하세요.
+          {t('sp.ui.tip')}
         </p>
       </section>
     )
@@ -1260,7 +1291,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       {/* 상단 헤더 */}
       <div className="speaking-session-header">
         <button className="speaking-back-btn" onClick={endSession}>
-          ← 카테고리 변경
+          {t('sp.ui.backBtn')}
         </button>
         <div className="speaking-cat-badge" style={{ background: selectedCat?.color }}>
           {selectedCat?.label}
@@ -1269,7 +1300,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
           <button
             type="button"
             onClick={() => adjustFontScale(-0.1)}
-            title="글자 작게"
+            title={t('sp.ui.smaller')}
             disabled={fontScale <= 0.8}
           >
             A-
@@ -1277,7 +1308,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
           <button
             type="button"
             onClick={() => adjustFontScale(0.1)}
-            title="글자 크게"
+            title={t('sp.ui.larger')}
             disabled={fontScale >= 1.8}
           >
             A+
@@ -1289,7 +1320,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
             setIsMuted((v) => !v)
             stopTts()
           }}
-          title={isMuted ? '음성 켜기' : '음성 끄기'}
+          title={isMuted ? t('sp.ui.muteOn') : t('sp.ui.muteOff')}
         >
           {isMuted ? '🔇' : '🔊'}
         </button>
@@ -1297,7 +1328,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
 
       {/* 패턴 목록 (접기/펼치기) */}
       <details className="speaking-patterns-detail">
-        <summary>연습 패턴 보기 ({selectedCat?.patterns.length}개)</summary>
+        <summary>{t('sp.ui.patternDetail', { n: selectedCat?.patterns.length ?? 0 })}</summary>
         <div className="speaking-patterns-list">
           {selectedCat?.patterns.map((p) => (
             <button
@@ -1305,7 +1336,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
               type="button"
               className="speaking-pattern-chip"
               onClick={() => togglePatternKo(p.en)}
-              title="클릭하면 한글/영어 전환"
+              title={t('sp.ui.chipToggle')}
             >
               {shownKoPatterns.has(p.en) ? p.ko : p.en}
             </button>
@@ -1323,14 +1354,14 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
                 className="speaking-shadow-toggle"
                 onClick={() => setShadowBoxVisible(false)}
               >
-                숨기기 ▲
+                {t('sp.ui.shadowHide')}
               </button>
               <div className="speaking-shadow-row">
-                <span className="speaking-shadow-label">✅ AI 추천 문장</span>
+                <span className="speaking-shadow-label">{t('sp.ui.aiSuggestion')}</span>
                 <p className="speaking-shadow-target">{lastCorrection}</p>
               </div>
               <div className="speaking-shadow-row">
-                <span className="speaking-shadow-label">🎤 내가 말한 문장</span>
+                <span className="speaking-shadow-label">{t('sp.ui.myAttempt')}</span>
                 <p className="speaking-shadow-attempt">
                   {lastUserAttempt ? (
                     diffWords(lastCorrection, lastUserAttempt).map((w, i) => (
@@ -1339,7 +1370,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
                       </span>
                     ))
                   ) : (
-                    <span className="speaking-shadow-waiting">따라 말해보세요...</span>
+                    <span className="speaking-shadow-waiting">{t('sp.ui.tryFollowing')}</span>
                   )}
                 </p>
               </div>
@@ -1350,7 +1381,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
               className="speaking-shadow-toggle"
               onClick={() => setShadowBoxVisible(true)}
             >
-              쉐도잉 비교 보기 ▼
+              {t('sp.ui.shadowShow')}
             </button>
           )}
         </div>
@@ -1363,7 +1394,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
             key={i}
             className={`speaking-msg speaking-msg-${msg.role} ${msg.auto ? 'speaking-msg-auto' : ''}`}
             onClick={() => toggleTranslation(i)}
-            title="클릭하면 한글 번역 보기"
+            title={t('sp.ui.clickTranslate')}
           >
             <span className="speaking-msg-role">
               {msg.role === 'model' ? 'AI' : msg.auto ? 'Me (Auto)' : 'Me'}
@@ -1391,7 +1422,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
         {sessionState === 'idle' ? (
           <>
             <div className="speaking-config-section">
-              <h4>1. 연습 패턴 선택 (다중 선택)</h4>
+              <h4>{t('sp.ui.step1')}</h4>
               <div className="speaking-pattern-multiselect">
                 {selectedCat?.patterns.map((p) => (
                   <button
@@ -1408,8 +1439,8 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
             </div>
 
             <div className="speaking-config-section">
-              <h4>2. 대화 주제 선택 (다중 선택, 안 고르면 AI가 다양하게 골라요)</h4>
-              {TOPIC_GROUPS.map((group) => (
+              <h4>{t('sp.ui.step2')}</h4>
+              {translatedTopicGroups.map((group) => (
                 <div key={group.id} className="speaking-topic-group">
                   <span className="speaking-topic-group-label">{group.label}</span>
                   <div className="speaking-topic-list">
@@ -1421,7 +1452,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
                         onClick={() => toggleTopicSelect(t.en)}
                       >
                         {selectedTopicKeys.has(t.en) ? '✅ ' : ''}
-                        {t.ko}
+                        {lang === 'ko' ? t.ko : t.en}
                       </button>
                     ))}
                   </div>
@@ -1430,23 +1461,23 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
             </div>
 
             <div className="speaking-config-section">
-              <h4>3. 대화 방식</h4>
+              <h4>{t('sp.ui.step3')}</h4>
               <div className="speaking-mode-select">
                 <button
                   type="button"
                   className={`speaking-mode-btn ${practiceMode === 'free' ? 'active' : ''}`}
                   onClick={() => setPracticeMode('free')}
                 >
-                  💬 자유롭게 대화하기
-                  <small>오류가 있어도 대화를 계속 이어가요</small>
+                  {t('sp.ui.modeFree')}
+                  <small>{t('sp.ui.modeFreeDesc')}</small>
                 </button>
                 <button
                   type="button"
                   className={`speaking-mode-btn ${practiceMode === 'correct' ? 'active' : ''}`}
                   onClick={() => setPracticeMode('correct')}
                 >
-                  ✏️ 오류 교정 + 쉐도잉
-                  <small>틀린 부분을 고쳐주고 따라 말해보게 해요</small>
+                  {t('sp.ui.modeCorrect')}
+                  <small>{t('sp.ui.modeCorrectDesc')}</small>
                 </button>
               </div>
             </div>
@@ -1459,7 +1490,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
                 if (selectedCat) startSession(selectedCat)
               }}
             >
-              🚀 시작하기
+              {t('sp.ui.startBtn')}
             </button>
           </>
         ) : (
@@ -1473,10 +1504,10 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
             }
           >
             {autoMode
-              ? '🤖 Auto 대화 중...'
+              ? t('sp.ui.autoRunning')
               : sessionState === 'listening'
-                ? '🔴 듣는 중...'
-                : '🎤 말하기'}
+                ? t('sp.ui.micActive')
+                : t('sp.ui.micSpeak')}
           </button>
         )}
         <div className="speaking-quick-btns">
@@ -1488,7 +1519,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
               sendToAI('feedback')
             }}
           >
-            📊 피드백
+            {t('sp.ui.feedback')}
           </button>
           <button
             disabled={sessionState === 'idle' || sessionState === 'thinking' || sessionState === 'speaking'}
@@ -1498,15 +1529,15 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
               sendToAI('next')
             }}
           >
-            ➡️ 다음 주제
+            {t('sp.ui.nextTopic')}
           </button>
-          <button onClick={endSession}>🔄 처음으로</button>
+          <button onClick={endSession}>{t('sp.ui.restart')}</button>
           <button
             className={`speaking-auto-btn ${autoMode ? 'active' : ''}`}
             onClick={() => setAutoMode((v) => !v)}
-            title={autoMode ? 'Auto 대화 끄기 (다시 내가 말하기)' : 'Auto 대화 켜기 (AI가 내 대신 대화 이어가기)'}
+            title={autoMode ? t('sp.ui.autoOnTitle') : t('sp.ui.autoOffTitle')}
           >
-            🤖 Auto 대화 {autoMode ? 'ON' : 'OFF'}
+            {autoMode ? t('sp.ui.autoOn') : t('sp.ui.autoOff')}
           </button>
         </div>
       </div>

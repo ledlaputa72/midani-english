@@ -6,6 +6,7 @@ import { GoogleAuthProvider, getRedirectResult, onAuthStateChanged, signInWithPo
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import { auth, db, firebaseReady } from './firebase'
 import SpeakingPage from './SpeakingPage'
+import { useLang } from './LangContext'
 import './App.css'
 
 type Status = 'new' | 'learning' | 'mastered'
@@ -84,10 +85,11 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   defaultAiProvider: 'default',
 }
 
-const STATUS_LABEL: Record<Status, string> = {
-  new: '새 단어',
-  learning: '학습 중',
-  mastered: '완료',
+// These are rebuilt inside App() via useLang() — see below.
+const STATUS_LABEL_STATIC: Record<Status, string> = {
+  new: 'New',
+  learning: 'Learning',
+  mastered: 'Mastered',
 }
 
 const ITEM_TYPE_LABEL: Record<ItemType, string> = {
@@ -96,18 +98,18 @@ const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   idiom: 'Idiom',
 }
 
-const AI_PROVIDER_LABEL: Record<AiProvider, string> = {
-  default: '기본 엔진 (사전+번역)',
+const AI_PROVIDER_LABEL_STATIC: Record<AiProvider, string> = {
+  default: 'Dictionary + Translation',
   gemini: 'Gemini',
 }
 
-const NAV_ITEMS: Array<{ id: Page; label: string }> = [
-  { id: 'dashboard', label: '대시보드' },
-  { id: 'list', label: '리스트' },
-  { id: 'board', label: '보드' },
-  { id: 'cards', label: '플래시카드' },
-  { id: 'calendar', label: '캘린더' },
-  { id: 'speaking', label: '🎙️ 스피킹' },
+const NAV_ITEMS_STATIC: Array<{ id: Page; labelKey: string }> = [
+  { id: 'dashboard', labelKey: 'nav.dashboard' },
+  { id: 'list',      labelKey: 'nav.list' },
+  { id: 'board',     labelKey: 'nav.board' },
+  { id: 'cards',     labelKey: 'nav.cards' },
+  { id: 'calendar',  labelKey: 'nav.calendar' },
+  { id: 'speaking',  labelKey: 'nav.speaking' },
 ]
 
 const EMPTY_FORM: FormState = {
@@ -289,8 +291,8 @@ function loadLocalData(): { items: StudyItem[]; profiles: CardInfoProfile[]; set
   }
 }
 
-function dateText(value?: string): string {
-  if (!value) return '없음'
+function dateText(value?: string, none = '—'): string {
+  if (!value) return none
   return value
 }
 
@@ -301,8 +303,9 @@ function toDateKey(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
-function monthTitle(date: Date): string {
-  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`
+function monthTitle(date: Date, lang: string): string {
+  if (lang === 'ko') return `${date.getFullYear()}년 ${date.getMonth() + 1}월`
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
 }
 
 function cyclicIndex(index: number, total: number): number {
@@ -1390,6 +1393,23 @@ function inferItemTypeAuto(phrase: string, definitionHint = ''): ItemType {
 }
 
 function App() {
+  const { t, lang, setLang } = useLang()
+
+  // Translated label maps — rebuilt whenever lang changes
+  const STATUS_LABEL: Record<Status, string> = {
+    new: t('status.new'),
+    learning: t('status.learning'),
+    mastered: t('status.mastered'),
+  }
+  const AI_PROVIDER_LABEL: Record<AiProvider, string> = {
+    default: t('settings.aiDefault'),
+    gemini: 'Gemini',
+  }
+  const NAV_ITEMS = NAV_ITEMS_STATIC.map(({ id, labelKey }) => ({
+    id,
+    label: t(labelKey as Parameters<typeof t>[0]),
+  }))
+
   const [page, setPage] = useState<Page>('dashboard')
   const [items, setItems] = useState<StudyItem[]>([])
   const [profiles, setProfiles] = useState<CardInfoProfile[]>([])
@@ -1474,7 +1494,7 @@ function App() {
   const loadOcrImageFile = useCallback((file: File | null | undefined) => {
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      setOcrError('이미지 파일만 지원합니다 (PNG, JPEG, WebP 등).')
+      setOcrError(t('error.ocrImgOnly'))
       return
     }
     setOcrError('')
@@ -1527,10 +1547,10 @@ function App() {
         .filter(Boolean)
       setOcrLines(lines)
       if (lines.length === 0) {
-        setOcrError('인식된 텍스트가 없습니다. 더 선명한 이미지로 다시 시도해 보세요.')
+        setOcrError(t('error.ocrNoText'))
       }
     } catch (err) {
-      setOcrError(err instanceof Error ? err.message : 'OCR 처리 중 오류가 발생했습니다.')
+      setOcrError(err instanceof Error ? err.message : 'OCR error.')
     } finally {
       setIsOcrRunning(false)
       setOcrProgress(0)
@@ -1603,7 +1623,7 @@ function App() {
       return
     }
     getRedirectResult(auth).catch((error) => {
-      setAuthError(error instanceof Error ? error.message : '구글 로그인에 실패했습니다.')
+      setAuthError(error instanceof Error ? error.message : t('auth.loginFailed'))
     })
     const unsub = onAuthStateChanged(auth, (nextUser) => {
       setAuthUser(nextUser)
@@ -1691,7 +1711,7 @@ function App() {
         setItems(cached.items.length > 0 ? cached.items : SAMPLE_ITEMS)
         setProfiles(cached.profiles)
         setAppSettings(cached.settings)
-        setSyncError(err.message || '클라우드 동기화에 실패했습니다.')
+        setSyncError(err.message || t('error.syncFailed'))
         setSyncLoading(false)
       },
     )
@@ -1736,7 +1756,7 @@ function App() {
       )
       setSyncError('')
     } catch (error) {
-      setSyncError(error instanceof Error ? error.message : '클라우드 저장 중 오류가 발생했습니다.')
+      setSyncError(error instanceof Error ? error.message : t('error.saveFailed'))
     }
   }
 
@@ -2343,7 +2363,7 @@ function App() {
   }
 
   const saveProfileFromCurrentForm = async () => {
-    const name = window.prompt('프로파일 이름을 입력하세요')
+    const name = window.prompt(t('profile.namePrompt'))
     if (!name || !name.trim()) return
     const nextProfile = await upsertProfile({
       name: name.trim(),
@@ -2355,10 +2375,10 @@ function App() {
         .filter(Boolean),
       difficulty: form.difficulty,
       notes: form.notes.trim(),
-      deck: form.deck.trim() || '기본 덱',
+      deck: form.deck.trim() || t('default.deck'),
     })
     setForm((prev) => ({ ...prev, profileId: nextProfile.id }))
-    setSettingsMsg(`프로파일 "${nextProfile.name}" 저장 완료`)
+    setSettingsMsg(t('msg.profileSaved', { name: nextProfile.name }))
   }
 
   const startEditProfile = (profile: CardInfoProfile) => {
@@ -2384,7 +2404,7 @@ function App() {
       tags: '',
       difficulty: 2,
       notes: '',
-      deck: '기본 덱',
+      deck: t('default.deck'),
     })
   }
 
@@ -2392,7 +2412,7 @@ function App() {
     event.preventDefault()
     const trimmedName = profileEditor.name.trim()
     if (!trimmedName) {
-      setSettingsMsg('프로파일 이름을 입력해 주세요.')
+      setSettingsMsg(t('profile.noName'))
       return
     }
     const saved = await upsertProfile({
@@ -2406,9 +2426,9 @@ function App() {
         .filter(Boolean),
       difficulty: profileEditor.difficulty,
       notes: profileEditor.notes.trim(),
-      deck: profileEditor.deck.trim() || '기본 덱',
+      deck: profileEditor.deck.trim() || t('default.deck'),
     })
-    setSettingsMsg(`프로파일 "${saved.name}" 저장 완료`)
+    setSettingsMsg(t('msg.profileSaved', { name: saved.name }))
     setProfileEditor({
       id: saved.id,
       name: saved.name,
@@ -2424,7 +2444,7 @@ function App() {
   const updateDefaultAiProvider = async (provider: AiProvider) => {
     const nextSettings: AppSettings = { ...appSettings, defaultAiProvider: provider }
     await persistAll(items, profiles, nextSettings)
-    setSettingsMsg(`기본 자동 생성 모델을 "${AI_PROVIDER_LABEL[provider]}"로 저장했습니다.`)
+    setSettingsMsg(t('msg.aiModelSaved', { model: AI_PROVIDER_LABEL[provider] }))
   }
 
   const updateStatus = (id: string, status: Status) => {
@@ -2476,8 +2496,8 @@ function App() {
 
   const removeItem = (id: string) => {
     const target = items.find((item) => item.id === id)
-    const label = target ? `"${target.phrase}"` : '이 항목'
-    if (!window.confirm(`${label}을(를) 삭제할까요?\n삭제하면 복구할 수 없습니다.`)) return
+    const label = target ? `"${target.phrase}"` : t('del.thisItem')
+    if (!window.confirm(t('del.confirmItem', { label }))) return
     const next = items.filter((item) => item.id !== id)
     persist(next)
     setIsDetailOpen(false)
@@ -2485,8 +2505,8 @@ function App() {
 
   const removeItemFromDeck = (id: string) => {
     const target = items.find((item) => item.id === id)
-    const label = target ? `"${target.phrase}"` : '이 항목'
-    if (!window.confirm(`${label}을(를) 삭제할까요?\n삭제하면 복구할 수 없습니다.`)) return
+    const label = target ? `"${target.phrase}"` : t('del.thisItem')
+    if (!window.confirm(t('del.confirmItem', { label }))) return
     const next = items.filter((item) => item.id !== id)
     persist(next)
   }
@@ -3049,12 +3069,12 @@ function App() {
           await signInWithRedirect(auth, googleProviderRef.current)
         } catch (redirectError) {
           setAuthError(
-            redirectError instanceof Error ? redirectError.message : '구글 로그인에 실패했습니다.',
+            redirectError instanceof Error ? redirectError.message : t('auth.loginFailed'),
           )
         }
         return
       }
-      setAuthError(error instanceof Error ? error.message : '구글 로그인에 실패했습니다.')
+      setAuthError(error instanceof Error ? error.message : t('auth.loginFailed'))
     }
   }
 
@@ -3064,7 +3084,7 @@ function App() {
       await signOut(auth)
       setItems([])
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : '로그아웃에 실패했습니다.')
+      setAuthError(error instanceof Error ? error.message : t('auth.logoutFailed'))
     }
   }
 
@@ -3078,10 +3098,10 @@ function App() {
         { items, profiles, settings: appSettings, updatedAt: serverTimestamp() },
         { merge: true },
       )
-      setSettingsMsg('클라우드 동기화를 완료했습니다.')
+      setSettingsMsg(t('msg.syncNowDone'))
       setSyncError('')
     } catch (error) {
-      setSyncError(error instanceof Error ? error.message : '동기화에 실패했습니다.')
+      setSyncError(error instanceof Error ? error.message : t('msg.syncNowFail'))
     } finally {
       setSyncLoading(false)
     }
@@ -3102,12 +3122,12 @@ function App() {
     a.download = `midani-study-backup-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
-    setSettingsMsg('백업 파일을 내보냈습니다.')
+    setSettingsMsg(t('settings.exportDone'))
   }
 
   const exportItemsCsv = () => {
     const escape = (s: string) => `"${String(s ?? '').replace(/"/g, '""')}"`
-    const headers = ['단어/구문', '한국어 뜻', '유형', '출처', '에피소드', '태그', '상태', '사용빈도', '복습횟수', '추가일']
+    const headers = ['Word/Phrase', 'Meaning', 'Type', 'Source', 'Episode', 'Tags', 'Status', 'Frequency', 'Review Count', 'Date Added']
     const rows = items.map((item) => [
       escape(item.phrase),
       escape(item.translation),
@@ -3129,7 +3149,7 @@ function App() {
     a.download = `midani-vocabulary-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
-    setSettingsMsg(`CSV 파일을 내보냈습니다. (${items.length}개 항목)`)
+    setSettingsMsg(t('msg.exportCsvDone', { n: items.length }))
   }
 
   const importItemsJson = async (file: File | null) => {
@@ -3159,13 +3179,13 @@ function App() {
         }
       })
       if (next.length === 0) {
-        setSettingsMsg('불러온 데이터에 카드가 없습니다.')
+        setSettingsMsg(t('settings.importEmpty'))
         return
       }
       await persistAll(hydratedNext, nextProfiles, nextSettings)
-      setSettingsMsg(`${hydratedNext.length}개 카드를 불러왔습니다.`)
+      setSettingsMsg(t('msg.importCount', { n: hydratedNext.length }))
     } catch {
-      setSettingsMsg('JSON 파일 형식이 올바르지 않습니다.')
+      setSettingsMsg(t('msg.importBadJson'))
     }
   }
 
@@ -3173,11 +3193,8 @@ function App() {
     return (
       <div className="auth-gate">
         <section className="auth-card">
-          <h2>Firebase 설정이 필요합니다</h2>
-          <p>
-            외부 접속 동기화를 위해 Firebase 프로젝트를 연결해 주세요. 루트에 `.env` 파일을 만들고
-            `.env.example` 키를 채운 뒤 다시 실행하면 됩니다.
-          </p>
+          <h2>{t('firebase.setupTitle')}</h2>
+          <p>{t('firebase.setupDesc')}</p>
         </section>
       </div>
     )
@@ -3187,7 +3204,7 @@ function App() {
     return (
       <div className="auth-gate">
         <section className="auth-card">
-          <h2>로그인 상태 확인 중…</h2>
+          <h2>{t('auth.loading')}</h2>
         </section>
       </div>
     )
@@ -3198,7 +3215,7 @@ function App() {
       <aside className="sidebar">
         <div className="logo">
           <h1>Mid/Ani English</h1>
-          <p>미드/애니 영어 학습</p>
+          <p>{t('dash.subtitle')}</p>
         </div>
         <nav>
           {NAV_ITEMS.map((item) => (
@@ -3220,7 +3237,7 @@ function App() {
               openCreateModal()
             }}
           >
-            + 단어 / 구문 추가
+            {t('addBtn.other')}
           </button>
         </div>
 
@@ -3230,7 +3247,7 @@ function App() {
             className={`sidebar-analytics-btn${page === 'analytics' ? ' active' : ''}`}
             onClick={() => setPage('analytics')}
           >
-            📊 학습 분석
+            {t('nav.analytics')}
           </button>
         </div>
 
@@ -3238,9 +3255,9 @@ function App() {
           {!authUser ? (
             <>
               <button type="button" className="account-login-link" onClick={loginWithGoogle}>
-                Google 로그인
+                {t('account.login')}
               </button>
-              <p className="account-subtext">로그인하면 기기 간 동기화가 활성화됩니다.</p>
+              <p className="account-subtext">{t('account.loginHint')}</p>
               {authError && <p className="auth-error">{authError}</p>}
             </>
           ) : (
@@ -3252,8 +3269,8 @@ function App() {
               >
                 <span className="account-avatar">{(authUser.displayName || authUser.email || 'U')[0]}</span>
                 <span className="account-main">
-                  <strong>{authUser.displayName || 'Google 사용자'}</strong>
-                  <small>{authUser.email || '이메일 없음'}</small>
+                  <strong>{authUser.displayName || t('default.googleUser')}</strong>
+                  <small>{authUser.email || t('common.noEmail')}</small>
                 </span>
                 <span className="account-caret">{isAccountMenuOpen ? '▴' : '▾'}</span>
               </button>
@@ -3268,7 +3285,7 @@ function App() {
                       setIsAccountMenuOpen(false)
                     }}
                   >
-                    카드 정보 프로파일
+                    {t('account.profiles')}
                   </button>
                   <button
                     type="button"
@@ -3278,10 +3295,10 @@ function App() {
                       setIsAccountMenuOpen(false)
                     }}
                   >
-                    설정
+                    {t('account.settings')}
                   </button>
                   <button type="button" onClick={logout}>
-                    로그아웃
+                    {t('account.logout')}
                   </button>
                 </div>
               )}
@@ -3295,35 +3312,35 @@ function App() {
           <div>
             <h2>
               {page === 'list'
-                ? '📋 전체 목록'
+                ? t('page.list.title')
                 : page === 'board'
-                  ? '📌 카드 보드'
+                  ? t('page.board.title')
                   : page === 'calendar'
-                    ? '학습 캘린더'
-                    : '학습 노트'}
+                    ? t('page.calendar.title')
+                    : t('page.cards.title')}
             </h2>
             <p>
               {page === 'list'
-                ? '단어·구문·뜻을 한눈에 보고 복습해 보세요.'
+                ? t('page.list.desc')
                 : page === 'board'
-                  ? '상태별 칸에서 예문·복습·출처를 함께 보며 진행도를 관리해 보세요.'
+                  ? t('page.board.desc')
                   : page === 'calendar'
-                    ? '카드를 날짜에 배정하고 학습 일정을 관리해 보세요.'
-                    : '프로토타입 기반 모달 + 카드 학습 흐름'}
+                    ? t('page.calendar.desc')
+                    : t('page.cards.desc')}
             </p>
           </div>
           <div className="header-actions">
             <span className="sync-chip">
-              {!authUser ? '로컬 모드' : syncLoading ? '동기화 중…' : '동기화 완료'}
+              {!authUser ? t('account.localMode') : syncLoading ? t('account.syncing') : t('account.synced')}
             </span>
             {authUser && (
               <span className="user-chip" title={authUser.email ?? ''}>
-                {authUser.displayName || authUser.email || 'Google 사용자'}
+                {authUser.displayName || authUser.email || t('default.googleUser')}
               </span>
             )}
             {page !== 'analytics' && (
               <button className="primary" onClick={() => openCreateModal()}>
-                {page === 'list' || page === 'board' ? '+ 추가' : '단어 / 구문 추가'}
+                {page === 'list' || page === 'board' ? t('addBtn.list') : t('addBtn.other')}
               </button>
             )}
             <div className="mobile-more-wrap" ref={mobileMoreMenuRef}>
@@ -3344,13 +3361,13 @@ function App() {
                       setIsMobileMoreOpen(false)
                     }}
                   >
-                    📊 학습 분석
+                    {t('nav.analytics')}
                   </button>
                   {authUser ? (
                     <>
                       <div className="mobile-more-user">
-                        <strong>{authUser.displayName || 'Google 사용자'}</strong>
-                        <small>{authUser.email || '이메일 없음'}</small>
+                        <strong>{authUser.displayName || t('default.googleUser')}</strong>
+                        <small>{authUser.email || t('common.noEmail')}</small>
                       </div>
                       <button
                         type="button"
@@ -3361,7 +3378,7 @@ function App() {
                           setIsMobileMoreOpen(false)
                         }}
                       >
-                        카드 정보 프로파일
+                        {t('account.profiles')}
                       </button>
                       <button
                         type="button"
@@ -3371,7 +3388,7 @@ function App() {
                           setIsMobileMoreOpen(false)
                         }}
                       >
-                        설정
+                        {t('account.settings')}
                       </button>
                       <button
                         type="button"
@@ -3380,7 +3397,7 @@ function App() {
                           setIsMobileMoreOpen(false)
                         }}
                       >
-                        로그아웃
+                        {t('account.logout')}
                       </button>
                     </>
                   ) : (
@@ -3391,7 +3408,7 @@ function App() {
                         setIsMobileMoreOpen(false)
                       }}
                     >
-                      Google 로그인
+                      {t('account.login')}
                     </button>
                   )}
                 </div>
@@ -3399,47 +3416,45 @@ function App() {
             </div>
           </div>
         </header>
-        {syncError && <p className="sync-error-banner">동기화 오류: {syncError}</p>}
+        {syncError && <p className="sync-error-banner">{t('sync.errorBanner', { error: syncError })}</p>}
 
         {page === 'dashboard' && (
           <>
             <section className="dash-welcome">
               <div>
-                <h3>👋 안녕하세요, Steve!</h3>
-                <p>오늘도 영어 한 구문씩 꾸준히 💪</p>
+                <h3>{t('dash.welcome', { name: authUser?.displayName?.split(' ')[0] || 'there' })}</h3>
+                <p>{t('dash.encouragement')}</p>
               </div>
             </section>
 
             <section className="stats-grid">
               <article>
-                <small>전체 등록</small>
+                <small>{t('dash.totalReg')}</small>
                 <strong className="c-accent">{stats.total}</strong>
-                <span>
-                  단어 {stats.vocabulary} · 구문 {stats.phraseLike}
-                </span>
+                <span>{t('dash.wordsPhrase', { v: stats.vocabulary, p: stats.phraseLike })}</span>
               </article>
               <article>
-                <small>학습 중</small>
+                <small>{t('dash.learning')}</small>
                 <strong className="c-yellow">{stats.learning}</strong>
-                <span>복습 필요</span>
+                <span>{t('dash.reviewNeeded')}</span>
               </article>
               <article>
-                <small>완료</small>
+                <small>{t('dash.mastered')}</small>
                 <strong className="c-green">{stats.mastered}</strong>
-                <span>마스터!</span>
+                <span>{t('dash.masteredBang')}</span>
               </article>
               <article>
-                <small>드라마 수</small>
+                <small>{t('dash.showCount')}</small>
                 <strong className="c-blue">{stats.shows}</strong>
-                <span>작품에서 수집</span>
+                <span>{t('dash.collected')}</span>
               </article>
             </section>
 
             {dashboardDue.length > 0 && (
               <section className="due-banner">
                 <div>
-                  <h4>🔔 오늘의 학습</h4>
-                  <p>학습할 카드가 {dashboardStudyByType.total}개 있어요!</p>
+                  <h4>{t('dash.todayStudy')}</h4>
+                  <p>{t('dash.studyCount', { n: dashboardStudyByType.total })}</p>
                   <div className="due-type-buttons">
                     <button
                       type="button"
@@ -3480,14 +3495,14 @@ function App() {
                     setPage('cards')
                   }}
                 >
-                  지금 학습하기 →
+                  {t('dash.startNow')}
                 </button>
               </section>
             )}
 
             <section className="week-board">
               <div className="week-board-header">
-                <div className="dash-title">🗓 주간 캘린더</div>
+                <div className="dash-title">{t('dash.weekCalendar')}</div>
                 <div className="week-nav">
                   <button className="secondary" onClick={() => setWeekStart((prev) => addDays(prev, -7))}>
                     ←
@@ -3514,7 +3529,7 @@ function App() {
                       }}
                     >
                       <div className="week-cell-head">
-                        <span>{['월', '화', '수', '목', '금', '토', '일'][((day.getDay() + 6) % 7)]}</span>
+                        <span>{[t('cal.mon'),t('cal.tue'),t('cal.wed'),t('cal.thu'),t('cal.fri'),t('cal.sat'),t('cal.sun')][((day.getDay() + 6) % 7)]}</span>
                         <small>{day.getMonth() + 1}/{day.getDate()}</small>
                       </div>
                       <div className="week-cards">
@@ -3530,7 +3545,7 @@ function App() {
                             <small>{item.deck}</small>
                           </div>
                         ))}
-                        {dayItems.length === 0 && <div className="week-empty">비어 있음</div>}
+                        {dayItems.length === 0 && <div className="week-empty">{t('dash.weekEmpty')}</div>}
                       </div>
                     </div>
                   )
@@ -3540,7 +3555,7 @@ function App() {
 
             <section className="dash-columns">
               <div>
-                <div className="dash-title">🕐 최근 추가</div>
+                <div className="dash-title">{t('dash.recentAdded')}</div>
                 <div className="dash-list">
                   {dashboardRecent.map((item) => (
                     <button key={item.id} className="item-card" onClick={() => openDetailModal(item.id)}>
@@ -3548,7 +3563,7 @@ function App() {
                       <p>{item.translation}</p>
                       <div className="chips">
                         <span>{STATUS_LABEL[item.status]}</span>
-                        <span>{item.show || '작품 미입력'}</span>
+                        <span>{item.show || t('default.noShow')}</span>
                       </div>
                     </button>
                   ))}
@@ -3556,7 +3571,7 @@ function App() {
               </div>
 
               <div>
-                <div className="dash-title">🔔 복습 필요</div>
+                <div className="dash-title">{t('dash.reviewDue')}</div>
                 <div className="dash-list">
                   {dashboardDue.map((item) => (
                     <button key={item.id} className="item-card" onClick={() => openDetailModal(item.id)}>
@@ -3564,7 +3579,7 @@ function App() {
                       <p>{item.translation}</p>
                       <div className="chips">
                         <span>{STATUS_LABEL[item.status]}</span>
-                        <span>{item.show || '작품 미입력'}</span>
+                        <span>{item.show || t('default.noShow')}</span>
                       </div>
                     </button>
                   ))}
@@ -3581,17 +3596,17 @@ function App() {
                 className="list-search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="단어, 구문, 뜻 검색..."
+                placeholder={t('list.searchPlaceholder')}
               />
               <select
                 className="list-filter-select"
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as 'all' | Status)}
               >
-                <option value="all">전체 상태</option>
-                <option value="new">새 단어</option>
-                <option value="learning">학습 중</option>
-                <option value="mastered">완료</option>
+                <option value="all">{t('list.filterAllStatus')}</option>
+                <option value="new">{t('status.new')}</option>
+                <option value="learning">{t('status.learning')}</option>
+                <option value="mastered">{t('status.mastered')}</option>
               </select>
               <select
                 className="list-filter-select"
@@ -3608,36 +3623,36 @@ function App() {
                 value={listShowFilter}
                 onChange={(event) => setListShowFilter(event.target.value)}
               >
-                <option value="all">전체 드라마</option>
+                <option value="all">{t('list.filterAllShow')}</option>
                 {listShowOptions.map((name) => (
                   <option key={name} value={name}>
                     {name}
                   </option>
                 ))}
-                <option value="__none__">작품 미입력</option>
+                <option value="__none__">{t('list.filterNoShow')}</option>
               </select>
               <select
                 className="list-filter-select"
                 value={frequencyFilter}
                 onChange={(event) => setFrequencyFilter(event.target.value as typeof frequencyFilter)}
               >
-                <option value="all">전체 빈도</option>
-                <option value="5">★★★★★ 매우 높음</option>
-                <option value="4">★★★★☆ 높음</option>
-                <option value="3">★★★☆☆ 보통</option>
-                <option value="2">★★☆☆☆ 낮음</option>
-                <option value="1">★☆☆☆☆ 매우 낮음</option>
+                <option value="all">{t('list.filterAllFreq')}</option>
+                <option value="5">{t('list.freqVeryHigh')}</option>
+                <option value="4">{t('list.freqHigh')}</option>
+                <option value="3">{t('list.freqMid')}</option>
+                <option value="2">{t('list.freqLow')}</option>
+                <option value="1">{t('list.freqVeryLow')}</option>
               </select>
               <select
                 className="list-filter-select"
                 value={listSort}
                 onChange={(event) => setListSort(event.target.value as ListSort)}
               >
-                <option value="latest">최신순</option>
-                <option value="oldest">오래된순</option>
-                <option value="phrase">가나다·ABC순</option>
-                <option value="freq-high">빈도 높은순</option>
-                <option value="freq-low">빈도 낮은순</option>
+                <option value="latest">{t('sort.latest')}</option>
+                <option value="oldest">{t('sort.oldest')}</option>
+                <option value="phrase">{t('sort.phrase')}</option>
+                <option value="freq-high">{t('sort.freqHigh')}</option>
+                <option value="freq-low">{t('sort.freqLow')}</option>
               </select>
             </section>
 
@@ -3645,13 +3660,13 @@ function App() {
               <table className="study-table">
                 <thead>
                   <tr>
-                    <th className="col-phrase">영어 단어 / 구문</th>
-                    <th className="col-meaning">한국어 뜻</th>
-                    <th className="col-source">출처</th>
-                    <th className="col-tags">태그</th>
-                    <th className="col-status">상태</th>
-                    <th className="col-stars">사용빈도</th>
-                    <th className="col-actions" aria-label="작업" />
+                    <th className="col-phrase">{t('th.phrase')}</th>
+                    <th className="col-meaning">{t('th.meaning')}</th>
+                    <th className="col-source">{t('th.source')}</th>
+                    <th className="col-tags">{t('th.tags')}</th>
+                    <th className="col-status">{t('th.status')}</th>
+                    <th className="col-stars">{t('th.freq')}</th>
+                    <th className="col-actions" aria-label="actions" />
                   </tr>
                 </thead>
                 <tbody>
@@ -3670,7 +3685,7 @@ function App() {
                             <button
                               type="button"
                               className="speak-btn speak-btn--sm"
-                              title="발음 듣기"
+                              title={t('list.speakBtn')}
                               onClick={(e) => { e.stopPropagation(); speakEnglish(item.phrase) }}
                             >
                               🔊
@@ -3704,7 +3719,7 @@ function App() {
                         <td className="col-source">
                           <span
                             className={`list-source-badge list-filter-chip${listShowFilter === (item.show ?? '').trim() ? ' chip-active' : ''}`}
-                            title="클릭하면 이 출처로 필터"
+                            title={t('list.filterClickHint')}
                             onClick={(event) => {
                               event.stopPropagation()
                               const show = (item.show ?? '').trim()
@@ -3714,7 +3729,7 @@ function App() {
                             <span className="list-source-icon" aria-hidden>
                               🎬
                             </span>{' '}
-                            {(item.show ?? '').trim() || '작품 미입력'}
+                            {(item.show ?? '').trim() || t('default.noShow')}
                           </span>
                         </td>
                         <td className="col-tags">
@@ -3753,7 +3768,7 @@ function App() {
                         <td className="col-stars">
                           <span
                             className={`list-star-row list-filter-chip${frequencyFilter === String(item.difficulty) ? ' chip-active' : ''}`}
-                            aria-label={`사용빈도 ${item.difficulty}단계 — 클릭하면 동일 빈도만 필터`}
+                            aria-label={t('freq.ariaFilter', { n: item.difficulty })}
                             title="클릭하면 동일 빈도로 필터"
                             onClick={(event) => {
                               event.stopPropagation()
@@ -3797,7 +3812,7 @@ function App() {
                 </tbody>
               </table>
               {filteredItems.length === 0 && (
-                <p className="list-empty">조건에 맞는 항목이 없습니다. 검색이나 필터를 바꿔 보세요.</p>
+                <p className="list-empty">{t('list.empty')}</p>
               )}
             </div>
           </>
@@ -3855,7 +3870,7 @@ function App() {
                     <span className="board-count">{boardColumnCounts[status]}</span>
                   </div>
                   {columnItems.length === 0 ? (
-                    <p className="board-column-empty">이 칸에 카드가 없습니다.</p>
+                    <p className="board-column-empty">{t('board.columnEmpty')}</p>
                   ) : (
                     columnItems.map((item) => {
                       const itemType = item.itemType ?? inferItemType(item.phrase)
@@ -3885,12 +3900,12 @@ function App() {
                                 </span>
                               </div>
                               <span className="board-deck-pill" title={item.deck}>
-                                {item.deck || '기본 덱'}
+                                {item.deck || t('default.deck')}
                               </span>
                             </div>
                             <p className="board-ko">{koPrimary}</p>
                             {item.tags.length > 0 && (
-                              <div className="board-tags" aria-label="태그">
+                              <div className="board-tags" aria-label={t('board.tagsLabel')}>
                                 {item.tags.map((tag) => (
                                   <span key={tag} className="board-tag">
                                     {tag}
@@ -3900,7 +3915,7 @@ function App() {
                             )}
                             {exampleLine && (
                               <p className="board-example">
-                                <span className="board-example-label">예문</span>
+                                <span className="board-example-label">{t('board.exampleLabel')}</span>
                                 <span className="board-example-text">"{exampleLine}"</span>
                               </p>
                             )}
@@ -3909,14 +3924,14 @@ function App() {
                                 <span className="board-source-icon" aria-hidden>
                                   🎬
                                 </span>
-                                {(item.show ?? '').trim() || '작품 미입력'}
+                                {(item.show ?? '').trim() || t('default.noShow')}
                                 {item.episode ? (
                                   <small className="board-ep">{item.episode}</small>
                                 ) : null}
                               </span>
                               <span
                                 className="board-stars"
-                                aria-label={`사용빈도 ${item.difficulty}단계`}
+                                aria-label={t('freq.aria', { n: item.difficulty })}
                               >
                                 {[1, 2, 3, 4, 5].map((n) => (
                                   <span
@@ -3930,15 +3945,15 @@ function App() {
                             </div>
                             <dl className="board-srs">
                               <div>
-                                <dt>복습</dt>
-                                <dd>{item.reviewCount}회</dd>
+                                <dt>{t('board.reviewLabel')}</dt>
+                                <dd>{t('board.reviewCount', { n: item.reviewCount })}</dd>
                               </div>
                               <div>
-                                <dt>마지막</dt>
+                                <dt>{t('board.lastLabel')}</dt>
                                 <dd>{dateText(item.lastReviewedAt)}</dd>
                               </div>
                               <div>
-                                <dt>일정</dt>
+                                <dt>{t('board.schedLabel')}</dt>
                                 <dd>{item.scheduledDate ? item.scheduledDate : '—'}</dd>
                               </div>
                             </dl>
@@ -3951,17 +3966,17 @@ function App() {
                           <div className="card-actions board-card-actions">
                             {status !== 'new' && (
                               <button type="button" onClick={() => updateStatus(item.id, 'new')}>
-                                ← 새 단어
+                                {t('board.statusNew')}
                               </button>
                             )}
                             {status !== 'learning' && (
                               <button type="button" onClick={() => updateStatus(item.id, 'learning')}>
-                                학습
+                                {t('board.statusLearn')}
                               </button>
                             )}
                             {status !== 'mastered' && (
                               <button type="button" onClick={() => updateStatus(item.id, 'mastered')}>
-                                완료 →
+                                {t('board.statusDone')}
                               </button>
                             )}
                           </div>
@@ -4007,7 +4022,7 @@ function App() {
               >
                 Idiom
               </button>
-              <span className="card-play-mode" role="group" aria-label="카드 재생 순서">
+              <span className="card-play-mode" role="group" aria-label={t('cards.playOrder')}>
                 <button
                   type="button"
                   className={`card-play-mode-btn${cardPlayMode === 'sequential' ? ' active' : ''}`}
@@ -4015,8 +4030,8 @@ function App() {
                     setCardPlayMode('sequential')
                     setCardIndex(0)
                   }}
-                  title="순서대로 보기"
-                  aria-label="순서대로 보기"
+                  title={t('cards.sequential')}
+                  aria-label={t('cards.sequential')}
                   aria-pressed={cardPlayMode === 'sequential'}
                 >
                   {/* 리스트(순서) 아이콘 */}
@@ -4038,8 +4053,8 @@ function App() {
                     setCardShuffleSeed(Date.now())
                     setCardIndex(0)
                   }}
-                  title={cardPlayMode === 'shuffle' ? '셔플 (다시 섞기)' : '셔플로 보기'}
-                  aria-label="셔플로 보기"
+                  title={cardPlayMode === 'shuffle' ? t('cards.reshuffleBtn') : t('cards.shuffleBtn')}
+                  aria-label={t('cards.shuffleBtn')}
                   aria-pressed={cardPlayMode === 'shuffle'}
                 >
                   {/* 셔플 아이콘 */}
@@ -4058,8 +4073,8 @@ function App() {
             </section>
             <p className="card-counter">
               {cardItems.length === 0
-                ? '카드 없음'
-                : `${cardIndex + 1} / ${cardItems.length} 카드 · ${currentCard?.deck ?? ''}`}
+                ? t('cards.noCards')
+                : t('cards.cardCount', { cur: cardIndex + 1, total: cardItems.length, deck: currentCard?.deck ?? '' })}
             </p>
             {currentCard ? (
               <>
@@ -4101,7 +4116,7 @@ function App() {
                           <div className="flashcard-inner">
                             {/* ── 앞면: 구문 → 발음기호+스피커 → 별표 ── */}
                             <div className="flashcard-face flashcard-front">
-                              <span>{isCenter ? '클릭해서 뜻 확인' : stackCard.deck}</span>
+                              <span>{isCenter ? t('cards.clickRevealBtn') : stackCard.deck}</span>
                               <div className="flashcard-title-line">
                                 <h3>{stackCard.phrase}</h3>
                                 <small className={`item-type-pill item-type-${itemType}`}>
@@ -4116,7 +4131,7 @@ function App() {
                                   <button
                                     type="button"
                                     className="speak-btn speak-btn--card"
-                                    title="발음 듣기"
+                                    title={t('list.speakBtn')}
                                     onClick={(e) => { e.stopPropagation(); speakEnglish(stackCard.phrase) }}
                                   >
                                     🔊
@@ -4143,7 +4158,7 @@ function App() {
                                   <div className="flashcard-meanings-list">
                                     {/* 뜻 1: 앞면과 같이 크고 굵게 (앞면의 60% 크기) */}
                                     <div className="flashcard-meaning-row flashcard-meaning-row--primary">
-                                      <span className="flashcard-meaning-badge">뜻 1</span>
+                                      <span className="flashcard-meaning-badge">{t('cards.meaning', { n: 1 })}</span>
                                       <span className="flashcard-meaning-text flashcard-meaning-text--primary">
                                         {allMeanings[0]}
                                       </span>
@@ -4154,7 +4169,7 @@ function App() {
                                         key={idx + 1}
                                         className="flashcard-meaning-row flashcard-meaning-row--secondary"
                                       >
-                                        <span className="flashcard-meaning-badge">뜻 {idx + 2}</span>
+                                        <span className="flashcard-meaning-badge">{t('cards.meaning', { n: idx + 2 })}</span>
                                         <span className="flashcard-meaning-text flashcard-meaning-text--secondary">
                                           {meaning}
                                         </span>
@@ -4189,7 +4204,7 @@ function App() {
                   </button>
                 </div>
                 <div className="card-timer-wrap">
-                  <div className="card-timer-label">다음 카드까지</div>
+                  <div className="card-timer-label">{t('cards.nextCard')}</div>
                   <div className="card-timer-track" aria-hidden>
                     <div
                       className="card-timer-fill"
@@ -4201,21 +4216,21 @@ function App() {
                 </div>
                 <div className="rate-buttons">
                   <button className="again" onClick={() => rateCard('again')}>
-                    다시
+                    {t('cards.ratingAgain')}
                   </button>
                   <button className="good" onClick={() => rateCard('good')}>
-                    좋아요
+                    {t('cards.ratingGood')}
                   </button>
                   <button className="easy" onClick={() => rateCard('easy')}>
-                    쉬워요
+                    {t('cards.ratingEasy')}
                   </button>
                   <button className="skip" onClick={() => rateCard('skip')}>
-                    건너뛰기
+                    {t('cards.ratingSkip')}
                   </button>
                 </div>
 
                 <section className="deck-grid-wrap">
-                  <div className="deck-grid-title">덱 폴더</div>
+                  <div className="deck-grid-title">{t('cards.deckFolder')}</div>
                   <div className="deck-grid">
                     <button
                       className={`deck-folder ${activeDeck === 'all' ? 'active' : ''}`}
@@ -4234,7 +4249,7 @@ function App() {
                       }}
                     >
                       <div className="folder-icon">📁</div>
-                      <strong>전체 덱</strong>
+                      <strong>{t('cards.allDecks')}</strong>
                       <small>{items.length} cards</small>
                     </button>
                     {deckNames.map((deck) => (
@@ -4267,7 +4282,7 @@ function App() {
                   <section className="deck-explorer">
                     <header className="deck-explorer-head">
                       <div>
-                        <strong>📁 {openedDeck === 'all' ? '전체 덱' : openedDeck}</strong>
+                        <strong>📁 {openedDeck === 'all' ? t('cards.allDecks') : openedDeck}</strong>
                         <small>{openedDeckItems.length} cards</small>
                       </div>
                       <div className="deck-explorer-actions">
@@ -4275,10 +4290,10 @@ function App() {
                           className="secondary"
                           onClick={() => openCreateModal(openedDeck === 'all' ? undefined : openedDeck)}
                         >
-                          + 카드 추가
+                          {t('cards.addCard')}
                         </button>
                         <button className="secondary" onClick={() => setOpenedDeck(null)}>
-                          폴더 닫기
+                          {t('cards.closeFolder')}
                         </button>
                       </div>
                     </header>
@@ -4299,10 +4314,10 @@ function App() {
                               </button>
                               <div className="deck-file-actions">
                                 <button className="secondary" onClick={() => openEditModal(item)}>
-                                  수정
+                                  {t('cards.editBtn')}
                                 </button>
                                 <button className="danger" onClick={() => removeItemFromDeck(item.id)}>
-                                  삭제
+                                  {t('cards.deleteBtn')}
                                 </button>
                               </div>
                             </div>
@@ -4310,7 +4325,7 @@ function App() {
                         </section>
                       ))}
                       {openedDeckItems.length === 0 && (
-                        <div className="deck-file-empty">폴더 안 카드가 없습니다. + 카드 추가를 눌러주세요.</div>
+                        <div className="deck-file-empty">{t('cards.folderEmpty')}</div>
                       )}
                     </div>
                   </section>
@@ -4318,9 +4333,9 @@ function App() {
               </>
             ) : (
               <>
-                <div className="empty">복습할 카드가 없습니다.</div>
+                <div className="empty">{t('cards.noReview')}</div>
                 <section className="deck-grid-wrap">
-                  <div className="deck-grid-title">덱 폴더</div>
+                  <div className="deck-grid-title">{t('cards.deckFolder')}</div>
                   <div className="deck-grid">
                     <button
                       className={`deck-folder ${activeDeck === 'all' ? 'active' : ''}`}
@@ -4339,7 +4354,7 @@ function App() {
                       }}
                     >
                       <div className="folder-icon">📁</div>
-                      <strong>전체 덱</strong>
+                      <strong>{t('cards.allDecks')}</strong>
                       <small>{items.length} cards</small>
                     </button>
                     {deckNames.map((deck) => (
@@ -4372,7 +4387,7 @@ function App() {
                   <section className="deck-explorer">
                     <header className="deck-explorer-head">
                       <div>
-                        <strong>📁 {openedDeck === 'all' ? '전체 덱' : openedDeck}</strong>
+                        <strong>📁 {openedDeck === 'all' ? t('cards.allDecks') : openedDeck}</strong>
                         <small>{openedDeckItems.length} cards</small>
                       </div>
                       <div className="deck-explorer-actions">
@@ -4380,10 +4395,10 @@ function App() {
                           className="secondary"
                           onClick={() => openCreateModal(openedDeck === 'all' ? undefined : openedDeck)}
                         >
-                          + 카드 추가
+                          {t('cards.addCard')}
                         </button>
                         <button className="secondary" onClick={() => setOpenedDeck(null)}>
-                          폴더 닫기
+                          {t('cards.closeFolder')}
                         </button>
                       </div>
                     </header>
@@ -4404,10 +4419,10 @@ function App() {
                               </button>
                               <div className="deck-file-actions">
                                 <button className="secondary" onClick={() => openEditModal(item)}>
-                                  수정
+                                  {t('cards.editBtn')}
                                 </button>
                                 <button className="danger" onClick={() => removeItemFromDeck(item.id)}>
-                                  삭제
+                                  {t('cards.deleteBtn')}
                                 </button>
                               </div>
                             </div>
@@ -4415,7 +4430,7 @@ function App() {
                         </section>
                       ))}
                       {openedDeckItems.length === 0 && (
-                        <div className="deck-file-empty">폴더 안 카드가 없습니다. + 카드 추가를 눌러주세요.</div>
+                        <div className="deck-file-empty">{t('cards.folderEmpty')}</div>
                       )}
                     </div>
                   </section>
@@ -4435,14 +4450,14 @@ function App() {
                   className={calendarView === 'month' ? 'cal-view-btn active' : 'cal-view-btn'}
                   onClick={() => setCalendarView('month')}
                 >
-                  월간
+                  {t('cal.monthly')}
                 </button>
                 <button
                   type="button"
                   className={calendarView === 'week' ? 'cal-view-btn active' : 'cal-view-btn'}
                   onClick={() => setCalendarView('week')}
                 >
-                  주간
+                  {t('cal.weekly')}
                 </button>
               </div>
               <div className="calendar-nav">
@@ -4453,7 +4468,7 @@ function App() {
                   ←
                 </button>
                 <strong>
-                  {calendarView === 'month' ? monthTitle(calendarMonth) : weekTitle(calendarWeekStart)}
+                  {calendarView === 'month' ? monthTitle(calendarMonth, lang) : weekTitle(calendarWeekStart)}
                 </strong>
                 <button
                   className="secondary"
@@ -4466,8 +4481,8 @@ function App() {
 
             <div className="calendar-layout">
               <aside className="unscheduled-panel">
-                <h4>미배정 카드</h4>
-                <p>카드를 원하는 날짜로 드래그하세요</p>
+                <h4>{t('cal.unscheduled')}</h4>
+                <p>{t('cal.dragHint')}</p>
                 <div
                   className="unscheduled-drop"
                   onDragOver={(event) => event.preventDefault()}
@@ -4489,7 +4504,7 @@ function App() {
                       <small>{item.translation}</small>
                     </div>
                   ))}
-                  {unscheduledItems.length === 0 && <div className="cal-empty">미배정 카드 없음</div>}
+                  {unscheduledItems.length === 0 && <div className="cal-empty">{t('cal.noUnscheduled')}</div>}
                 </div>
               </aside>
 
@@ -4504,12 +4519,12 @@ function App() {
                           day.getDate() === today.getDate()
                         return (
                           <div key={day.toISOString()} className={isToday ? 'today-label' : ''}>
-                            {['일', '월', '화', '수', '목', '금', '토'][day.getDay()]}
+                            {[t('cal.sun'),t('cal.mon'),t('cal.tue'),t('cal.wed'),t('cal.thu'),t('cal.fri'),t('cal.sat')][day.getDay()]}
                             <span className="week-day-num">{day.getDate()}</span>
                           </div>
                         )
                       })
-                    : ['일', '월', '화', '수', '목', '금', '토'].map((d) => (
+                    : [t('cal.sun'),t('cal.mon'),t('cal.tue'),t('cal.wed'),t('cal.thu'),t('cal.fri'),t('cal.sat')].map((d) => (
                         <div key={d}>{d}</div>
                       ))
                   }
@@ -4541,7 +4556,7 @@ function App() {
                         >
                           <div className="cell-date">
                             {day.getDate()}
-                            {isToday && <span className="cell-today-badge">오늘</span>}
+                            {isToday && <span className="cell-today-badge">{t('cal.today')}</span>}
                           </div>
                           <div className="cell-cards">
                             {dayItems.map((item) => (
@@ -4553,7 +4568,7 @@ function App() {
                                 onClick={() => openDetailModal(item.id)}
                               >
                                 <strong>{item.phrase}</strong>
-                                <small>{item.show || '작품 미입력'}</small>
+                                <small>{item.show || t('default.noShow')}</small>
                               </div>
                             ))}
                           </div>
@@ -4594,7 +4609,7 @@ function App() {
                                 onClick={() => openDetailModal(item.id)}
                               >
                                 <strong>{item.phrase}</strong>
-                                <small>{item.show || '작품 미입력'}</small>
+                                <small>{item.show || t('default.noShow')}</small>
                               </div>
                             ))}
                             {dayItems.length === 0 && <div className="cal-empty-week">—</div>}
@@ -4762,8 +4777,12 @@ function App() {
           }
           const formatMonth = (ym: string): string => {
             const [y, m] = ym.split('-').map(Number)
-            const KOR_MONTHS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월']
-            return `${y}년 ${KOR_MONTHS[(m ?? 1) - 1]}`
+            if (lang === 'ko') {
+              const KOR_MONTHS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월']
+              return `${y}년 ${KOR_MONTHS[(m ?? 1) - 1]}`
+            }
+            const d = new Date(y, (m ?? 1) - 1, 1)
+            return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
           }
 
           // 연속일 계산: 오늘부터 거꾸로 활동 있는 날 카운트 → current streak
@@ -4806,18 +4825,18 @@ function App() {
           return (
             <section className="analytics-page">
               <header className="analytics-header">
-                <h2>📊 학습 분석</h2>
-                <p>조회 기록(viewCount + 일자별 viewLog)을 기반으로 학습 패턴을 분석합니다. AI 학습 지도의 데이터 소스로 사용됩니다.</p>
+                <h2>{t('analytics.title')}</h2>
+                <p>{t('analytics.desc')}</p>
               </header>
 
               {/* 기간 선택 */}
               <div className="analytics-range-tabs">
                 {([
-                  { key: '1d', label: '1일' },
-                  { key: '7d', label: '7일' },
-                  { key: '30d', label: '30일' },
-                  { key: '365d', label: '1년' },
-                  { key: 'custom', label: '커스텀' },
+                  { key: '1d', label: t('analytics.range1d') },
+                  { key: '7d', label: t('analytics.range7d') },
+                  { key: '30d', label: t('analytics.range30d') },
+                  { key: '365d', label: t('analytics.range365d') },
+                  { key: 'custom', label: t('analytics.custom') },
                 ] as const).map((opt) => (
                   <button
                     key={opt.key}
@@ -4847,29 +4866,29 @@ function App() {
                   </div>
                 )}
                 <div className="analytics-range-info">
-                  {startKey} ~ {endKey} ({rangeDays}일)
+                  {startKey} ~ {endKey} ({t('analytics.daysUnit', { n: rangeDays })})
                 </div>
               </div>
 
               {/* 요약 카드 */}
               <div className="analytics-summary">
                 <div className="analytics-card">
-                  <small>총 조회</small>
-                  <strong>{totalViews.toLocaleString()}회</strong>
+                  <small>{t('analytics.totalViews')}</small>
+                  <strong>{t('analytics.viewsUnit', { n: totalViews.toLocaleString() })}</strong>
                 </div>
                 <div className="analytics-card">
-                  <small>활성일</small>
-                  <strong>{activeDays}일</strong>
+                  <small>{t('analytics.activeDays')}</small>
+                  <strong>{t('analytics.daysUnit', { n: activeDays })}</strong>
                 </div>
                 <div className="analytics-card">
-                  <small>활성일 평균</small>
-                  <strong>{avgPerActiveDay.toLocaleString()}회</strong>
+                  <small>{t('analytics.avgPerDay')}</small>
+                  <strong>{t('analytics.viewsUnit', { n: avgPerActiveDay.toLocaleString() })}</strong>
                 </div>
                 <div className="analytics-card">
-                  <small>최다 학습일</small>
+                  <small>{t('analytics.peakDay')}</small>
                   <strong>
                     {mostActiveDay
-                      ? `${mostActiveDay.date} (${mostActiveDay.count}회)`
+                      ? `${mostActiveDay.date} (${t('analytics.viewsUnit', { n: mostActiveDay.count })})`
                       : '—'}
                   </strong>
                 </div>
@@ -4950,21 +4969,21 @@ function App() {
                 return (
                   <section className="analytics-section">
                     <div className="analytics-chart-header">
-                      <h3>일별 조회 추이</h3>
+                      <h3>{t('analytics.dailyChart')}</h3>
                       <div className="analytics-chart-mode-tabs" role="tablist">
                         <button
                           type="button"
                           className={analyticsChartMode === 'daily' ? 'active' : ''}
                           onClick={() => setAnalyticsChartMode('daily')}
                         >
-                          일별
+                          {t('analytics.daily')}
                         </button>
                         <button
                           type="button"
                           className={analyticsChartMode === 'cumulative' ? 'active' : ''}
                           onClick={() => setAnalyticsChartMode('cumulative')}
                         >
-                          누적
+                          {t('analytics.cumulative')}
                         </button>
                       </div>
                     </div>
@@ -4974,7 +4993,7 @@ function App() {
                         viewBox={`0 0 ${W} ${H}`}
                         className="analytics-chart-svg"
                         role="img"
-                        aria-label="일별 조회 추이 차트"
+                        aria-label={t('analytics.dailyChart')}
                         onMouseLeave={() => setAnalyticsHoverIdx(null)}
                         onMouseMove={(event) => {
                           if (series.length === 0) return
@@ -5099,13 +5118,13 @@ function App() {
                           <strong>{hover.point.key}</strong>
                           <div className="analytics-chart-tooltip-row">
                             <span className="dot" />
-                            <span>일별</span>
-                            <b>{hover.point.daily.toLocaleString()}회</b>
+                            <span>{t('analytics.dayView')}</span>
+                            <b>{t('analytics.viewsUnit', { n: hover.point.daily.toLocaleString() })}</b>
                           </div>
                           <div className="analytics-chart-tooltip-row">
                             <span className="dot dot-cum" />
-                            <span>누적</span>
-                            <b>{hover.point.cumulative.toLocaleString()}회</b>
+                            <span>{t('analytics.cumView')}</span>
+                            <b>{t('analytics.viewsUnit', { n: hover.point.cumulative.toLocaleString() })}</b>
                           </div>
                         </div>
                       )}
@@ -5114,17 +5133,17 @@ function App() {
                     {/* 차트 요약 footer */}
                     <div className="analytics-chart-footer">
                       <div>
-                        <small>총 조회</small>
-                        <strong>{totalViews.toLocaleString()}회</strong>
+                        <small>{t('analytics.totalLabel')}</small>
+                        <strong>{t('analytics.viewsUnit', { n: totalViews.toLocaleString() })}</strong>
                       </div>
                       <div>
-                        <small>일평균</small>
+                        <small>{t('analytics.avgLabel')}</small>
                         <strong>
-                          {(rangeDays > 0 ? Math.round(totalViews / rangeDays) : 0).toLocaleString()}회
+                          {t('analytics.viewsUnit', { n: (rangeDays > 0 ? Math.round(totalViews / rangeDays) : 0).toLocaleString() })}
                         </strong>
                       </div>
                       <div>
-                        <small>최고 일</small>
+                        <small>{t('analytics.peakLabel')}</small>
                         <strong>
                           {mostActiveDay
                             ? `${mostActiveDay.date} (${mostActiveDay.count.toLocaleString()})`
@@ -5132,7 +5151,7 @@ function App() {
                         </strong>
                       </div>
                       <div>
-                        <small>활성일 비율</small>
+                        <small>{t('analytics.activeRate')}</small>
                         <strong>
                           {rangeDays > 0
                             ? `${Math.round((activeDays / rangeDays) * 100)}% (${activeDays}/${rangeDays})`
@@ -5146,7 +5165,7 @@ function App() {
 
               {/* 365일 히트맵 */}
               <section className="analytics-section">
-                <h3>연간 활동 히트맵 (최근 1년)</h3>
+                <h3>{t('analytics.heatmap')}</h3>
                 <div className="analytics-heatmap-wrap">
                   <div className="analytics-heatmap-grid">
                     {/* 월 라벨 행 */}
@@ -5179,7 +5198,7 @@ function App() {
                               <div
                                 key={`${wi}-${di}`}
                                 className={`analytics-heatmap-day level-${heatmapLevel(d.count)}${d.inFuture ? ' is-future' : ''}`}
-                                title={d.inFuture ? '' : `${d.key} — ${d.count}회`}
+                                title={d.inFuture ? '' : `${d.key} — ${t('analytics.viewsUnit', { n: d.count })}`}
                               />
                             ))}
                           </div>
@@ -5192,42 +5211,42 @@ function App() {
                 {/* 히트맵 통계 + 범례 */}
                 <div className="analytics-heatmap-stats">
                   <div className="analytics-heatmap-stat">
-                    <small>최다 학습월</small>
+                    <small>{t('analytics.topMonth')}</small>
                     <strong>
                       {mostActiveMonth ? formatMonth(mostActiveMonth.ym) : '—'}
                     </strong>
                   </div>
                   <div className="analytics-heatmap-stat">
-                    <small>최다 학습일</small>
+                    <small>{t('analytics.topDay')}</small>
                     <strong>
                       {mostActiveDay
-                        ? `${mostActiveDay.date} (${mostActiveDay.count.toLocaleString()}회)`
+                        ? `${mostActiveDay.date} (${t('analytics.viewsUnit', { n: mostActiveDay.count.toLocaleString() })})`
                         : '—'}
                     </strong>
                   </div>
                   <div className="analytics-heatmap-stat">
-                    <small>최장 연속</small>
-                    <strong>{longestStreak}일</strong>
+                    <small>{t('analytics.longestRun')}</small>
+                    <strong>{t('analytics.daysUnit', { n: longestStreak })}</strong>
                   </div>
                   <div className="analytics-heatmap-stat">
-                    <small>현재 연속</small>
-                    <strong>{currentStreak}일</strong>
+                    <small>{t('analytics.currentRun')}</small>
+                    <strong>{t('analytics.daysUnit', { n: currentStreak })}</strong>
                   </div>
                 </div>
                 <div className="analytics-heatmap-legend">
-                  <small>적음</small>
+                  <small>{t('analytics.fewLabel')}</small>
                   {[0, 1, 2, 3, 4].map((lv) => (
                     <span key={lv} className={`analytics-heatmap-legend-cell level-${lv}`} />
                   ))}
-                  <small>많음</small>
+                  <small>{t('analytics.manyLabel')}</small>
                 </div>
               </section>
 
               {/* 트렌딩 단어 랭킹 */}
               <section className="analytics-section">
-                <h3>기간 내 학습량 순위 (Top 30)</h3>
+                <h3>{t('analytics.rankTitle')}</h3>
                 {itemTotals.length === 0 ? (
-                  <p className="analytics-empty">이 기간에 조회된 단어가 없습니다.</p>
+                  <p className="analytics-empty">{t('analytics.rankEmpty')}</p>
                 ) : (
                   <ol className="analytics-ranking">
                     {itemTotals.slice(0, 30).map((row, idx) => (
@@ -5237,7 +5256,7 @@ function App() {
                           type="button"
                           className="analytics-ranking-phrase"
                           onClick={() => openDetailModal(row.item.id)}
-                          title="상세 보기 열기"
+                          title={t('analytics.rankDetail')}
                         >
                           {row.item.phrase}
                         </button>
@@ -5252,10 +5271,10 @@ function App() {
                           }}
                         />
                         <span className="analytics-ranking-count">
-                          {row.inRangeViews.toLocaleString()}회
+                          {t('analytics.viewsUnit', { n: row.inRangeViews.toLocaleString() })}
                         </span>
                         <span className="analytics-ranking-total">
-                          (전체 {(row.item.viewCount ?? 0).toLocaleString()})
+                          {t('analytics.rankTotal', { n: (row.item.viewCount ?? 0).toLocaleString() })}
                         </span>
                       </li>
                     ))}
@@ -5265,7 +5284,7 @@ function App() {
 
               <footer className="analytics-footer">
                 <small>
-                  데이터 기준: 항목 생성 시 1회 + 상세 보기 열 때마다 1회 누적. AI 학습 지도용 raw 데이터로 활용됩니다.
+                  {t('analytics.footerNote')}
                 </small>
               </footer>
             </section>
@@ -5300,12 +5319,12 @@ function App() {
         document.body,
       )}
 
-      {/* ── 계정 및 동기화 설정 모달 ── */}
+      {/* ── Settings modal ── */}
       {isSettingsOpen && (
         <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
           <section className="modal settings-modal" onClick={(event) => event.stopPropagation()}>
             <header>
-              <h3>계정 및 동기화 설정</h3>
+              <h3>{t('settings.title')}</h3>
               <button
                 type="button"
                 onClick={() => {
@@ -5317,12 +5336,12 @@ function App() {
               </button>
             </header>
             <div className="settings-block">
-              <small>계정</small>
-              <strong>{authUser?.displayName || 'Google 사용자'}</strong>
-              <p>{authUser?.email || '이메일 없음'}</p>
+              <small>{t('settings.account')}</small>
+              <strong>{authUser?.displayName || t('default.googleUser')}</strong>
+              <p>{authUser?.email || t('common.noEmail')}</p>
             </div>
             <div className="settings-block">
-              <small>자동 생성 기본 모델</small>
+              <small>{t('settings.aiModel')}</small>
               <strong>{AI_PROVIDER_LABEL[appSettings.defaultAiProvider]}</strong>
               <div className="ai-provider-row">
                 <select
@@ -5336,23 +5355,33 @@ function App() {
                 </select>
                 <small>
                   {appSettings.defaultAiProvider === 'gemini' && !GEMINI_API_KEY
-                    ? 'Gemini 키가 없으면 기본 엔진으로 자동 전환됩니다.'
-                    : '카드 추가/수정에서 기본값으로 사용됩니다.'}
+                    ? t('settings.aiGeminiWarn')
+                    : ''}
                 </small>
+              </div>
+            </div>
+            <div className="settings-block">
+              <small>{t('settings.language')}</small>
+              <div className="ai-provider-row">
+                <select value={lang} onChange={(event) => setLang(event.target.value as 'en' | 'ko')}>
+                  <option value="en">English</option>
+                  <option value="ko">한국어</option>
+                </select>
+                <small>{t('settings.languageDesc')}</small>
               </div>
             </div>
             <div className="settings-actions">
               <button type="button" className="secondary" onClick={forceSyncNow} disabled={!authUser}>
-                지금 동기화
+                {t('settings.syncNow')}
               </button>
               <button type="button" className="secondary" onClick={exportItemsJson}>
-                JSON 백업
+                {t('settings.exportBackup')}
               </button>
               <button type="button" className="secondary" onClick={exportItemsCsv}>
-                CSV 내보내기
+                {t('settings.exportCsv')}
               </button>
               <button type="button" className="secondary" onClick={() => importFileRef.current?.click()}>
-                데이터 가져오기
+                {t('settings.importBackup')}
               </button>
               <input
                 ref={importFileRef}
@@ -5374,7 +5403,7 @@ function App() {
                   setSettingsMsg('')
                 }}
               >
-                닫기
+                {t('common.close')}
               </button>
             </footer>
           </section>
@@ -5386,7 +5415,7 @@ function App() {
         <div className="modal-overlay" onClick={() => { setIsProfilesOpen(false); setSettingsMsg('') }}>
           <section className="modal settings-modal profiles-modal" onClick={(event) => event.stopPropagation()}>
             <header>
-              <h3>카드 정보 프로파일</h3>
+              <h3>{t('account.profiles')}</h3>
               <button
                 type="button"
                 onClick={() => {
@@ -5400,7 +5429,7 @@ function App() {
             <div className="profile-settings-panel">
               <form className="profile-editor-form modal-form" onSubmit={submitProfileEditor}>
                 <label>
-                  프로파일 이름 *
+                  {t('profile.namePrompt')} *
                   <input
                     value={profileEditor.name}
                     onChange={(event) =>
@@ -5410,7 +5439,7 @@ function App() {
                 </label>
                 <div className="row2">
                   <label>
-                    드라마 / 작품명
+                    {t('form.show')}
                     <input
                       list="show-keywords"
                       value={profileEditor.show}
@@ -5420,7 +5449,7 @@ function App() {
                     />
                   </label>
                   <label>
-                    에피소드
+                    {t('form.episode')}
                     <input
                       list="episode-keywords"
                       value={profileEditor.episode}
@@ -5432,7 +5461,7 @@ function App() {
                 </div>
                 <div className="row2">
                   <label>
-                    태그 (쉼표 구분)
+                    {t('form.tags')}
                     <input
                       list="tag-keywords"
                       value={profileEditor.tags}
@@ -5442,7 +5471,7 @@ function App() {
                     />
                   </label>
                   <label>
-                    덱(그룹)
+                    {t('form.deck')}
                     <input
                       list="deck-keywords"
                       value={profileEditor.deck}
@@ -5454,7 +5483,7 @@ function App() {
                 </div>
                 <div className="row2">
                   <label>
-                    사용빈도
+                    {t('form.difficulty')}
                     <select
                       value={profileEditor.difficulty}
                       onChange={(event) =>
@@ -5464,16 +5493,16 @@ function App() {
                         }))
                       }
                     >
-                      <option value={1}>★☆☆☆☆ 매우 낮음</option>
-                      <option value={2}>★★☆☆☆ 낮음</option>
-                      <option value={3}>★★★☆☆ 보통</option>
-                      <option value={4}>★★★★☆ 높음</option>
-                      <option value={5}>★★★★★ 매우 높음</option>
+                      <option value={1}>{t('list.freqVeryLow')}</option>
+                      <option value={2}>{t('list.freqLow')}</option>
+                      <option value={3}>{t('list.freqMid')}</option>
+                      <option value={4}>{t('list.freqHigh')}</option>
+                      <option value={5}>{t('list.freqVeryHigh')}</option>
                     </select>
                   </label>
                 </div>
                 <label>
-                  메모
+                  {t('form.notes')}
                   <textarea
                     value={profileEditor.notes}
                     onChange={(event) =>
@@ -5483,31 +5512,31 @@ function App() {
                 </label>
                 <div className="profile-editor-actions">
                   <button type="submit">
-                    {profileEditor.id ? '프로파일 업데이트' : '새 프로파일 저장'}
+                    {profileEditor.id ? t('profile.update') : t('profile.save')}
                   </button>
                   <button type="button" onClick={resetProfileEditor}>
-                    새로 작성
+                    {t('common.reset')}
                   </button>
                 </div>
               </form>
               {settingsMsg && <p className="settings-msg">{settingsMsg}</p>}
               <div className="profile-list">
                 {profiles.length === 0 ? (
-                  <p className="profile-list-empty">저장된 프로파일이 없습니다.</p>
+                  <p className="profile-list-empty">{t('common.noResult')}</p>
                 ) : (
                   profiles.map((profile) => (
                     <div key={profile.id} className="profile-list-item">
                       <div>
                         <strong>{profile.name}</strong>
                         <p>
-                          {profile.show || '작품 미입력'} · {profile.episode || '에피소드 미입력'} ·{' '}
+                          {profile.show || t('default.noShow')} · {profile.episode || t('default.noEpisode')} ·{' '}
                           {profile.deck}
                         </p>
-                        <small>연결 카드 {profileUsageCounts[profile.id] ?? 0}개</small>
+                        <small>{profileUsageCounts[profile.id] ?? 0} linked cards</small>
                       </div>
                       <div className="profile-list-actions">
                         <button type="button" className="secondary" onClick={() => startEditProfile(profile)}>
-                          수정
+                          {t('common.edit')}
                         </button>
                         <button
                           type="button"
@@ -5515,14 +5544,14 @@ function App() {
                           onClick={() => {
                             if (
                               window.confirm(
-                                `"${profile.name}" 프로파일을 삭제할까요? 연결 카드들은 프로파일 연결만 해제됩니다.`,
+                                `Delete profile "${profile.name}"? Linked cards will be unlinked.`,
                               )
                             ) {
                               void deleteProfile(profile.id)
                             }
                           }}
                         >
-                          삭제
+                          {t('common.delete')}
                         </button>
                       </div>
                     </div>
@@ -5538,7 +5567,7 @@ function App() {
                   setSettingsMsg('')
                 }}
               >
-                닫기
+                {t('common.close')}
               </button>
             </footer>
           </section>
@@ -5549,22 +5578,21 @@ function App() {
         <div className="modal-overlay" onClick={closeAddModal}>
           <section className="modal" onClick={(event) => event.stopPropagation()}>
             <header>
-              <h3>단어 / 구문 추가</h3>
+              <h3>{t('addBtn.other')}</h3>
               <button onClick={closeAddModal}>✕</button>
             </header>
             <div className="tab-row">
               <button className={inputTab === 'text' ? 'active' : ''} onClick={() => setInputTab('text')}>
-                직접 입력
+                {t('common.add')}
               </button>
               <button className={inputTab === 'ocr' ? 'active' : ''} onClick={() => setInputTab('ocr')}>
-                이미지 인식 (OCR)
+                {t('ocr.run')}
               </button>
             </div>
             {inputTab === 'ocr' && (
               <div className="ocr-panel">
                 <p className="ocr-hint">
-                  이미지를 드래그해서 놓거나 클릭해서 파일을 선택하세요. 이 탭이 열린 상태에서 {' '}
-                  <kbd>Ctrl</kbd>+<kbd>V</kbd>로 클립보드 이미지를 붙여넣을 수 있습니다.
+                  {t('ocr.hint')}
                 </p>
                 <div
                   className={`ocr-dropzone ${ocrDragOver ? 'ocr-dropzone-active' : ''} ${ocrPreviewUrl ? 'ocr-dropzone-filled' : ''}`}
@@ -5594,7 +5622,7 @@ function App() {
                   {ocrPreviewUrl ? (
                     <img src={ocrPreviewUrl} alt="" className="ocr-preview-img" />
                   ) : (
-                    <span className="ocr-dropzone-label">여기에 놓거나 클릭해서 업로드</span>
+                    <span className="ocr-dropzone-label">Drop or click to upload</span>
                   )}
                 </div>
                 <div className="ocr-toolbar">
@@ -5619,14 +5647,14 @@ function App() {
                         resetOcrState()
                       }}
                     >
-                      이미지 지우기
+                      {t('form.ocrClear')}
                     </button>
                   )}
                 </div>
                 {ocrError && <div className="ocr-error">{ocrError}</div>}
                 {ocrLines.length > 0 && (
                   <div className="ocr-results">
-                    <p className="ocr-results-title">인식된 줄 — 영어 구문으로 쓸 줄을 체크하세요.</p>
+                    <p className="ocr-results-title">{t('form.ocrLines')}</p>
                     <ul className="ocr-line-list">
                       {ocrLines.map((line, index) => (
                         <li key={`${index}-${line.slice(0, 24)}`} className="ocr-line-row">
@@ -5643,7 +5671,7 @@ function App() {
                             className="secondary ocr-line-apply"
                             onClick={() => setForm((prev) => ({ ...prev, phrase: line }))}
                           >
-                            이 줄만 적용
+                            {t('form.ocrApplyLine')}
                           </button>
                         </li>
                       ))}
@@ -5655,7 +5683,7 @@ function App() {
                         disabled={ocrLineSelected.length === 0}
                         onClick={applyOcrSelectionToPhrase}
                       >
-                        선택한 줄을 영어 구문에 적용
+                        {t('form.ocrApplySel')}
                       </button>
                       <button
                         type="button"
@@ -5667,7 +5695,7 @@ function App() {
                           }))
                         }
                       >
-                        전체 텍스트 적용
+                        {t('form.ocrApplyAll')}
                       </button>
                     </div>
                   </div>
@@ -5676,7 +5704,7 @@ function App() {
             )}
             <form onSubmit={onSubmitAdd} className="modal-form">
               <label>
-                영어 단어 / 구문 *
+                {t('form.phrase')} *
                 <div className="af-input-row">
                   <input
                     value={form.phrase}
@@ -5705,7 +5733,7 @@ function App() {
                     value={formAiProvider}
                     onChange={(event) => setFormAiProvider(event.target.value as AiProvider)}
                   >
-                    <option value="default">기본</option>
+                    <option value="default">{t('common.all')}</option>
                     <option value="gemini">Gemini</option>
                   </select>
                   <button
@@ -5721,18 +5749,17 @@ function App() {
                     }}
                     disabled={isAutoFilling}
                   >
-                    {isAutoFilling ? (editingId ? '업데이트 중...' : '생성 중...') : editingId ? '업데이트' : '자동 생성'}
+                    {isAutoFilling ? (editingId ? t('common.updating') : t('common.generating')) : editingId ? t('common.update') : t('form.autoFill')}
                   </button>
                 </div>
                 <small className="af-msg">
-                  모델: {AI_PROVIDER_LABEL[formAiProvider]}
-                  {formAiProvider === 'gemini' && !GEMINI_API_KEY ? ' (API 키 필요)' : ''} · 유형 자동 판별:{' '}
-                  {ITEM_TYPE_LABEL[form.itemType]}
+                  {t('form.modelLabel', { model: AI_PROVIDER_LABEL[formAiProvider] })}
+                  {formAiProvider === 'gemini' && !GEMINI_API_KEY ? ` ${t('form.apiKeyNeeded')}` : ''} · {t('form.typeAuto', { type: ITEM_TYPE_LABEL[form.itemType] })}
                 </small>
                 {autoFillMsg && <small className="af-msg">{autoFillMsg}</small>}
               </label>
               <label>
-                한국어 뜻 *
+                {t('form.translation')} *
                 <textarea
                   className="translation-box"
                   rows={4}
@@ -5741,7 +5768,7 @@ function App() {
                 />
               </label>
               <label>
-                예문
+                {t('form.example')}
                 <textarea
                   rows={4}
                   value={form.example}
@@ -5750,9 +5777,9 @@ function App() {
               </label>
               <div className="profile-bind-row">
                 <label>
-                  카드 정보 프로파일
+                  {t('form.profileLabel')}
                   <select value={form.profileId} onChange={(event) => onFormProfileChange(event.target.value)}>
-                    <option value="">직접 입력 (프로파일 미사용)</option>
+                    <option value="">{t('form.directEntry')}</option>
                     {profiles.map((profile) => (
                       <option key={profile.id} value={profile.id}>
                         {profile.name}
@@ -5762,7 +5789,7 @@ function App() {
                 </label>
                 <div className="profile-bind-actions">
                   <button type="button" className="secondary" onClick={saveProfileFromCurrentForm}>
-                    현재 입력으로 프로파일 저장
+                    {t('form.saveProfile')}
                   </button>
                   {isFormUsingProfile && (
                     <button
@@ -5772,20 +5799,19 @@ function App() {
                         setForm((prev) => ({ ...prev, profileId: '' }))
                       }}
                     >
-                      프로파일 해제
+                      {t('form.releaseProfile')}
                     </button>
                   )}
                 </div>
                 {selectedFormProfile && (
                   <p className="profile-bind-hint">
-                    "{selectedFormProfile.name}" 프로파일을 사용하는 중입니다. 메타 정보는 프로파일 변경 시
-                    연결된 카드에 일괄 반영됩니다.
+                    {t('form.profileUsing', { name: selectedFormProfile.name })}
                   </p>
                 )}
               </div>
               <div className="row2">
                 <label>
-                  드라마 / 작품명
+                  {t('form.show')}
                   <input
                     list="show-keywords"
                     value={form.show}
@@ -5794,7 +5820,7 @@ function App() {
                   />
                 </label>
                 <label>
-                  에피소드
+                  {t('form.episode')}
                   <input
                     list="episode-keywords"
                     value={form.episode}
@@ -5805,7 +5831,7 @@ function App() {
               </div>
               <div className="row2">
                 <label>
-                  태그 (쉼표 구분)
+                  {t('form.tags')}
                   <input
                     list="tag-keywords"
                     value={form.tags}
@@ -5814,19 +5840,19 @@ function App() {
                   />
                 </label>
                 <label>
-                  덱(그룹)
+                  {t('form.deck')}
                   <input
                     list="deck-keywords"
                     value={form.deck}
                     onChange={(event) => setForm((prev) => ({ ...prev, deck: event.target.value }))}
-                    placeholder="예: 일상 회화, 비즈니스, 시험"
+                    placeholder={t('form.deckPlaceholder')}
                     disabled={isFormUsingProfile}
                   />
                 </label>
               </div>
               <div className="row2">
                 <label>
-                  사용빈도
+                  {t('form.difficulty')}
                   <select
                     value={form.difficulty}
                     onChange={(event) =>
@@ -5837,16 +5863,16 @@ function App() {
                     }
                     disabled={isFormUsingProfile}
                   >
-                    <option value={1}>★☆☆☆☆ 매우 낮음</option>
-                    <option value={2}>★★☆☆☆ 낮음</option>
-                    <option value={3}>★★★☆☆ 보통</option>
-                    <option value={4}>★★★★☆ 높음</option>
-                    <option value={5}>★★★★★ 매우 높음</option>
+                    <option value={1}>★☆☆☆☆ {t('list.freqVeryLow')}</option>
+                    <option value={2}>★★☆☆☆ {t('list.freqLow')}</option>
+                    <option value={3}>★★★☆☆ {t('list.freqMid')}</option>
+                    <option value={4}>★★★★☆ {t('list.freqHigh')}</option>
+                    <option value={5}>★★★★★ {t('list.freqVeryHigh')}</option>
                   </select>
                 </label>
               </div>
               <label>
-                메모
+                {t('form.notes')}
                 <textarea
                   value={form.notes}
                   onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
@@ -5855,10 +5881,10 @@ function App() {
               </label>
               <footer>
                 <button type="button" className="secondary" onClick={closeAddModal}>
-                  취소
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="primary">
-                  저장하기
+                  {t('form.saveBtn')}
                 </button>
               </footer>
             </form>
@@ -5893,8 +5919,8 @@ function App() {
             onClick={(event) => event.stopPropagation()}
           >
             <header>
-              <h3>상세 보기</h3>
-              <button type="button" onClick={() => setIsDetailOpen(false)} aria-label="닫기">
+              <h3>{t('det.title')}</h3>
+              <button type="button" onClick={() => setIsDetailOpen(false)} aria-label={t('common.close')}>
                 ✕
               </button>
             </header>
@@ -5910,19 +5936,19 @@ function App() {
                   >
                     {ITEM_TYPE_LABEL[detailItem.itemType ?? inferItemType(detailItem.phrase)]}
                   </span>
-                  <span className="det-freq-stars" aria-label={`사용빈도 ${detailItem.difficulty}단계`}>
+                  <span className="det-freq-stars" aria-label={t('det.freqAria', { n: detailItem.difficulty })}>
                     {'★'.repeat(detailItem.difficulty)}
                     <span className="det-freq-stars-empty">{'☆'.repeat(5 - detailItem.difficulty)}</span>
                   </span>
-                  <div className="det-view-count-group" aria-label="상세 보기 접속 횟수">
+                  <div className="det-view-count-group" aria-label={t('det.viewCount')}>
                     <span
                       className="det-view-count"
-                      title="지금까지 상세 보기를 연 횟수"
+                      title={t('det.viewCountTitle')}
                     >
                       <span className="det-view-count-icon" aria-hidden="true">👁</span>
                       <strong>{(detailItem.viewCount ?? 0).toLocaleString()}</strong>
                     </span>
-                    <div className="det-view-count-adjust" role="group" aria-label="횟수 구간">
+                    <div className="det-view-count-adjust" role="group" aria-label={t('det.viewCountRange')}>
                       {(() => {
                         const total = detailItem.viewCount ?? 0
                         // 구간 라벨: 0~50→50, 51~100→100, 101~200→200, ... (100단위 올림)
@@ -5940,7 +5966,7 @@ function App() {
                         return (
                           <span
                             className={`det-view-count-chip det-view-count-bucket ${tier}`}
-                            title={`현재 ${total}회 — ${bucket} 구간`}
+                            title={t('det.viewBucket', { total, bucket })}
                           >
                             {bucket}
                           </span>
@@ -5980,7 +6006,7 @@ function App() {
                 if (blocks.length === 0) {
                   return (
                     <section className="det-sec det-sec--meaning" aria-labelledby="det-meaning-heading">
-                      <h4 className="det-sec-title">한글 뜻</h4>
+                      <h4 className="det-sec-title">{t('det.meaning')}</h4>
                       <p className="det-trans">{detailItem.translation || '—'}</p>
                     </section>
                   )
@@ -5988,7 +6014,7 @@ function App() {
 
                 return (
                   <section className="det-sec det-sec--meanings-accordion">
-                    <h4 className="det-sec-title">뜻 &amp; 예문</h4>
+                    <h4 className="det-sec-title">{t('det.meaningEx')}</h4>
                     {allMeanings.map((meaning, idx) => {
                       const block = blocks[idx] ?? blocks[0]
                       const isOpen = openMeaningIdx === idx
@@ -6000,7 +6026,7 @@ function App() {
                             onClick={() => setOpenMeaningIdx(isOpen ? -1 : idx)}
                             aria-expanded={isOpen}
                           >
-                            <span className="meaning-accordion-num">뜻 {idx + 1}</span>
+                            <span className="meaning-accordion-num">{t('det.meaningNum', { n: idx + 1 })}</span>
                             <span className="meaning-accordion-text">{meaning}</span>
                             <span className="meaning-accordion-arrow">{isOpen ? '▲' : '▼'}</span>
                           </button>
@@ -6014,7 +6040,7 @@ function App() {
                                   {highlightPhrase(block.dialogue, detailItem.phrase)}
                                 </div>
                               ) : (
-                                <p className="det-empty-line">예문 없음</p>
+                                <p className="det-empty-line">{t('det.noExample')}</p>
                               )}
                             </div>
                           )}
@@ -6033,8 +6059,8 @@ function App() {
                             onClick={() => setOpenMeaningIdx(isOpen ? -1 : idx)}
                             aria-expanded={isOpen}
                           >
-                            <span className="meaning-accordion-num">뜻 {idx + 1}</span>
-                            <span className="meaning-accordion-text">{block.meaning || '기타'}</span>
+                            <span className="meaning-accordion-num">{t('det.meaningNum', { n: idx + 1 })}</span>
+                            <span className="meaning-accordion-text">{block.meaning || t('common.unknown')}</span>
                             <span className="meaning-accordion-arrow">{isOpen ? '▲' : '▼'}</span>
                           </button>
                           {isOpen && (
@@ -6047,7 +6073,7 @@ function App() {
                                   {highlightPhrase(block.dialogue, detailItem.phrase)}
                                 </div>
                               ) : (
-                                <p className="det-empty-line">예문 없음</p>
+                                <p className="det-empty-line">{t('det.noExample')}</p>
                               )}
                             </div>
                           )}
@@ -6060,7 +6086,7 @@ function App() {
 
               <section className="det-sec det-sec--extra" aria-labelledby="det-extra-heading">
                 <h4 id="det-extra-heading" className="det-sec-title">
-                  기타 · 태그 · 학습 상태
+                  {t('det.otherInfo')}
                 </h4>
                 <div className="det-extra-chips chips">
                   <span className="chip-status">{STATUS_LABEL[detailItem.status]}</span>
@@ -6075,11 +6101,11 @@ function App() {
                       className={`meta-note-btn${highlightedNoteBtn === 'study' ? ' is-highlighted' : ''}`}
                       onClick={() => handleNoteBtnClick('study', detailItem.id)}
                     >
-                      <strong>학습 내용</strong>
+                      <strong>{t('det.studyNote')}</strong>
                       <small>
                         {(detailItem.studyNote ?? '').trim()
-                          ? `${(detailItem.studyNote ?? '').trim().length}자`
-                          : '클릭해서 작성'}
+                          ? `${(detailItem.studyNote ?? '').trim().length} chars`
+                          : t('det.clickToWrite')}
                       </small>
                     </button>
                     {highlightedNoteBtn === 'study' && (
@@ -6087,9 +6113,9 @@ function App() {
                         {(detailItem.studyNote ?? '').trim() ? (
                           <p>{detailItem.studyNote}</p>
                         ) : (
-                          <p className="meta-note-tooltip--empty">저장된 학습 내용이 없습니다. 한 번 더 클릭하면 작성할 수 있습니다.</p>
+                          <p className="meta-note-tooltip--empty">{t('det.noStudyNote')}</p>
                         )}
-                        <small className="meta-note-tooltip-hint">한 번 더 클릭 → 편집</small>
+                        <small className="meta-note-tooltip-hint">{t('det.clickToEdit')}</small>
                       </div>
                     )}
                   </div>
@@ -6099,11 +6125,11 @@ function App() {
                       className={`meta-note-btn${highlightedNoteBtn === 'review' ? ' is-highlighted' : ''}`}
                       onClick={() => handleNoteBtnClick('review', detailItem.id)}
                     >
-                      <strong>복습 내용</strong>
+                      <strong>{t('det.reviewNote')}</strong>
                       <small>
                         {(detailItem.reviewNote ?? '').trim()
-                          ? `${(detailItem.reviewNote ?? '').trim().length}자`
-                          : '클릭해서 작성'}
+                          ? `${(detailItem.reviewNote ?? '').trim().length} chars`
+                          : t('det.clickToWrite')}
                       </small>
                     </button>
                     {highlightedNoteBtn === 'review' && (
@@ -6111,19 +6137,19 @@ function App() {
                         {(detailItem.reviewNote ?? '').trim() ? (
                           <p>{detailItem.reviewNote}</p>
                         ) : (
-                          <p className="meta-note-tooltip--empty">저장된 복습 내용이 없습니다. 한 번 더 클릭하면 작성할 수 있습니다.</p>
+                          <p className="meta-note-tooltip--empty">{t('det.noReviewNote')}</p>
                         )}
-                        <small className="meta-note-tooltip-hint">한 번 더 클릭 → 편집</small>
+                        <small className="meta-note-tooltip-hint">{t('det.clickToEdit')}</small>
                       </div>
                     )}
                   </div>
                   <div className="meta-date-cell">
                     <div className="meta-date-row">
-                      <small>추가일</small>
+                      <small>{t('det.dateAdded')}</small>
                       <strong>{dateText(detailItem.createdAt)}</strong>
                     </div>
                     <div className="meta-date-row">
-                      <small>최근 확인일</small>
+                      <small>{t('det.lastViewed')}</small>
                       <strong>{dateText(detailItem.lastViewedAt)}</strong>
                     </div>
                   </div>
@@ -6134,21 +6160,21 @@ function App() {
                     className={detailItem.status === 'new' ? 'is-active' : ''}
                     onClick={() => updateStatus(detailItem.id, 'new')}
                   >
-                    → 새 단어
+                    → {t('board.statusNew')}
                   </button>
                   <button
                     type="button"
                     className={detailItem.status === 'learning' ? 'is-active' : ''}
                     onClick={() => updateStatus(detailItem.id, 'learning')}
                   >
-                    → 학습 중
+                    → {t('board.statusLearn')}
                   </button>
                   <button
                     type="button"
                     className={detailItem.status === 'mastered' ? 'is-active' : ''}
                     onClick={() => updateStatus(detailItem.id, 'mastered')}
                   >
-                    → 완료
+                    → {t('board.statusDone')}
                   </button>
                 </div>
               </section>
@@ -6158,26 +6184,26 @@ function App() {
                 aria-labelledby="det-context-heading"
               >
                 <h4 id="det-context-heading" className="det-sec-title">
-                  추가 정보
+                  {t('det.extraInfo')}
                 </h4>
                 <dl className="det-dl">
-                  <dt>드라마 / 작품</dt>
+                  <dt>{t('det.show')}</dt>
                   <dd>{detailItem.show.trim() || '—'}</dd>
-                  <dt>에피소드</dt>
+                  <dt>{t('det.episode')}</dt>
                   <dd>{detailItem.episode.trim() || '—'}</dd>
-                  <dt>덱</dt>
+                  <dt>{t('det.deck')}</dt>
                   <dd>{detailItem.deck.trim() || '—'}</dd>
-                  <dt>사용빈도</dt>
+                  <dt>{t('det.frequency')}</dt>
                   <dd>{'★'.repeat(detailItem.difficulty)}{'☆'.repeat(5 - detailItem.difficulty)}</dd>
-                  <dt>카드 정보 프로파일</dt>
+                  <dt>{t('det.profile')}</dt>
                   <dd>
                     {detailItem.profileId
-                      ? detailProfile?.name ?? '(삭제된 프로파일)'
+                      ? detailProfile?.name ?? t('det.deletedProfile')
                       : '—'}
                   </dd>
                   {detailItem.notes.trim() ? (
                     <>
-                      <dt>메모</dt>
+                      <dt>{t('det.notes')}</dt>
                       <dd className="det-dd-notes">{detailItem.notes}</dd>
                     </>
                   ) : null}
@@ -6185,7 +6211,7 @@ function App() {
                 {detailPhraseWords.length >= 2 && (
                   <div className="det-phrase-words-inner" aria-labelledby="det-words-intro">
                     <p id="det-words-intro" className="det-phrase-words-intro">
-                      추가 정보는 포함된 단어 — 클릭하면 새 카드로 추가합니다
+                      {t('det.wordsIntro')}
                     </p>
                     <div className="det-phrase-words-btns">
                       {detailPhraseWords.map((word, index) => (
@@ -6205,10 +6231,10 @@ function App() {
             </div>
             <footer className="card-detail-footer">
               <button type="button" className="secondary" onClick={() => openEditModal(detailItem)}>
-                수정
+                {t('common.edit')}
               </button>
               <button type="button" className="danger" onClick={() => removeItem(detailItem.id)}>
-                삭제
+                {t('common.delete')}
               </button>
             </footer>
           </section>
@@ -6223,12 +6249,12 @@ function App() {
         >
           <section className="modal note-editor-modal" role="dialog" aria-modal="true">
             <header className="modal-header">
-              <h3>{noteEditor.kind === 'study' ? '학습 내용' : '복습 내용'}</h3>
+              <h3>{noteEditor.kind === 'study' ? t('note.study') : t('note.review')}</h3>
               <button
                 type="button"
                 className="icon-btn"
                 onClick={closeNoteEditor}
-                aria-label="닫기 (자동 저장됨)"
+                aria-label={t('note.closeAria')}
               >
                 ✕
               </button>
@@ -6240,8 +6266,8 @@ function App() {
                 maxLength={1000}
                 placeholder={
                   noteEditor.kind === 'study'
-                    ? '이 단어/구문에 대한 학습 메모를 자유롭게 작성하세요. (최대 1000자)'
-                    : '복습할 때 유용한 메모를 자유롭게 작성하세요. (최대 1000자)'
+                    ? t('note.studyHint')
+                    : t('note.reviewHint')
                 }
                 onChange={(event) =>
                   setNoteEditor((prev) =>
@@ -6251,13 +6277,13 @@ function App() {
                 autoFocus
               />
               <div className="note-editor-meta">
-                <small>{noteEditor.draft.length} / 1000자</small>
-                <small className="note-editor-hint">닫기를 누르면 자동 저장됩니다.</small>
+                <small>{t('note.charCount', { n: noteEditor.draft.length })}</small>
+                <small className="note-editor-hint">{t('note.autoSave')}</small>
               </div>
             </div>
             <footer className="modal-actions">
               <button type="button" className="primary" onClick={closeNoteEditor}>
-                닫기 (저장)
+                {t('note.closeBtn')}
               </button>
             </footer>
           </section>
