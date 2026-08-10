@@ -7,6 +7,7 @@ export type Lang = 'en' | 'ko'
 const translations = {
   // ── 공통 ─────────────────────────────────────────────────────────────
   'common.save':        { en: 'Save', ko: '저장' },
+  'common.more':        { en: 'More', ko: '더 보기' },
   'common.cancel':      { en: 'Cancel', ko: '취소' },
   'common.delete':      { en: 'Delete', ko: '삭제' },
   'common.edit':        { en: 'Edit', ko: '수정' },
@@ -33,6 +34,7 @@ const translations = {
   'nav.cards':      { en: 'Flashcards', ko: '플래시카드' },
   'nav.calendar':   { en: 'Calendar', ko: '캘린더' },
   'nav.analytics':  { en: '📊 Analytics', ko: '📊 학습 분석' },
+  'nav.main':       { en: 'Main navigation', ko: '모바일 주 메뉴' },
   'nav.speaking':   { en: '🎙️ Speaking', ko: '🎙️ 스피킹' },
 
   // ── 상태 ──────────────────────────────────────────────────────────────
@@ -407,6 +409,7 @@ const translations = {
   'det.viewCountTitle': { en: 'Total times this detail was opened', ko: '지금까지 상세 보기를 연 횟수' },
   'det.viewBucket':     { en: 'Current {total} — bucket {bucket}', ko: '현재 {total}회 — {bucket} 구간' },
   'det.viewCountRange': { en: 'View count range', ko: '횟수 구간' },
+  'det.listenPronun':   { en: 'Listen to pronunciation', ko: '영어 발음 듣기' },
 
   // ── 폼 모달 추가 ─────────────────────────────────────────────────────
   'form.directEntry':    { en: 'Direct entry (no profile)', ko: '직접 입력 (프로파일 미사용)' },
@@ -424,6 +427,16 @@ const translations = {
   'form.ocrApplyLine':   { en: 'Apply this line', ko: '이 줄만 적용' },
   'form.ocrApplySel':    { en: 'Apply selected lines', ko: '선택한 줄을 영어 구문에 적용' },
   'form.ocrApplyAll':    { en: 'Apply all text', ko: '전체 텍스트 적용' },
+  'form.duplicateConfirm': { en: '"{phrase}" is already registered.\n\nExisting entry: "{dup}" ({trans})\n\nSave anyway?', ko: '"{phrase}"은(는) 이미 등록된 단어/구문입니다.\n\n등록된 항목: "{dup}" ({trans})\n\n그래도 저장하시겠습니까?' },
+  'msg.idiomCheck':        { en: 'Check the idiomatic meaning of "{phrase}".\n\nNote: This phrase is an idiom and may have a different meaning from its literal translation.', ko: '"{phrase}"의 관용적 의미를 확인해 주세요.\n\n참고: 이 구문은 이디엄으로 직역과 다른 의미를 가질 수 있습니다.' },
+  'msg.meaningCheck':      { en: 'Please verify the meaning of "{phrase}".', ko: '"{phrase}"의 의미를 확인해 주세요.' },
+  'err.quota429':          { en: 'Quota exceeded (429)', ko: '쿼터 초과 (429)' },
+  'err.model404':          { en: 'Model not found (404)', ko: '모델 없음 (404)' },
+  'err.server503':         { en: 'Server overloaded (503)', ko: '서버 과부하 (503)' },
+  'err.authFail':          { en: 'Auth failed', ko: '인증 실패' },
+  'err.noApiKey':          { en: 'API key missing', ko: 'API 키 없음' },
+  'err.badResponse':       { en: 'Invalid response format', ko: '응답 형식 오류' },
+  'err.httpCode':          { en: 'Error {code}', ko: '오류 {code}' },
 
   // ── 노트 에디터 ──────────────────────────────────────────────────────
   'note.charCount':     { en: '{n} / 1000 chars', ko: '{n} / 1000자' },
@@ -497,6 +510,9 @@ const translations = {
 
   // ── 리스트 빈 결과 ────────────────────────────────────────────────────
   'list.empty':         { en: 'No items match your filters. Try different search terms or filters.', ko: '조건에 맞는 항목이 없습니다. 검색이나 필터를 바꿔 보세요.' },
+  'list.filterByTag':   { en: 'Click to filter by this tag', ko: '클릭하면 이 태그로 필터' },
+  'list.filterByStatus':{ en: 'Click to filter by this status', ko: '클릭하면 이 상태로 필터' },
+  'list.filterByFreq':  { en: 'Click to filter by this frequency', ko: '클릭하면 동일 빈도로 필터' },
 
   // ── 분석 랭킹 ────────────────────────────────────────────────────────
   'analytics.rankTitle':   { en: 'Top 30 by Study Volume', ko: '기간 내 학습량 순위 (Top 30)' },

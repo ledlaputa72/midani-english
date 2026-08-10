@@ -2599,7 +2599,7 @@ function App() {
       )
       if (duplicate) {
         const confirm = window.confirm(
-          `"${form.phrase.trim()}"은(는) 이미 등록된 단어/구문입니다.\n\n등록된 항목: "${duplicate.phrase}" (${duplicate.translation})\n\n그래도 저장하시겠습니까?`,
+          t('form.duplicateConfirm', { phrase: form.phrase.trim(), dup: duplicate.phrase, trans: duplicate.translation }),
         )
         if (!confirm) return
       }
@@ -2670,7 +2670,7 @@ function App() {
       )
       if (duplicate) {
         const confirm = window.confirm(
-          `"${phrase}"은(는) 이미 등록된 단어/구문입니다.\n\n등록된 항목: "${duplicate.phrase}" (${duplicate.translation})\n\n그래도 계속 진행하시겠습니까?`,
+          t('form.duplicateConfirm', { phrase, dup: duplicate.phrase, trans: duplicate.translation }),
         )
         if (!confirm) return
       }
@@ -2680,7 +2680,7 @@ function App() {
     const phraseOverride = PHRASE_USAGE_OVERRIDES[normalizeForContains(phrase)]
 
     setIsAutoFilling(true)
-    setAutoFillMsg('자동 생성 중...')
+    setAutoFillMsg(t('common.generating'))
 
     let koMeaning = ''
     let enExample = ''
@@ -2804,13 +2804,13 @@ function App() {
       // 이디엄으로 판별됐으나 override도 없고 Gemini도 실패한 경우
       // 사전 직역 대신 의미 확인 안내 메시지로 대체
       if (resolvedItemType === 'idiom' && !phraseOverride && koMeaning) {
-        koMeaning = `"${phrase}"의 관용적 의미를 확인해 주세요.\n\n참고: 이 구문은 이디엄으로 직역과 다른 의미를 가질 수 있습니다.`
+        koMeaning = t('msg.idiomCheck', { phrase })
         altMeanings = []
       }
     }
 
     if (!koMeaning) {
-      koMeaning = `"${phrase}"의 의미를 확인해 주세요.`
+      koMeaning = t('msg.meaningCheck', { phrase })
     }
     if (!enExample) {
       enExample = inferredType !== 'vocabulary'
@@ -2926,15 +2926,15 @@ function App() {
     const summarizeGeminiError = (raw: string | undefined): string => {
       if (!raw) return 'unknown'
       // 가장 흔한 패턴 우선 매칭
-      if (/http-429|exceeded.*quota|RESOURCE_EXHAUSTED/i.test(raw)) return '쿼터 초과 (429)'
-      if (/http-404/i.test(raw)) return '모델 없음 (404)'
-      if (/http-503|overloaded|UNAVAILABLE/i.test(raw)) return '서버 과부하 (503)'
-      if (/http-401|http-403|API_KEY|PERMISSION/i.test(raw)) return '인증 실패'
-      if (/missing-key/i.test(raw)) return 'API 키 없음'
-      if (/invalid-json|empty-fields/i.test(raw)) return '응답 형식 오류'
-      // 첫 번째 http-XXX 또는 첫 단어만 추출
+      if (/http-429|exceeded.*quota|RESOURCE_EXHAUSTED/i.test(raw)) return t('err.quota429')
+      if (/http-404/i.test(raw)) return t('err.model404')
+      if (/http-503|overloaded|UNAVAILABLE/i.test(raw)) return t('err.server503')
+      if (/http-401|http-403|API_KEY|PERMISSION/i.test(raw)) return t('err.authFail')
+      if (/missing-key/i.test(raw)) return t('err.noApiKey')
+      if (/invalid-json|empty-fields/i.test(raw)) return t('err.badResponse')
+      // extract first http-XXX code or first word
       const httpMatch = raw.match(/http-(\d{3})/i)
-      if (httpMatch) return `오류 ${httpMatch[1]}`
+      if (httpMatch) return t('err.httpCode', { code: httpMatch[1] })
       return raw.slice(0, 40)
     }
     const providerMsg =
@@ -2947,8 +2947,8 @@ function App() {
             : `${AI_PROVIDER_LABEL.default} 사용`
     setAutoFillMsg(
       forceUpdate
-        ? `뜻/예문을 최신 자동 생성 내용으로 업데이트했습니다. (${providerMsg})`
-        : `뜻/예문 자동 채우기 완료 (${providerMsg}).`,
+        ? t('msg.autoFillUpdate', { provider: providerMsg })
+        : t('msg.autoFillDone', { provider: providerMsg }),
     )
     setIsAutoFilling(false)
   }
@@ -3348,7 +3348,7 @@ function App() {
                 type="button"
                 className="mobile-more-trigger"
                 onClick={() => setIsMobileMoreOpen((prev) => !prev)}
-                aria-label="더 보기"
+                aria-label={t('common.more')}
               >
                 ⋯
               </button>
@@ -3739,7 +3739,7 @@ function App() {
                                 <span
                                   key={tag}
                                   className={`list-tag-pill list-filter-chip${tagFilter === tag ? ' chip-active' : ''}`}
-                                  title="클릭하면 이 태그로 필터"
+                                  title={t('list.filterByTag')}
                                   onClick={(event) => {
                                     event.stopPropagation()
                                     setTagFilter(tagFilter === tag ? 'all' : tag)
@@ -3756,7 +3756,7 @@ function App() {
                         <td className="col-status">
                           <span
                             className={`list-status-pill list-status-${item.status} list-filter-chip${statusFilter === item.status ? ' chip-active' : ''}`}
-                            title="클릭하면 이 상태로 필터"
+                            title={t('list.filterByStatus')}
                             onClick={(event) => {
                               event.stopPropagation()
                               setStatusFilter(statusFilter === item.status ? 'all' : item.status)
@@ -3769,7 +3769,7 @@ function App() {
                           <span
                             className={`list-star-row list-filter-chip${frequencyFilter === String(item.difficulty) ? ' chip-active' : ''}`}
                             aria-label={t('freq.ariaFilter', { n: item.difficulty })}
-                            title="클릭하면 동일 빈도로 필터"
+                            title={t('list.filterByFreq')}
                             onClick={(event) => {
                               event.stopPropagation()
                               setFrequencyFilter(
@@ -3791,7 +3791,7 @@ function App() {
                             <button
                               type="button"
                               className="list-icon-btn list-icon-edit"
-                              title="수정"
+                              title={t('common.edit')}
                               onClick={() => openEditModal(item)}
                             >
                               ✏️
@@ -3799,7 +3799,7 @@ function App() {
                             <button
                               type="button"
                               className="list-icon-btn list-icon-del"
-                              title="삭제"
+                              title={t('common.delete')}
                               onClick={() => removeItem(item.id)}
                             >
                               🗑️
@@ -5304,7 +5304,7 @@ function App() {
       </main>
 
       {createPortal(
-        <nav className="mobile-bottom-nav" aria-label="모바일 주 메뉴">
+        <nav className="mobile-bottom-nav" aria-label={t('nav.main')}>
           {NAV_ITEMS.map((item) => (
             <button
               key={`mobile-${item.id}`}
@@ -5635,7 +5635,7 @@ function App() {
                       void runOcrRecognize()
                     }}
                   >
-                    {isOcrRunning ? `텍스트 인식 중… ${ocrProgress}%` : '텍스트 인식 (OCR)'}
+                    {isOcrRunning ? t('ocr.running', { pct: ocrProgress }) : t('ocr.run')}
                   </button>
                   {ocrPreviewUrl && (
                     <button
@@ -5983,7 +5983,7 @@ function App() {
                   <button
                     type="button"
                     className="speak-btn speak-btn--phonetic"
-                    title="영어 발음 듣기"
+                    title={t('det.listenPronun')}
                     onClick={() => speakEnglish(detailItem.phrase)}
                   >
                     🔊
