@@ -89,6 +89,12 @@ const translations = {
   'settings.exportCsv':      { en: 'Export CSV', ko: 'CSV 내보내기' },
   'settings.language':       { en: 'Language', ko: '언어' },
   'settings.languageDesc':   { en: 'App display language', ko: '앱 표시 언어' },
+  'settings.geminiBlock':    { en: 'Block Gemini AI', ko: 'Gemini AI 차단' },
+  'settings.geminiBlockDesc':{ en: 'Completely disable all Gemini API calls in this app', ko: '앱에서 Gemini API 호출을 완전히 차단합니다' },
+  'settings.geminiBlockedOn': { en: 'Gemini AI blocked.', ko: 'Gemini AI가 차단되었습니다.' },
+  'settings.geminiBlockedOff':{ en: 'Gemini AI enabled.', ko: 'Gemini AI가 활성화되었습니다.' },
+  'settings.geminiBlockedLabel': { en: 'Blocked', ko: '차단됨' },
+  'settings.geminiEnabledLabel': { en: 'Allowed', ko: '허용됨' },
 
   // ── 페이지 헤더 ──────────────────────────────────────────────────────
   'page.list.title':   { en: '📋 Full List', ko: '📋 전체 목록' },

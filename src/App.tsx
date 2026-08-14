@@ -59,6 +59,7 @@ type CardInfoProfile = {
 
 type AppSettings = {
   defaultAiProvider: AiProvider
+  geminiBlocked: boolean   // 앱에서 Gemini API 호출 완전 차단 여부
 }
 
 type FormState = {
@@ -83,6 +84,7 @@ const GEMINI_API_KEY = (import.meta.env.VITE_GEMINI_API_KEY ?? '').trim()
 const CARD_AUTO_ADVANCE_MS = 8000
 const DEFAULT_APP_SETTINGS: AppSettings = {
   defaultAiProvider: 'default',
+  geminiBlocked: false,
 }
 
 const ITEM_TYPE_LABEL: Record<ItemType, string> = {
@@ -258,6 +260,7 @@ function normalizeAppSettings(source: unknown): AppSettings {
   const raw = (source ?? {}) as Partial<AppSettings>
   return {
     defaultAiProvider: raw.defaultAiProvider === 'gemini' ? 'gemini' : 'default',
+    geminiBlocked: raw.geminiBlocked === true,
   }
 }
 
@@ -1408,6 +1411,8 @@ function App() {
   const [syncLoading, setSyncLoading] = useState(false)
   const [authError, setAuthError] = useState('')
   const [geminiEnabled, setGeminiEnabled] = useState(false)
+  // 서버 env(geminiEnabled) AND 앱 설정(!geminiBlocked) 두 조건 모두 충족해야 사용 가능
+  const isGeminiAllowed = geminiEnabled && !appSettings.geminiBlocked
   const [syncError, setSyncError] = useState('')
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -2444,6 +2449,13 @@ function App() {
     setSettingsMsg(t('msg.aiModelSaved', { model: AI_PROVIDER_LABEL[provider] }))
   }
 
+  const toggleGeminiBlocked = async () => {
+    const nextBlocked = !appSettings.geminiBlocked
+    const nextSettings: AppSettings = { ...appSettings, geminiBlocked: nextBlocked }
+    await persistAll(items, profiles, nextSettings)
+    setSettingsMsg(nextBlocked ? t('settings.geminiBlockedOn') : t('settings.geminiBlockedOff'))
+  }
+
   const updateStatus = (id: string, status: Status) => {
     const next = items.map((item) => (item.id === id ? { ...item, status } : item))
     persist(next)
@@ -2755,10 +2767,10 @@ function App() {
       }
     }
 
-    const shouldUseGemini = provider === 'gemini' && geminiEnabled
+    const shouldUseGemini = provider === 'gemini' && isGeminiAllowed
     const geminiResponse = shouldUseGemini
       ? await generateMeaningAndExampleWithGemini(phrase, inferredType)
-      : { result: null, error: provider === 'gemini' ? (geminiEnabled ? 'missing-key' : 'ai-disabled') : undefined }
+      : { result: null, error: provider === 'gemini' ? (isGeminiAllowed ? 'missing-key' : 'ai-disabled') : undefined }
     const geminiResult = geminiResponse.result
     let resolvedItemType = inferredType
     if (geminiResult) {
@@ -5297,6 +5309,7 @@ function App() {
               itemType: item.itemType ?? inferItemType(item.phrase),
               frequency: item.difficulty,
             }))}
+            geminiAllowed={isGeminiAllowed}
           />
         )}
       </main>
@@ -5356,6 +5369,20 @@ function App() {
                     ? t('settings.aiGeminiWarn')
                     : ''}
                 </small>
+              </div>
+            </div>
+            <div className="settings-block">
+              <small>{t('settings.geminiBlock')}</small>
+              <div className="ai-provider-row" style={{ alignItems: 'center', gap: '12px' }}>
+                <button
+                  type="button"
+                  className={appSettings.geminiBlocked ? 'danger' : 'secondary'}
+                  onClick={() => void toggleGeminiBlocked()}
+                  style={{ minWidth: '110px' }}
+                >
+                  {appSettings.geminiBlocked ? `🚫 ${t('settings.geminiBlockedLabel')}` : `✅ ${t('settings.geminiEnabledLabel')}`}
+                </button>
+                <small>{t('settings.geminiBlockDesc')}</small>
               </div>
             </div>
             <div className="settings-block">
@@ -5745,15 +5772,15 @@ function App() {
                       const force = Boolean(editingId) || isRetryOnSamePhrase
                       autoFillFromEnglish(force, formAiProvider)
                     }}
-                    disabled={isAutoFilling || (formAiProvider === 'gemini' && !geminiEnabled)}
-                    title={formAiProvider === 'gemini' && !geminiEnabled ? t('err.aiDisabled') : undefined}
+                    disabled={isAutoFilling || (formAiProvider === 'gemini' && !isGeminiAllowed)}
+                    title={formAiProvider === 'gemini' && !isGeminiAllowed ? t('err.aiDisabled') : undefined}
                   >
                     {isAutoFilling ? (editingId ? t('common.updating') : t('common.generating')) : editingId ? t('common.update') : t('form.autoFill')}
                   </button>
                 </div>
                 <small className="af-msg">
                   {t('form.modelLabel', { model: AI_PROVIDER_LABEL[formAiProvider] })}
-                  {formAiProvider === 'gemini' && !geminiEnabled ? ` ${t('err.aiDisabled')}` : ''} · {t('form.typeAuto', { type: ITEM_TYPE_LABEL[form.itemType] })}
+                  {formAiProvider === 'gemini' && !isGeminiAllowed ? ` ${t('err.aiDisabled')}` : ''} · {t('form.typeAuto', { type: ITEM_TYPE_LABEL[form.itemType] })}
                 </small>
                 {autoFillMsg && <small className="af-msg">{autoFillMsg}</small>}
               </label>

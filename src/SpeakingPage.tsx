@@ -683,10 +683,11 @@ function isStudyCategory(cat: Category): cat is StudyCategory {
 
 type SpeakingPageProps = {
   studyItems?: StudyListItem[]
+  geminiAllowed?: boolean   // App에서 내려주는 통합 Gemini 허용 여부
 }
 
 // ── 메인 컴포넌트 ───────────────────────────────────────────
-export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
+export default function SpeakingPage({ studyItems = [], geminiAllowed: geminiAllowedProp }: SpeakingPageProps) {
   const { t, lang } = useLang()
 
   const [sessionState, setSessionState] = useState<SessionState>('selecting')
@@ -707,7 +708,9 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   const [lastUserAttempt, setLastUserAttempt] = useState('')
   const [shadowBoxVisible, setShadowBoxVisible] = useState(true)
   const [autoMode, setAutoMode] = useState(false)
-  const [geminiEnabled, setGeminiEnabled] = useState(false)
+  // prop이 전달된 경우 그것을 우선 사용, 없으면 /api/config로 독립 조회
+  const [geminiEnabledLocal, setGeminiEnabledLocal] = useState(false)
+  const geminiEnabled = geminiAllowedProp !== undefined ? geminiAllowedProp : geminiEnabledLocal
 
   const recognitionRef = useRef<any>(null)
   const systemPromptRef = useRef<string>('')
@@ -721,11 +724,12 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   const runAutoTurnRef = useRef<() => void>(() => {})
 
   useEffect(() => {
+    if (geminiAllowedProp !== undefined) return  // prop이 있으면 fetch 불필요
     fetch('/api/config')
       .then((r) => r.json())
-      .then((data) => setGeminiEnabled(!!data?.geminiEnabled))
-      .catch(() => setGeminiEnabled(false))
-  }, [])
+      .then((data) => setGeminiEnabledLocal(!!data?.geminiEnabled))
+      .catch(() => setGeminiEnabledLocal(false))
+  }, [geminiAllowedProp])
 
   useEffect(() => {
     messagesRef.current = messages
