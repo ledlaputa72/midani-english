@@ -437,6 +437,7 @@ const translations = {
   'err.noApiKey':          { en: 'API key missing', ko: 'API 키 없음' },
   'err.badResponse':       { en: 'Invalid response format', ko: '응답 형식 오류' },
   'err.httpCode':          { en: 'Error {code}', ko: '오류 {code}' },
+  'err.aiDisabled':        { en: 'AI feature is currently paused', ko: 'AI 기능이 일시 중지되었습니다' },
 
   // ── 노트 에디터 ──────────────────────────────────────────────────────
   'note.charCount':     { en: '{n} / 1000 chars', ko: '{n} / 1000자' },

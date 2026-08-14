@@ -1,3 +1,5 @@
+import { isAiEnabled, AI_DISABLED_RESPONSE } from './_gemini-gate.js'
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -5,6 +7,8 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  if (!isAiEnabled()) return res.status(503).json(AI_DISABLED_RESPONSE)
 
   const apiKey = (process.env.VITE_GEMINI_API_KEY ?? '').trim()
   if (!apiKey) return res.status(500).json({ error: 'missing-key' })

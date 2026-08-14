@@ -13,7 +13,10 @@ async function callGeminiChat(systemInstruction: string, contents: GeminiContent
     body: JSON.stringify({ systemInstruction, contents }),
   })
   const data = await res.json()
-  if (!res.ok || !data.text) throw new Error(data.error || 'gemini-chat-failed')
+  if (!res.ok || !data.text) {
+    const code = (data as { code?: string }).code
+    throw new Error(code === 'AI_DISABLED' ? 'AI_DISABLED' : (data.error || 'gemini-chat-failed'))
+  }
   return data.text as string
 }
 
@@ -603,7 +606,10 @@ async function speak(text: string, onEnd?: () => void, gender: VoiceGender = 'ma
       body: JSON.stringify({ text, voice: ttsVoiceFor(gender) }),
     })
     const data = await res.json()
-    if (!res.ok || !data.audio) throw new Error(data.error || 'tts-failed')
+    if (!res.ok || !data.audio) {
+      const code = (data as { code?: string }).code
+      throw new Error(code === 'AI_DISABLED' ? 'AI_DISABLED' : (data.error || 'tts-failed'))
+    }
 
     try {
       const ctx = getAudioCtx()
@@ -701,6 +707,7 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   const [lastUserAttempt, setLastUserAttempt] = useState('')
   const [shadowBoxVisible, setShadowBoxVisible] = useState(true)
   const [autoMode, setAutoMode] = useState(false)
+  const [geminiEnabled, setGeminiEnabled] = useState(false)
 
   const recognitionRef = useRef<any>(null)
   const systemPromptRef = useRef<string>('')
@@ -712,6 +719,13 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
   const recognitionRetryCountRef = useRef(0)
   const autoModeRef = useRef(false)
   const runAutoTurnRef = useRef<() => void>(() => {})
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then((r) => r.json())
+      .then((data) => setGeminiEnabled(!!data?.geminiEnabled))
+      .catch(() => setGeminiEnabled(false))
+  }, [])
 
   useEffect(() => {
     messagesRef.current = messages
@@ -877,13 +891,17 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
           isProcessingRef.current = false
           proceedAfterAi(aiText)
         }
-      } catch {
+      } catch (err) {
         isProcessingRef.current = false
-        setStatusText(t('sp.status.error'))
+        if (err instanceof Error && err.message === 'AI_DISABLED') {
+          setStatusText(t('err.aiDisabled'))
+        } else {
+          setStatusText(t('sp.status.error'))
+        }
         setSessionState('ready')
       }
     },
-    [isMuted, proceedAfterAi],
+    [isMuted, proceedAfterAi, t],
   )
 
   // ── Auto 대화: 사용자 대신 AI가 학습자 역할의 다음 발화를 만들어 대화를 이어간다 ──
@@ -920,11 +938,11 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
       } else {
         sendToAI(autoUserText)
       }
-    } catch {
-      setStatusText(t('sp.status.autoError'))
+    } catch (err) {
+      setStatusText(err instanceof Error && err.message === 'AI_DISABLED' ? t('err.aiDisabled') : t('sp.status.autoError'))
       setSessionState('ready')
     }
-  }, [sendToAI, isMuted])
+  }, [sendToAI, isMuted, t])
 
   useEffect(() => {
     runAutoTurnRef.current = runAutoTurn
@@ -1018,7 +1036,11 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
           proceedAfterAi(aiText)
         }
       } catch (err) {
-        setStatusText(t('sp.status.startError', { msg: err instanceof Error ? err.message : t('common.unknown') }))
+        if (err instanceof Error && err.message === 'AI_DISABLED') {
+          setStatusText(t('err.aiDisabled'))
+        } else {
+          setStatusText(t('sp.status.startError', { msg: err instanceof Error ? err.message : t('common.unknown') }))
+        }
         setSessionState('idle')
       }
     },
@@ -1234,7 +1256,10 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
           <h2>{t('sp.ui.title')}</h2>
           <p>{t('sp.ui.desc')}</p>
         </div>
-        {statusText !== t('sp.status.selectCat') && (
+        {!geminiEnabled && (
+          <p className="speaking-error">{t('err.aiDisabled')}</p>
+        )}
+        {geminiEnabled && statusText !== t('sp.status.selectCat') && (
           <p className={statusText.toLowerCase().includes('error') || statusText.includes('오류') ? 'speaking-error' : 'speaking-tip'}>
             {statusText}
           </p>
@@ -1484,7 +1509,8 @@ export default function SpeakingPage({ studyItems = [] }: SpeakingPageProps) {
 
             <button
               className="speaking-mic-btn speaking-start-btn"
-              disabled={selectedPatternKeys.size === 0}
+              disabled={selectedPatternKeys.size === 0 || !geminiEnabled}
+              title={!geminiEnabled ? t('err.aiDisabled') : undefined}
               onClick={() => {
                 unlockTtsAudio()
                 if (selectedCat) startSession(selectedCat)

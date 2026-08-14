@@ -85,22 +85,10 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   defaultAiProvider: 'default',
 }
 
-// These are rebuilt inside App() via useLang() — see below.
-const STATUS_LABEL_STATIC: Record<Status, string> = {
-  new: 'New',
-  learning: 'Learning',
-  mastered: 'Mastered',
-}
-
 const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   vocabulary: 'Vocabulary',
   expression: 'Expression',
   idiom: 'Idiom',
-}
-
-const AI_PROVIDER_LABEL_STATIC: Record<AiProvider, string> = {
-  default: 'Dictionary + Translation',
-  gemini: 'Gemini',
 }
 
 const NAV_ITEMS_STATIC: Array<{ id: Page; labelKey: string }> = [
@@ -1161,8 +1149,9 @@ async function generateMeaningAndExampleWithGemini(
       body: JSON.stringify({ prompt }),
     })
     if (!res.ok) {
-      const errData = (await res.json().catch(() => ({}))) as { error?: string }
-      return { result: null, error: errData.error ?? `http-${res.status}` }
+      const errData = (await res.json().catch(() => ({}))) as { error?: string; code?: string }
+      const errorKey = errData.code === 'AI_DISABLED' ? 'ai-disabled' : (errData.error ?? `http-${res.status}`)
+      return { result: null, error: errorKey }
     }
     const data = (await res.json()) as { text?: string; error?: string }
     if (data.error) return { result: null, error: data.error }
@@ -1418,6 +1407,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true)
   const [syncLoading, setSyncLoading] = useState(false)
   const [authError, setAuthError] = useState('')
+  const [geminiEnabled, setGeminiEnabled] = useState(false)
   const [syncError, setSyncError] = useState('')
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -1616,6 +1606,13 @@ function App() {
     },
     [],
   )
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then((r) => r.json())
+      .then((data) => setGeminiEnabled(!!data?.geminiEnabled))
+      .catch(() => setGeminiEnabled(false))
+  }, [])
 
   useEffect(() => {
     if (!firebaseReady || !auth) {
@@ -2758,10 +2755,10 @@ function App() {
       }
     }
 
-    const shouldUseGemini = provider === 'gemini' && Boolean(GEMINI_API_KEY)
+    const shouldUseGemini = provider === 'gemini' && geminiEnabled
     const geminiResponse = shouldUseGemini
       ? await generateMeaningAndExampleWithGemini(phrase, inferredType)
-      : { result: null, error: provider === 'gemini' ? 'missing-key' : undefined }
+      : { result: null, error: provider === 'gemini' ? (geminiEnabled ? 'missing-key' : 'ai-disabled') : undefined }
     const geminiResult = geminiResponse.result
     let resolvedItemType = inferredType
     if (geminiResult) {
@@ -2925,6 +2922,7 @@ function App() {
 
     const summarizeGeminiError = (raw: string | undefined): string => {
       if (!raw) return 'unknown'
+      if (/ai-disabled|AI_DISABLED/i.test(raw)) return t('err.aiDisabled')
       // 가장 흔한 패턴 우선 매칭
       if (/http-429|exceeded.*quota|RESOURCE_EXHAUSTED/i.test(raw)) return t('err.quota429')
       if (/http-404/i.test(raw)) return t('err.model404')
@@ -5747,14 +5745,15 @@ function App() {
                       const force = Boolean(editingId) || isRetryOnSamePhrase
                       autoFillFromEnglish(force, formAiProvider)
                     }}
-                    disabled={isAutoFilling}
+                    disabled={isAutoFilling || (formAiProvider === 'gemini' && !geminiEnabled)}
+                    title={formAiProvider === 'gemini' && !geminiEnabled ? t('err.aiDisabled') : undefined}
                   >
                     {isAutoFilling ? (editingId ? t('common.updating') : t('common.generating')) : editingId ? t('common.update') : t('form.autoFill')}
                   </button>
                 </div>
                 <small className="af-msg">
                   {t('form.modelLabel', { model: AI_PROVIDER_LABEL[formAiProvider] })}
-                  {formAiProvider === 'gemini' && !GEMINI_API_KEY ? ` ${t('form.apiKeyNeeded')}` : ''} · {t('form.typeAuto', { type: ITEM_TYPE_LABEL[form.itemType] })}
+                  {formAiProvider === 'gemini' && !geminiEnabled ? ` ${t('err.aiDisabled')}` : ''} · {t('form.typeAuto', { type: ITEM_TYPE_LABEL[form.itemType] })}
                 </small>
                 {autoFillMsg && <small className="af-msg">{autoFillMsg}</small>}
               </label>

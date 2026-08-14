@@ -1,5 +1,9 @@
 // 진단용 엔드포인트: 사용 가능한 모델 목록 확인
+import { isAiEnabled, AI_DISABLED_RESPONSE } from './_gemini-gate.js'
+
 export default async function handler(req, res) {
+  if (!isAiEnabled()) return res.status(503).json(AI_DISABLED_RESPONSE)
+
   const apiKey = (process.env.VITE_GEMINI_API_KEY ?? '').trim()
 
   const result = {
